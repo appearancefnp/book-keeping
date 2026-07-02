@@ -8,7 +8,7 @@ import { postApprovedBankMatch } from '../banking/confirm-match.js';
 import { trialBalance } from '../ledger/balances.js';
 
 /** Wraps a handler: resolves auth+RBAC, maps errors to 401/403, else runs the body with a TenantContext. */
-async function authed(req: AuthedRequest, fn: (ctx: import('../tenancy/context.js').TenantContext) => Promise<ApiResponse>): Promise<ApiResponse> {
+export async function authed(req: AuthedRequest, fn: (ctx: import('../tenancy/context.js').TenantContext) => Promise<ApiResponse>): Promise<ApiResponse> {
   let ctx;
   try {
     ctx = await resolveTenantContext(req.token, req.clientCompanyId, req.atUnixSeconds);
