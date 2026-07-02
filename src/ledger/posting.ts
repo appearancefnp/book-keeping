@@ -17,11 +17,12 @@ const entrySchema = z.object({
   currency: z.string().length(3),
   lines: z.array(lineSchema).min(2),
   sourceDocumentId: z.string().uuid().nullable().optional(),
+  reversesEntryId: z.string().uuid().nullable().optional(),
 });
 
 export interface NewJournalLine { accountCode: string; debit: string; credit: string; description?: string; }
 export interface NewJournalEntry {
-  date: string; memo: string; currency: string; lines: NewJournalLine[]; sourceDocumentId?: string | null;
+  date: string; memo: string; currency: string; lines: NewJournalLine[]; sourceDocumentId?: string | null; reversesEntryId?: string | null;
 }
 export interface JournalEntryRow {
   id: string; entryDate: string; memo: string; currency: string;
@@ -60,9 +61,9 @@ export async function postEntry(
 
   // 4. Insert entry + lines.
   const entryRes = await tx.query(
-    `INSERT INTO journal_entries(client_company_id, entry_date, memo, currency, source_document_id)
-     VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-    [ctx.clientCompanyId, entry.date, entry.memo, entry.currency, entry.sourceDocumentId ?? null],
+    `INSERT INTO journal_entries(client_company_id, entry_date, memo, currency, source_document_id, reverses_entry_id)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+    [ctx.clientCompanyId, entry.date, entry.memo, entry.currency, entry.sourceDocumentId ?? null, entry.reversesEntryId ?? null],
   );
   const entryId = entryRes.rows[0].id as string;
 
@@ -105,4 +106,36 @@ export async function getEntry(
     currency: row.currency,
     lines: lines.rows.map((l) => ({ accountId: l.account_id, debit: l.debit, credit: l.credit, description: l.description })),
   };
+}
+
+export async function reverseEntry(
+  tx: PoolClient, ctx: TenantContext, entryId: string, memo: string,
+): Promise<{ entryId: string }> {
+  // Read the original entry — explicit tenant predicate in addition to RLS.
+  const orig = await tx.query(
+    'SELECT entry_date, currency FROM journal_entries WHERE id = $1 AND client_company_id = $2',
+    [entryId, ctx.clientCompanyId],
+  );
+  if (!orig.rowCount) throw new Error(`Entry not found: ${entryId}`);
+
+  // Read the original lines with account codes — explicit tenant predicate in addition to RLS.
+  const lines = await tx.query(
+    `SELECT a.code AS "accountCode", jl.debit::text AS debit, jl.credit::text AS credit, jl.description
+     FROM journal_lines jl JOIN accounts a ON a.id = jl.account_id
+     WHERE jl.entry_id = $1 AND jl.client_company_id = $2 ORDER BY jl.id`,
+    [entryId, ctx.clientCompanyId],
+  );
+
+  // Build a swapped entry (debit↔credit) and post it via the same validated path.
+  // Pass reversesEntryId at INSERT time — no post-hoc UPDATE (which would violate the append-only trigger).
+  const swapped: NewJournalEntry = {
+    date: orig.rows[0].entry_date.toISOString().slice(0, 10),
+    memo,
+    currency: orig.rows[0].currency,
+    lines: lines.rows.map((l) => ({
+      accountCode: l.accountCode, debit: l.credit, credit: l.debit, description: l.description ?? undefined,
+    })),
+    reversesEntryId: entryId,
+  };
+  return postEntry(tx, ctx, swapped);
 }
