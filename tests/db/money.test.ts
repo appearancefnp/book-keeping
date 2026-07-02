@@ -14,3 +14,8 @@ test('toCents rejects more than two decimal places', () => {
 test('sumCents adds a list of decimal strings exactly', () => {
   expect(sumCents(['0.10', '0.20'])).toBe(30n); // the classic 0.1 + 0.2 float trap
 });
+
+test('toCents parses negative values', () => {
+  expect(toCents('-5.50')).toBe(-550n);
+  expect(toCents('-0.05')).toBe(-5n);
+});
