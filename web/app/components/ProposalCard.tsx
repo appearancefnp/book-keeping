@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import type { Proposal } from '../lib/proposal-types';
-import { asPostingPayload } from '../lib/proposal-types';
+import { asPostingPayload, asBankMatchPayload, asDeclarationPayload } from '../lib/proposal-types';
 import { StatusBadge } from './StatusBadge';
 import { PostingLines } from './PostingLines';
+import { BankMatchDetails } from './BankMatchDetails';
+import { DeclarationDetails } from './DeclarationDetails';
 import { RationaleBlock } from './RationaleBlock';
 import styles from './ProposalCard.module.css';
 
@@ -50,6 +52,10 @@ export function ProposalCard({
 
   const postingPayload =
     proposal.type === 'posting' ? asPostingPayload(proposal.payload) : null;
+  const bankMatchPayload =
+    proposal.type === 'bank_match' ? asBankMatchPayload(proposal.payload) : null;
+  const declarationPayload =
+    proposal.type === 'declaration' ? asDeclarationPayload(proposal.payload) : null;
 
   function handleApprove() {
     if (!busy) onApprove(proposal.id);
@@ -90,6 +96,10 @@ export function ProposalCard({
       <div className={styles.payload}>
         {postingPayload ? (
           <PostingLines payload={postingPayload} />
+        ) : bankMatchPayload ? (
+          <BankMatchDetails payload={bankMatchPayload} />
+        ) : declarationPayload ? (
+          <DeclarationDetails payload={declarationPayload} />
         ) : (
           <div className={styles.rawPayload}>
             <p className={styles.rawPayloadLabel}>Payload</p>

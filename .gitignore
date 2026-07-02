@@ -6,3 +6,7 @@ web/node_modules/
 web/.next/
 web/.env.local
 graphify-out/
+
+# Playwright MCP browser-QA artifacts (screenshots, snapshots, console logs)
+.playwright-mcp/
+*.png

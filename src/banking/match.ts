@@ -37,9 +37,10 @@ export async function proposeMatches(
     const entryId = cand.rows[0].entryId as string;
     const confidence = t.reference || t.endToEndId ? 1.0 : 0.7;
 
+    const amountEur = (Number(t.amountCents) / 100).toFixed(2);
     const rationale = {
       ruleRef: 'bank-match-amount',
-      computation: `bank credit ${t.amountCents} cents matches receivable entry ${entryId}`,
+      computation: `Bank credit of ${amountEur} EUR matches an open receivable${t.counterparty ? ` from ${t.counterparty}` : ''}.`,
       sourceRefs: { bankTransactionId: t.id, candidateEntryId: entryId, confidence, counterparty: t.counterparty },
     } as Rationale;
 

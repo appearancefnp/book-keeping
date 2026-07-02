@@ -42,3 +42,39 @@ export function asPostingPayload(payload: unknown): PostingPayload | null {
   }
   return null;
 }
+
+export interface BankMatchPayload {
+  amountCents?: string;
+  bankAccount?: string;
+  receivablesAccount?: string;
+}
+
+// Type guard for bank-match payloads (settling a bank line against a ledger entry)
+export function asBankMatchPayload(payload: unknown): BankMatchPayload | null {
+  if (payload && typeof payload === 'object') {
+    const p = payload as Record<string, unknown>;
+    if ('amountCents' in p || 'bankAccount' in p || 'receivablesAccount' in p) {
+      return p as BankMatchPayload;
+    }
+  }
+  return null;
+}
+
+export interface DeclarationPayload {
+  period?: { fromDate?: string; toDate?: string };
+  ruleRef?: { value?: string; ruleType?: string; effectiveFrom?: string };
+  inputVat?: string;
+  outputVat?: string;
+  netPayable?: string;
+}
+
+// Type guard for VAT declaration payloads
+export function asDeclarationPayload(payload: unknown): DeclarationPayload | null {
+  if (payload && typeof payload === 'object') {
+    const p = payload as Record<string, unknown>;
+    if ('netPayable' in p || 'outputVat' in p || 'inputVat' in p || 'period' in p) {
+      return p as DeclarationPayload;
+    }
+  }
+  return null;
+}
