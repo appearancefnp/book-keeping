@@ -13,7 +13,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (!body.clientCompanyId) return NextResponse.json({ error: 'missing clientCompanyId' }, { status: 400 });
   const res = await rejectHandler({
     token, clientCompanyId: body.clientCompanyId, params: { id },
-    body: { reason: body.reason ?? '' }, atUnixSeconds: nowUnix(),
+    body: { reason: body.reason && body.reason.trim() ? body.reason : undefined }, atUnixSeconds: nowUnix(),
   });
   return NextResponse.json(res.body, { status: res.status });
 }

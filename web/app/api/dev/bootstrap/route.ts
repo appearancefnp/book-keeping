@@ -15,8 +15,10 @@ import { openPeriod } from '@domain/ledger/periods.js';
 import { createProposal } from '@domain/proposals/proposals.js';
 import { SESSION_COOKIE, nowUnix } from '@/app/lib/session';
 
+// Must match the root `npm run seed` credentials so the two seeders interoperate:
+// if the DB was already seeded, this route re-logs-in the existing user rather than failing.
 const DEV_EMAIL = 'accountant@demo.lv';
-const DEV_PASSWORD = 'demo-password-123';
+const DEV_PASSWORD = 'password123';
 
 export async function GET(req: Request) {
   if (process.env.NODE_ENV === 'production') {

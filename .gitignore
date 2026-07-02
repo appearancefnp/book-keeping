@@ -5,3 +5,4 @@ dist
 web/node_modules/
 web/.next/
 web/.env.local
+graphify-out/

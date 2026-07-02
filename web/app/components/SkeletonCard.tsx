@@ -2,7 +2,7 @@ import styles from './SkeletonCard.module.css';
 
 export function SkeletonCard() {
   return (
-    <div className={styles.card} aria-hidden="true" aria-label="Loading proposal">
+    <div className={styles.card} aria-hidden="true">
       {/* Header row */}
       <div className={styles.header}>
         <div className={styles.barShort} />
