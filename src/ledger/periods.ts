@@ -26,12 +26,12 @@ export async function closePeriod(
 
 /** date is 'YYYY-MM-DD'. */
 export async function periodStatusFor(
-  tx: PoolClient, _ctx: TenantContext, date: string,
+  tx: PoolClient, ctx: TenantContext, date: string,
 ): Promise<PeriodStatus> {
   const [y, m] = date.split('-').map(Number);
   const res = await tx.query(
-    'SELECT status FROM accounting_periods WHERE year = $1 AND month = $2',
-    [y, m],
+    'SELECT status FROM accounting_periods WHERE client_company_id = $1 AND year = $2 AND month = $3',
+    [ctx.clientCompanyId, y, m],
   );
   return (res.rows[0]?.status as PeriodStatus) ?? 'none';
 }
