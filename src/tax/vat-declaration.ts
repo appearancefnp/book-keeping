@@ -3,6 +3,7 @@ import type { TenantContext } from '../tenancy/context.js';
 import { computeVat, type VatConfig } from './vat-compute.js';
 import { getTaxRate, type TaxRate } from './rules.js';
 import { centsToDecimal } from './money-format.js';
+import { escapeXml } from '../xml/escape.js';
 
 export interface VatDeclaration {
   period: { fromDate: string; toDate: string };
@@ -35,7 +36,7 @@ export function toEdsXml(d: VatDeclaration): string {
     `  <OutputVat>${d.outputVat}</OutputVat>`,
     `  <InputVat>${d.inputVat}</InputVat>`,
     `  <NetPayable>${d.netPayable}</NetPayable>`,
-    `  <RateRule type="${d.ruleRef.ruleType}" value="${d.ruleRef.value}" effectiveFrom="${d.ruleRef.effectiveFrom}"/>`,
+    `  <RateRule type="${escapeXml(d.ruleRef.ruleType)}" value="${escapeXml(d.ruleRef.value)}" effectiveFrom="${escapeXml(d.ruleRef.effectiveFrom)}"/>`,
     '</VatDeclaration>',
   ].join('\n');
 }
