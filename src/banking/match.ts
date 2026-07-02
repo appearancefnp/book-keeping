@@ -18,6 +18,10 @@ export async function proposeMatches(
   const proposalIds: string[] = [];
   for (const t of txns.rows) {
     // Candidate open receivables: a debit on the receivables account of the same amount.
+    // MVP limitation: amount-only matching does not exclude receivables already referenced
+    // by a pending/approved bank_match proposal. Two equal-amount credit transactions can
+    // both propose against the same receivable. This is an accepted MVP trade-off; reference
+    // matching, fuzzy matching, and candidate deduplication are future refinements.
     const cand = await tx.query(
       `SELECT je.id AS "entryId"
        FROM journal_lines jl

@@ -36,6 +36,7 @@ test('proposes a bank_match for a credit that matches an open receivable', async
   expect(p.type).toBe('bank_match');
   expect(p.status).toBe('pending_approval');
   expect((p.payload as { amountCents: string }).amountCents).toBe('12100');
+  expect((p.rationale as { sourceRefs: { confidence: number } }).sourceRefs.confidence).toBe(1.0);
 });
 
 test('does not propose when no receivable matches the amount', async () => {
