@@ -2,20 +2,12 @@ import type { PoolClient } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
 import { computeVat, type VatConfig } from './vat-compute.js';
 import { getTaxRate, type TaxRate } from './rules.js';
+import { centsToDecimal } from './money-format.js';
 
 export interface VatDeclaration {
   period: { fromDate: string; toDate: string };
   outputVat: string; inputVat: string; netPayable: string;
   ruleRef: TaxRate;
-}
-
-function centsToDecimal(cents: string): string {
-  const n = BigInt(cents);
-  const neg = n < 0n;
-  const abs = neg ? -n : n;
-  const whole = abs / 100n;
-  const frac = (abs % 100n).toString().padStart(2, '0');
-  return `${neg ? '-' : ''}${whole}.${frac}`;
 }
 
 export async function assembleVatDeclaration(
