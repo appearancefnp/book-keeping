@@ -29,7 +29,12 @@ export async function submitToVid(
   const { ublXml, issueDate } = row.rows[0];
   const dueDate = addWorkingDays(issueDate, 5);
 
-  const result = await vid.submit(ublXml);
+  let result: { ok: boolean; detail: string };
+  try {
+    result = await vid.submit(ublXml);
+  } catch (err) {
+    result = { ok: false, detail: `submit threw: ${String(err)}` };
+  }
   const status = result.ok ? 'submitted' : 'failed';
 
   await tx.query(

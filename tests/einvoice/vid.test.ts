@@ -41,8 +41,25 @@ test('successful VID submission marks the einvoice submitted and records an atte
   const vid = { submit: async () => ({ ok: true, detail: 'accepted' }) };
   const r = await withTenant(ctx(t), (tx) => submitToVid(tx, ctx(t), einvoiceId, vid));
   expect(r.status).toBe('submitted');
-  const row = await withTenant(ctx(t), async (tx) => (await tx.query('SELECT vid_status, vid_due_date FROM einvoices WHERE id=$1', [einvoiceId])).rows[0]);
+  const row = await withTenant(ctx(t), async (tx) => (await tx.query('SELECT vid_status, to_char(vid_due_date,\'YYYY-MM-DD\') AS vid_due_date FROM einvoices WHERE id=$1', [einvoiceId])).rows[0]);
   expect(row.vid_status).toBe('submitted');
+  // M1: attempt row was recorded
+  const attemptCount = await withTenant(ctx(t), async (tx) => (await tx.query('SELECT count(*)::int AS n FROM vid_submission_attempts WHERE einvoice_id=$1', [einvoiceId])).rows[0].n);
+  expect(attemptCount).toBe(1);
+  // M2: vid_due_date was set (2026-03-10 + 5 working days = 2026-03-17)
+  expect(row.vid_due_date).toBe('2026-03-17');
+});
+
+test('adapter throw is treated as a failed attempt (does not reject)', async () => {
+  const t = await makeFirmAndClient();
+  const { einvoiceId } = await send(t);
+  const throwing = { submit: async (): Promise<{ ok: boolean; detail: string }> => { throw new Error('network down'); } };
+  const r = await withTenant(ctx(t), (tx) => submitToVid(tx, ctx(t), einvoiceId, throwing));
+  expect(r.status).toBe('failed');
+  // attempt row with ok=false was still recorded
+  const attempt = await withTenant(ctx(t), async (tx) => (await tx.query('SELECT ok, detail FROM vid_submission_attempts WHERE einvoice_id=$1', [einvoiceId])).rows[0]);
+  expect(attempt.ok).toBe(false);
+  expect(attempt.detail).toContain('network down');
 });
 
 test('a failed submission stays retryable and shows up as overdue past due date', async () => {
