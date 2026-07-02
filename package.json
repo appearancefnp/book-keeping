@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "migrate": "node --env-file=.env --import tsx src/db/migrate.ts",
     "test": "vitest run",
@@ -11,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "fast-xml-parser": "^4.5.6",
     "pg": "^8.13.0",
     "zod": "^3.23.8"
   },
