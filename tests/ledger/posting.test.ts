@@ -69,7 +69,7 @@ test('journal is append-only: UPDATE on journal_entries is blocked', async () =>
   }));
   await expect(withTenant(ctx(t), (tx) =>
     tx.query("UPDATE journal_entries SET memo = 'x' WHERE id = $1", [entryId]),
-  )).rejects.toThrow(/append-only/i);
+  )).rejects.toThrow(/permission denied|append-only/i);
 });
 
 test('writes an audit row when an entry is posted', async () => {

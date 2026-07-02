@@ -4,6 +4,8 @@ import { runMigrations } from '../../src/db/migrate.js';
 import { createFirm, createClientCompany } from '../../src/tenancy/firms.js';
 import type { TenantContext } from '../../src/tenancy/context.js';
 
+let seq = 0;
+
 /** Wipe the public schema (as admin, to also drop the migrations table cleanly) and re-run migrations. */
 export async function resetDb(): Promise<void> {
   await adminPool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
@@ -16,7 +18,7 @@ export async function closeDb(): Promise<void> {
 
 export async function makeFirmAndClient(clientName = 'SIA Test'): Promise<{ firmId: string; clientCompanyId: string }> {
   const firm = await createFirm('Test Firm');
-  const client = await createClientCompany(firm.id, { name: clientName, regNo: '40000000000' });
+  const client = await createClientCompany(firm.id, { name: clientName, regNo: String(40000000000 + seq++) });
   return { firmId: firm.id, clientCompanyId: client.id };
 }
 

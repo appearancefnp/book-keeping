@@ -40,5 +40,5 @@ test('WITH CHECK blocks inserting a row for another tenant', async () => {
         [b.clientCompanyId], // trying to write into B while scoped to A
       );
     }),
-  ).rejects.toThrow();
+  ).rejects.toThrow(/row-level security/i);
 });

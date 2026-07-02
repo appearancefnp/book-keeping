@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { PoolClient } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
-import { sumCents } from '../db/money.js';
+import { toCents, sumCents } from '../db/money.js';
 import { periodStatusFor } from './periods.js';
 import { appendAudit } from '../audit/audit.js';
 
@@ -10,7 +10,11 @@ const lineSchema = z.object({
   debit: z.string(),
   credit: z.string(),
   description: z.string().optional(),
-});
+}).refine(l => {
+  const d = toCents(l.debit);
+  const c = toCents(l.credit);
+  return d >= 0n && c >= 0n && (d > 0n) !== (c > 0n);
+}, { message: 'line must have exactly one of debit/credit > 0, non-negative' });
 const entrySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   memo: z.string().min(1),
@@ -25,7 +29,7 @@ export interface NewJournalEntry {
   date: string; memo: string; currency: string; lines: NewJournalLine[]; sourceDocumentId?: string | null; reversesEntryId?: string | null;
 }
 export interface JournalEntryRow {
-  id: string; entryDate: string; memo: string; currency: string;
+  id: string; entryDate: string; memo: string; currency: string; reversesEntryId: string | null;
   lines: { accountId: string; debit: string; credit: string; description: string | null }[];
 }
 
@@ -89,7 +93,7 @@ export async function getEntry(
 ): Promise<JournalEntryRow> {
   // Defense-in-depth: explicit tenant predicate in addition to RLS.
   const e = await tx.query(
-    'SELECT id, entry_date, memo, currency FROM journal_entries WHERE id = $1 AND client_company_id = $2',
+    'SELECT id, entry_date, memo, currency, reverses_entry_id FROM journal_entries WHERE id = $1 AND client_company_id = $2',
     [entryId, ctx.clientCompanyId],
   );
   if (!e.rowCount) throw new Error(`Entry not found: ${entryId}`);
@@ -104,6 +108,7 @@ export async function getEntry(
     entryDate: row.entry_date.toISOString().slice(0, 10),
     memo: row.memo,
     currency: row.currency,
+    reversesEntryId: row.reverses_entry_id ?? null,
     lines: lines.rows.map((l) => ({ accountId: l.account_id, debit: l.debit, credit: l.credit, description: l.description })),
   };
 }

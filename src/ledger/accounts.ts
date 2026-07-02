@@ -25,7 +25,10 @@ export async function createAccount(
   return res.rows[0];
 }
 
-export async function listAccounts(tx: PoolClient, _ctx: TenantContext): Promise<AccountRow[]> {
-  const res = await tx.query('SELECT id, code, name, type FROM accounts ORDER BY code');
+export async function listAccounts(tx: PoolClient, ctx: TenantContext): Promise<AccountRow[]> {
+  const res = await tx.query(
+    'SELECT id, code, name, type FROM accounts WHERE client_company_id = $1 ORDER BY code',
+    [ctx.clientCompanyId],
+  );
   return res.rows;
 }

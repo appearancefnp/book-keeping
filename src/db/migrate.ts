@@ -1,8 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import type { Pool } from 'pg';
-import { adminPool, appPool } from './pool.js';
+import { adminPool } from './pool.js';
 
 const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../migrations');
 
@@ -17,7 +16,7 @@ export async function runMigrations(): Promise<string[]> {
     applied.push(bootstrap);
   }
 
-  await appPool.query(`
+  await adminPool.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       filename text PRIMARY KEY,
       applied_at timestamptz NOT NULL DEFAULT now()
@@ -25,10 +24,10 @@ export async function runMigrations(): Promise<string[]> {
 
   for (const file of files) {
     if (file.startsWith('000_')) continue;
-    const done = await appPool.query('SELECT 1 FROM schema_migrations WHERE filename = $1', [file]);
+    const done = await adminPool.query('SELECT 1 FROM schema_migrations WHERE filename = $1', [file]);
     if (done.rowCount) continue;
     const sql = await readFile(join(MIGRATIONS_DIR, file), 'utf8');
-    const client = await appPool.connect();
+    const client = await adminPool.connect();
     try {
       await client.query('BEGIN');
       await client.query(sql);
@@ -48,6 +47,6 @@ export async function runMigrations(): Promise<string[]> {
 // Allow `npm run migrate`
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   runMigrations()
-    .then((a) => { console.log('Applied:', a); return Promise.all([adminPool.end(), appPool.end()]); })
+    .then((a) => { console.log('Applied:', a); return adminPool.end(); })
     .catch((e) => { console.error(e); process.exit(1); });
 }

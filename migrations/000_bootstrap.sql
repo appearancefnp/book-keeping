@@ -6,8 +6,6 @@ BEGIN
   END IF;
 END $$;
 
-GRANT ALL ON SCHEMA public TO bookkeeping_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO bookkeeping_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO bookkeeping_app;
+GRANT USAGE ON SCHEMA public TO bookkeeping_app;
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";  -- gen_random_uuid()

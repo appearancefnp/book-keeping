@@ -29,7 +29,7 @@ test('reversing an entry swaps debits and credits', async () => {
 
   const rev = await withTenant(ctx(t), (tx) => getEntry(tx, ctx(t), reversal.entryId));
   // Line that was a 121.00 debit is now a 121.00 credit.
-  const debitLine = rev.lines.find((l) => l.credit === '121.00');
-  expect(debitLine).toBeDefined();
+  const formerDebitLine = rev.lines.find((l) => l.credit === '121.00');
+  expect(formerDebitLine).toBeDefined();
   expect(rev.lines.every((l) => (l.debit === '0.00') !== (l.credit === '0.00'))).toBe(true);
 });

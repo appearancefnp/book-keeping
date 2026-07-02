@@ -13,6 +13,7 @@ const newClientSchema = z.object({
 });
 
 export async function createFirm(name: string): Promise<Firm> {
+  z.string().min(1).parse(name);
   const res = await appPool.query('INSERT INTO firms(name) VALUES ($1) RETURNING id, name', [name]);
   return res.rows[0];
 }
