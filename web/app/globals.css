@@ -1,0 +1,55 @@
+/* ── Design tokens ─────────────────────────────────────────── */
+:root {
+  --bg: oklch(0.972 0.008 205);
+  --surface: oklch(0.995 0.004 205);
+  --ink: oklch(0.27 0.02 220);
+  --ink-soft: oklch(0.44 0.02 220);
+  --primary: oklch(0.52 0.09 200);
+  --primary-deep: oklch(0.45 0.10 200);
+  --primary-ink: oklch(0.99 0.01 200);
+  --border: oklch(0.90 0.01 210);
+  --ok: oklch(0.55 0.11 155);
+  --danger: oklch(0.52 0.15 25);
+  --attention: oklch(0.68 0.12 75);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+}
+
+/* ── Reset ──────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; }
+
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Tabular numerals for all figures ───────────────────────── */
+table, [data-numeric], .numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Focus ring (teal, accessible) ─────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Reduced motion ─────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

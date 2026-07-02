@@ -2,3 +2,6 @@ node_modules
 dist
 .env
 .superpowers/
+web/node_modules/
+web/.next/
+web/.env.local
