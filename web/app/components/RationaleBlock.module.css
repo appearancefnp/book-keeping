@@ -1,0 +1,100 @@
+.root {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.headerIcon {
+  color: var(--ink-soft);
+  flex-shrink: 0;
+}
+
+.headerLabel {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ── Attention chip — quiet, not alarming ───────────────────── */
+.attentionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--attention);
+  border-radius: var(--radius-sm);
+  color: var(--attention);
+  font-size: 0.75rem;
+  margin-left: auto;
+}
+
+/* ── Empty fallback ─────────────────────────────────────────── */
+.empty {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+/* ── Field rows ─────────────────────────────────────────────── */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.fieldLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+  line-height: 1.2;
+}
+
+.fieldValue {
+  /* dd reset */
+  margin: 0;
+}
+
+/* ── Rule ref — monospace for machine identifier ────────────── */
+.ruleCode {
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
+  font-size: 0.875rem;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+/* ── Computation — plain language, readable prose ───────────── */
+.computationText {
+  font-size: 0.9375rem;
+  color: var(--ink);
+  line-height: 1.6;
+  max-width: 72ch;
+  word-break: break-word;
+}
+
+/* ── Sources — machine data, monospace, scrollable ──────────── */
+.sourcesPre {
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
+  font-size: 0.8125rem;
+  color: var(--ink);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+  margin: 0;
+  max-height: 16rem;
+  overflow-y: auto;
+}

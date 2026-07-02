@@ -1,0 +1,208 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  /* Flat at rest — no shadow */
+}
+
+/* ── Leaving transition (card being removed from list) ──────── */
+.leaving {
+  opacity: 0;
+  transition: opacity 250ms ease-out;
+  /* reduced-motion global rule neutralizes this */
+}
+
+/* ── Header row ─────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-height: 0;
+}
+
+.createdAt {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* ── Payload section ────────────────────────────────────────── */
+.payload {
+  /* no extra wrapper styling needed — PostingLines has its own */
+}
+
+/* ── Raw payload fallback (non-posting types) ───────────────── */
+.rawPayload {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.rawPayloadLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.rawPayloadPre {
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
+  font-size: 0.8125rem;
+  color: var(--ink);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+  margin: 0;
+  max-height: 20rem;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+
+/* ── Actions row ────────────────────────────────────────────── */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* Shared button base */
+.btnApprove,
+.btnReject,
+.btnConfirmReject,
+.btnCancel {
+  min-height: 44px;
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-sm);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background-color 150ms ease, opacity 150ms ease;
+  white-space: nowrap;
+}
+
+/* Teal primary — Approve */
+.btnApprove {
+  background: var(--primary);
+  color: var(--primary-ink);
+  border-color: var(--primary);
+}
+
+.btnApprove:hover:not(:disabled) {
+  background: var(--primary-deep);
+  border-color: var(--primary-deep);
+}
+
+.btnApprove:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Quiet secondary — Reject */
+.btnReject {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--border);
+}
+
+.btnReject:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+.btnReject:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Reject panel ───────────────────────────────────────────── */
+.rejectPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.rejectLabel {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.rejectOptional {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+
+.rejectTextarea {
+  width: 100%;
+  min-height: 80px;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.rejectTextarea::placeholder {
+  color: var(--ink-soft);
+}
+
+.rejectTextarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rejectActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* Confirm rejection — teal primary (it's a decisive action) */
+.btnConfirmReject {
+  background: var(--primary);
+  color: var(--primary-ink);
+  border-color: var(--primary);
+}
+
+.btnConfirmReject:hover:not(:disabled) {
+  background: var(--primary-deep);
+  border-color: var(--primary-deep);
+}
+
+.btnConfirmReject:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Cancel — quiet secondary */
+.btnCancel {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--border);
+}
+
+.btnCancel:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+.btnCancel:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

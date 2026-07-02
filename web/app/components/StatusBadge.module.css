@@ -1,0 +1,23 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.icon {
+  font-size: 0.625rem; /* 10px — small glyph, decorative only */
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.label {
+  letter-spacing: 0;
+}
