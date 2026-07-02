@@ -28,7 +28,7 @@ test('listProposals filters to the approval queue', async () => {
   });
   const queue = await withTenant(ctx(t), (tx) => listProposals(tx, ctx(t), { status: 'pending_approval' }));
   expect(queue).toHaveLength(1);
-  expect(queue[0].type).toBe('posting');
+  expect(queue[0]!.type).toBe('posting');
 });
 
 test('proposal core fields are immutable (payload cannot be updated)', async () => {
