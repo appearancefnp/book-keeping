@@ -31,12 +31,15 @@ export async function sendInvoice(
   });
 
   // 4. Dispatch via the Access Point.
+  // NOTE: ap.send is a network side effect outside the DB transaction; if send succeeds but
+  // the subsequent einvoice INSERT fails, the invoice is dispatched-but-unrecorded. This is an
+  // accepted MVP limitation; a future outbox/idempotency-key pattern should close the window.
   const { messageId } = await args.ap.send(ubl, args.recipientPeppolId);
 
   // 5. Record the einvoice (vid_status pending — VID submission handled in Task 6).
   const res = await tx.query(
-    `INSERT INTO einvoices(client_company_id, direction, invoice_number, issue_date, grand_total_cents, currency, ubl_xml, peppol_status, peppol_message_id, journal_entry_id)
-     VALUES ($1,'outbound',$2,$3,$4,$5,$6,'sent',$7,$8) RETURNING id`,
+    `INSERT INTO einvoices(client_company_id, direction, invoice_number, issue_date, grand_total_cents, currency, ubl_xml, vid_status, peppol_status, peppol_message_id, journal_entry_id)
+     VALUES ($1,'outbound',$2,$3,$4,$5,$6,'pending','sent',$7,$8) RETURNING id`,
     [ctx.clientCompanyId, inv.invoiceNumber, inv.issueDate, toCents(inv.grandTotal).toString(), inv.currency, ubl, messageId, entryId],
   );
   const einvoiceId = res.rows[0].id as string;
