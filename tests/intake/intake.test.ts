@@ -7,6 +7,7 @@ import { withTenant } from '../../src/db/pool.js';
 import { LocalBlobStore } from '../../src/blob/blob-store.js';
 import { StubExtractor } from '../../src/intake/extractor.js';
 import { createDocument, getDocument } from '../../src/documents/documents.js';
+import { createParty } from '../../src/parties/parties.js';
 import { getProposal } from '../../src/proposals/proposals.js';
 import { runIntake } from '../../src/intake/intake.js';
 import type { PostingTemplate } from '../../src/intake/map-posting.js';
@@ -32,6 +33,7 @@ test('a clean document produces a posting proposal and marks the document extrac
   await blob.put('doc-1', Buffer.from('fake-image'), 'image/jpeg');
 
   const { proposalId, docId } = await withTenant(ctx(t), async (tx) => {
+    await createParty(tx, ctx(t), { kind: 'vendor', name: 'SIA Piegādātājs', regNo: '40100000000' });
     const doc = await createDocument(tx, ctx(t), { source: 'mobile', storageKey: 'doc-1', mime: 'image/jpeg', uploadedBy: 'u' });
     const r = await runIntake(tx, ctx(t), { documentId: doc.id, blob, extractor: new StubExtractor(canned), template });
     return { proposalId: r.proposalId, docId: doc.id };

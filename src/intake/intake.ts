@@ -30,7 +30,7 @@ export async function runIntake(
   // Deterministic validation + party resolution.
   const report = validateExtraction(extracted, result.confidence);
   const party = await resolveParty(tx, ctx, extracted);
-  const needsReview = !report.valid || report.lowConfidenceFields.length > 0;
+  const needsReview = !report.valid || report.lowConfidenceFields.length > 0 || party.isNew;
 
   // Draft the posting.
   const entry = { ...extractedToJournalEntry(extracted, args.template), sourceDocumentId: doc.id };

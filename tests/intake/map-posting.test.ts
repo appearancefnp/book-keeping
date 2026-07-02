@@ -19,7 +19,7 @@ test('maps a purchase invoice to a balanced 3-line entry', () => {
   expect(debits).toBe(credits);
   // net→expense debit, vat→vat-input debit, gross→payables credit
   const byAcct = Object.fromEntries(entry.lines.map((l) => [l.accountCode, l]));
-  expect(byAcct['7710'].debit).toBe('100.00');
-  expect(byAcct['5721'].debit).toBe('21.00');
-  expect(byAcct['5310'].credit).toBe('121.00');
+  expect(byAcct['7710']!.debit).toBe('100.00');
+  expect(byAcct['5721']!.debit).toBe('21.00');
+  expect(byAcct['5310']!.credit).toBe('121.00');
 });
