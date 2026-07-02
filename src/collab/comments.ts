@@ -13,7 +13,7 @@ export async function addComment(tx: PoolClient, ctx: TenantContext, input: { en
 export async function listComments(tx: PoolClient, ctx: TenantContext, entityType: string, entityId: string): Promise<CommentRow[]> {
   const res = await tx.query(
     `SELECT id, author, body FROM comments
-     WHERE client_company_id = $1 AND entity_type = $2 AND entity_id = $3 ORDER BY created_at, id`,
+     WHERE client_company_id = $1 AND entity_type = $2 AND entity_id = $3 ORDER BY seq`,
     [ctx.clientCompanyId, entityType, entityId],
   );
   return res.rows;
