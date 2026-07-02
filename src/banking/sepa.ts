@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
+import { escapeXml } from '../xml/escape.js';
 
 /** Minimal SEPA pain.001 credit-transfer initiation. Representative; refined with bank specifics later. */
 export function generateSepaCreditTransfer(
@@ -7,10 +8,10 @@ export function generateSepaCreditTransfer(
 ): string {
   const txs = payments.map((p, i) => [
     '      <CdtTrfTxInf>',
-    `        <PmtId><EndToEndId>${p.reference || `E2E-${i + 1}`}</EndToEndId></PmtId>`,
+    `        <PmtId><EndToEndId>${escapeXml(p.reference || `E2E-${i + 1}`)}</EndToEndId></PmtId>`,
     `        <Amt><InstdAmt Ccy="EUR">${p.amount}</InstdAmt></Amt>`,
-    `        <CdtrAcct><Id><IBAN>${p.iban}</IBAN></Id></CdtrAcct>`,
-    `        <RmtInf><Ustrd>${p.reference}</Ustrd></RmtInf>`,
+    `        <CdtrAcct><Id><IBAN>${escapeXml(p.iban)}</IBAN></Id></CdtrAcct>`,
+    `        <RmtInf><Ustrd>${escapeXml(p.reference)}</Ustrd></RmtInf>`,
     '      </CdtTrfTxInf>',
   ].join('\n')).join('\n');
   return [
