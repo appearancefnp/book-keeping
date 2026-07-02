@@ -4,6 +4,7 @@ import type { AccessPoint } from './access-point.js';
 import { parseUblInvoice } from './ubl.js';
 import { extractedToJournalEntry, type PostingTemplate } from '../intake/map-posting.js';
 import type { ExtractedInvoice } from '../intake/extraction-schema.js';
+import { extractedInvoiceSchema } from '../intake/extraction-schema.js';
 import { createProposal, type Rationale } from '../proposals/proposals.js';
 import { toCents } from '../db/money.js';
 
@@ -31,7 +32,8 @@ export async function receiveInboundInvoices(
       lineItems: ubl.lines.map((l) => ({ description: l.description, net: l.net, vatRate: l.vatRate, vat: l.vat })),
       vatTotal: ubl.vatTotal, netTotal: ubl.netTotal, grandTotal: ubl.grandTotal,
     };
-    const entry = extractedToJournalEntry(extracted, args.template);
+    const validated = extractedInvoiceSchema.parse(extracted);
+    const entry = extractedToJournalEntry(validated, args.template);
 
     const rationale = {
       ruleRef: 'peppol-inbound',
