@@ -13,9 +13,9 @@ async function authed(req: AuthedRequest, fn: (ctx: import('../tenancy/context.j
   try {
     ctx = await resolveTenantContext(req.token, req.clientCompanyId, req.atUnixSeconds);
   } catch (e) {
-    const msg = String(e);
+    const msg = e instanceof Error ? e.message : String(e);
     const status = /session/i.test(msg) ? 401 : 403;
-    return { status, body: { error: msg.replace('Error: ', '') } };
+    return { status, body: { error: msg } };
   }
   return fn(ctx);
 }
