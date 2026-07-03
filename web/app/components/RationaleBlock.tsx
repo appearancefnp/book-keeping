@@ -1,4 +1,8 @@
+'use client';
+
 import type { Rationale } from '../lib/proposal-types';
+import { useMessages } from '../lib/i18n-context';
+import type { MsgKey } from '../lib/i18n';
 import styles from './RationaleBlock.module.css';
 
 // Defensive parse of sourceRefs (unknown)
@@ -26,18 +30,19 @@ function isLowConfidence(confidence?: number, flags?: string[]): boolean {
   return false;
 }
 
-// Human labels for the source fields an accountant actually reads.
-const SOURCE_LABELS: Record<string, string> = {
-  supplier: 'Supplier',
-  counterparty: 'Counterparty',
-  customer: 'Customer',
-  invoiceRef: 'Invoice',
-  invoiceNo: 'Invoice',
-  confidence: 'Confidence',
+// Message keys for the source fields an accountant actually reads.
+const SOURCE_LABEL_KEYS: Record<string, MsgKey> = {
+  supplier: 'rat.supplier',
+  counterparty: 'rat.counterparty',
+  customer: 'rat.customer',
+  invoiceRef: 'rat.invoice',
+  invoiceNo: 'rat.invoice',
+  confidence: 'rat.confidence',
 };
 
-function humanizeLabel(key: string): string {
-  if (SOURCE_LABELS[key]) return SOURCE_LABELS[key];
+function humanizeLabel(key: string, t: (k: MsgKey) => string): string {
+  const msgKey = SOURCE_LABEL_KEYS[key];
+  if (msgKey) return t(msgKey);
   const spaced = key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
@@ -45,7 +50,10 @@ function humanizeLabel(key: string): string {
 // Turn the machine-oriented sourceRefs into readable rows.
 // Drops opaque identifiers (documentId, candidateEntryId, …), nulls, and nested
 // structures the accountant has no use for — the opposite of a raw JSON dump.
-function humanizeSourceRefs(sourceRefs: unknown): { label: string; value: string }[] {
+function humanizeSourceRefs(
+  sourceRefs: unknown,
+  t: (k: MsgKey) => string,
+): { label: string; value: string }[] {
   if (!sourceRefs || typeof sourceRefs !== 'object' || Array.isArray(sourceRefs)) return [];
   const obj = sourceRefs as Record<string, unknown>;
   const rows: { label: string; value: string }[] = [];
@@ -55,30 +63,31 @@ function humanizeSourceRefs(sourceRefs: unknown): { label: string; value: string
     if (/id$/i.test(key)) continue; // opaque UUIDs — not for humans
     if (typeof raw === 'object') continue; // nested rule/period objects live in the payload
     if (key === 'confidence' && typeof raw === 'number') {
-      rows.push({ label: 'Confidence', value: `${Math.round(raw * 100)}%` });
+      rows.push({ label: t('rat.confidence'), value: `${Math.round(raw * 100)}%` });
       continue;
     }
-    rows.push({ label: humanizeLabel(key), value: String(raw) });
+    rows.push({ label: humanizeLabel(key, t), value: String(raw) });
   }
   return rows;
 }
 
 export function RationaleBlock({ rationale }: { rationale: Rationale }) {
+  const { t } = useMessages();
   const { ruleRef, computation, sourceRefs } = rationale;
   const { confidence, flags } = parseSourceRefs(sourceRefs);
   const lowConf = isLowConfidence(confidence, flags);
-  const sourceRows = humanizeSourceRefs(sourceRefs);
+  const sourceRows = humanizeSourceRefs(sourceRefs, t);
 
   const hasContent = ruleRef || computation || sourceRows.length > 0;
 
   return (
-    <aside className={styles.root} aria-label="AI reasoning">
+    <aside className={styles.root} aria-label={t('rat.title')}>
       <div className={styles.header}>
         <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none" className={styles.headerIcon}>
           <rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/>
           <path d="M4 5h6M4 7.5h4" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round"/>
         </svg>
-        <span className={styles.headerLabel}>AI reasoning</span>
+        <span className={styles.headerLabel}>{t('rat.title')}</span>
         {lowConf && (
           <span className={styles.attentionChip}>
             <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -86,18 +95,18 @@ export function RationaleBlock({ rationale }: { rationale: Rationale }) {
               <path d="M6 3.5V6.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round"/>
               <circle cx="6" cy="8.5" r="0.625" fill="currentColor"/>
             </svg>
-            Needs review
+            {t('rat.needsReview')}
           </span>
         )}
       </div>
 
       {!hasContent && (
-        <p className={styles.empty}>No reasoning provided.</p>
+        <p className={styles.empty}>{t('rat.none')}</p>
       )}
 
       {ruleRef && (
         <div className={styles.field}>
-          <dt className={styles.fieldLabel}>Rule</dt>
+          <dt className={styles.fieldLabel}>{t('rat.rule')}</dt>
           <dd className={styles.fieldValue}>
             <code className={styles.ruleCode}>{ruleRef}</code>
           </dd>
@@ -106,7 +115,7 @@ export function RationaleBlock({ rationale }: { rationale: Rationale }) {
 
       {computation && (
         <div className={styles.field}>
-          <dt className={styles.fieldLabel}>Computation</dt>
+          <dt className={styles.fieldLabel}>{t('rat.computation')}</dt>
           <dd className={styles.fieldValue}>
             <p className={styles.computationText}>{computation}</p>
           </dd>
@@ -115,7 +124,7 @@ export function RationaleBlock({ rationale }: { rationale: Rationale }) {
 
       {sourceRows.length > 0 && (
         <div className={styles.field}>
-          <dt className={styles.fieldLabel}>Sources</dt>
+          <dt className={styles.fieldLabel}>{t('rat.sources')}</dt>
           <dd className={styles.fieldValue}>
             <ul className={styles.sourceList}>
               {sourceRows.map((row, i) => (

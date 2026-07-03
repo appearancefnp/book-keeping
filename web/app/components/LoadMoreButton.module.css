@@ -1,0 +1,27 @@
+.row {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-4) 0;
+}
+
+.btn {
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--primary-deep);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-6);
+  cursor: pointer;
+  transition: border-color 150ms ease-out, background-color 150ms ease-out;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--primary);
+}
+
+.btn:disabled {
+  color: var(--ink-soft);
+  cursor: default;
+}

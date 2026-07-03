@@ -13,9 +13,15 @@ import { ProposalCard } from '@/app/components/ProposalCard';
 import { SkeletonCard } from '@/app/components/SkeletonCard';
 import { EmptyState } from '@/app/components/EmptyState';
 import { ErrorState } from '@/app/components/ErrorState';
+import { LoadMoreButton } from '@/app/components/LoadMoreButton';
 import { Toast } from '@/app/components/Toast';
 import type { ToastKind } from '@/app/components/Toast';
 import styles from './page.module.css';
+
+// Page size for the growing-window pagination: "show more" refetches with a
+// larger limit rather than offsetting, so approvals shrinking the queue can't
+// skip items.
+const PAGE_SIZE = 50;
 
 // ── Toast state ──────────────────────────────────────────────────────────────
 
@@ -48,6 +54,8 @@ function ApprovalQueue() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [proposalsLoading, setProposalsLoading] = useState(false);
   const [proposalsError, setProposalsError] = useState<string | null>(null);
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Per-card state (keyed by proposal id)
   const [cardStates, setCardStates] = useState<Record<string, CardState>>({});
@@ -102,16 +110,19 @@ function ApprovalQueue() {
 
   // ── Load proposals when client changes ────────────────────────────────────
 
-  const loadProposals = useCallback(async (clientId: string) => {
-    setProposalsLoading(true);
+  const loadProposals = useCallback(async (clientId: string, max: number, quiet = false) => {
+    if (quiet) setLoadingMore(true);
+    else setProposalsLoading(true);
     setProposalsError(null);
     loadedClientRef.current = clientId;
     try {
-      const loaded = await fetchProposals(clientId);
+      const loaded = await fetchProposals(clientId, max);
       if (loadedClientRef.current === clientId) {
         setProposals(loaded);
-        setCardStates({});
-        setCardErrors({});
+        if (!quiet) {
+          setCardStates({});
+          setCardErrors({});
+        }
       }
     } catch (err) {
       if (loadedClientRef.current === clientId) {
@@ -121,15 +132,24 @@ function ApprovalQueue() {
     } finally {
       if (loadedClientRef.current === clientId) {
         setProposalsLoading(false);
+        setLoadingMore(false);
       }
     }
   }, [t]);
 
   useEffect(() => {
     if (selectedClientId) {
-      loadProposals(selectedClientId);
+      setLimit(PAGE_SIZE);
+      loadProposals(selectedClientId, PAGE_SIZE);
     }
   }, [selectedClientId, loadProposals]);
+
+  function handleLoadMore() {
+    if (!selectedClientId || loadingMore) return;
+    const next = limit + PAGE_SIZE;
+    setLimit(next);
+    loadProposals(selectedClientId, next, true);
+  }
 
   // ── Approve flow ───────────────────────────────────────────────────────────
 
@@ -179,7 +199,7 @@ function ApprovalQueue() {
 
   function handleRetry() {
     if (proposalsError && selectedClientId) {
-      loadProposals(selectedClientId);
+      loadProposals(selectedClientId, limit);
     }
   }
 
@@ -244,6 +264,9 @@ function ApprovalQueue() {
                 );
               })}
             </ul>
+            {proposals.length >= limit && (
+              <LoadMoreButton onClick={handleLoadMore} busy={loadingMore} />
+            )}
           </section>
         )}
       </main>

@@ -10,12 +10,14 @@ export async function notify(tx: PoolClient, ctx: TenantContext, input: { recipi
   );
   return { id: res.rows[0].id };
 }
-export async function listNotifications(tx: PoolClient, ctx: TenantContext, recipient: string, opts: { unreadOnly?: boolean } = {}): Promise<NotificationRow[]> {
+export async function listNotifications(tx: PoolClient, ctx: TenantContext, recipient: string, opts: { unreadOnly?: boolean; limit?: number; offset?: number } = {}): Promise<NotificationRow[]> {
+  // LIMIT NULL / OFFSET NULL are no-ops in Postgres, so omitted paging keeps the old behavior.
   const res = await tx.query(
     `SELECT id, kind, message, read, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "createdAt" FROM notifications
      WHERE client_company_id = $1 AND recipient = $2 AND ($3::boolean IS NOT TRUE OR read = false)
-     ORDER BY created_at DESC`,
-    [ctx.clientCompanyId, recipient, opts.unreadOnly ?? false],
+     ORDER BY created_at DESC
+     LIMIT $4::int OFFSET $5::int`,
+    [ctx.clientCompanyId, recipient, opts.unreadOnly ?? false, opts.limit ?? null, opts.offset ?? null],
   );
   return res.rows;
 }

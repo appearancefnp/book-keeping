@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import type { Proposal } from '../lib/proposal-types';
 import { asPostingPayload, asBankMatchPayload, asDeclarationPayload } from '../lib/proposal-types';
+import { useMessages } from '../lib/i18n-context';
+import { LOCALE_FOR, type Lang } from '../lib/i18n';
 import { StatusBadge } from './StatusBadge';
 import { PostingLines } from './PostingLines';
 import { BankMatchDetails } from './BankMatchDetails';
@@ -18,9 +20,9 @@ export interface ProposalCardProps {
   leaving?: boolean;
 }
 
-function formatCreatedAt(iso: string): string {
+function formatCreatedAt(iso: string, lang: Lang): string {
   try {
-    return new Intl.DateTimeFormat('lv-LV', {
+    return new Intl.DateTimeFormat(LOCALE_FOR[lang], {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -47,6 +49,7 @@ export function ProposalCard({
   busy = false,
   leaving = false,
 }: ProposalCardProps) {
+  const { t, lang } = useMessages();
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
 
@@ -87,7 +90,7 @@ export function ProposalCard({
             dateTime={proposal.createdAt}
             className={styles.createdAt}
           >
-            {formatCreatedAt(proposal.createdAt)}
+            {formatCreatedAt(proposal.createdAt, lang)}
           </time>
         )}
       </div>
@@ -102,7 +105,7 @@ export function ProposalCard({
           <DeclarationDetails payload={declarationPayload} />
         ) : (
           <div className={styles.rawPayload}>
-            <p className={styles.rawPayloadLabel}>Payload</p>
+            <p className={styles.rawPayloadLabel}>{t('card.payload')}</p>
             <pre className={styles.rawPayloadPre}>
               {renderUnknownPayload(proposal.payload)}
             </pre>
@@ -124,7 +127,7 @@ export function ProposalCard({
               disabled={busy}
               aria-busy={busy}
             >
-              {busy ? 'Approving…' : 'Approve'}
+              {busy ? t('card.approving') : t('card.approve')}
             </button>
             <button
               type="button"
@@ -132,20 +135,20 @@ export function ProposalCard({
               onClick={() => setRejectOpen(true)}
               disabled={busy}
             >
-              Reject
+              {t('card.reject')}
             </button>
           </>
         ) : (
           <div className={styles.rejectPanel}>
             <label htmlFor={`reject-reason-${proposal.id}`} className={styles.rejectLabel}>
-              Reason for rejection <span className={styles.rejectOptional}>(optional)</span>
+              {t('card.rejectReason')} <span className={styles.rejectOptional}>{t('card.rejectOptional')}</span>
             </label>
             <textarea
               id={`reject-reason-${proposal.id}`}
               className={styles.rejectTextarea}
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Describe why this proposal is being rejected…"
+              placeholder={t('card.rejectPlaceholder')}
               rows={3}
               disabled={busy}
             />
@@ -157,7 +160,7 @@ export function ProposalCard({
                 disabled={busy}
                 aria-busy={busy}
               >
-                {busy ? 'Rejecting…' : 'Confirm rejection'}
+                {busy ? t('card.rejecting') : t('card.confirmReject')}
               </button>
               <button
                 type="button"
@@ -165,7 +168,7 @@ export function ProposalCard({
                 onClick={handleRejectCancel}
                 disabled={busy}
               >
-                Cancel
+                {t('card.cancel')}
               </button>
             </div>
           </div>

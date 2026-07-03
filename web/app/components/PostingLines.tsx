@@ -1,4 +1,7 @@
+'use client';
+
 import type { PostingPayload, PostingLine } from '../lib/proposal-types';
+import { useMessages } from '../lib/i18n-context';
 import styles from './PostingLines.module.css';
 
 function formatAmount(value: string, currency?: string): string {
@@ -25,6 +28,7 @@ function formatTotal(amount: number, currency?: string): string {
 }
 
 export function PostingLines({ payload }: { payload: PostingPayload }) {
+  const { t } = useMessages();
   const { lines = [], memo, date, currency } = payload;
 
   const totalDebit = sumLines(lines, 'debit');
@@ -37,13 +41,13 @@ export function PostingLines({ payload }: { payload: PostingPayload }) {
         <div className={styles.meta}>
           {date && (
             <span className={styles.metaItem}>
-              <span className={styles.metaLabel}>Date</span>
+              <span className={styles.metaLabel}>{t('post.date')}</span>
               <span className={styles.metaValue}>{date}</span>
             </span>
           )}
           {memo && (
             <span className={styles.metaItem}>
-              <span className={styles.metaLabel}>Memo</span>
+              <span className={styles.metaLabel}>{t('post.memo')}</span>
               <span className={styles.metaValue}>{memo}</span>
             </span>
           )}
@@ -55,9 +59,9 @@ export function PostingLines({ payload }: { payload: PostingPayload }) {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th scope="col" className={styles.colAccount}>Account</th>
-                <th scope="col" className={styles.colAmount}>Debit</th>
-                <th scope="col" className={styles.colAmount}>Credit</th>
+                <th scope="col" className={styles.colAccount}>{t('over.account')}</th>
+                <th scope="col" className={styles.colAmount}>{t('over.debit')}</th>
+                <th scope="col" className={styles.colAmount}>{t('over.credit')}</th>
               </tr>
             </thead>
             <tbody>
@@ -79,7 +83,7 @@ export function PostingLines({ payload }: { payload: PostingPayload }) {
             </tbody>
             <tfoot>
               <tr className={styles.totalRow}>
-                <td className={styles.totalLabel}>Total</td>
+                <td className={styles.totalLabel}>{t('post.total')}</td>
                 <td className={styles.cellAmount}>{formatTotal(totalDebit, currency)}</td>
                 <td className={styles.cellAmount}>{formatTotal(totalCredit, currency)}</td>
               </tr>
@@ -95,7 +99,7 @@ export function PostingLines({ payload }: { payload: PostingPayload }) {
               <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5"/>
               <path d="M4.5 7l1.8 1.8L9.5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Balanced
+            {t('post.balanced')}
           </span>
         ) : (
           <span className={styles.unbalanced}>
@@ -104,7 +108,7 @@ export function PostingLines({ payload }: { payload: PostingPayload }) {
               <path d="M7 4v3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               <circle cx="7" cy="10" r="0.75" fill="currentColor"/>
             </svg>
-            Not balanced
+            {t('post.notBalanced')}
           </span>
         )}
       </div>

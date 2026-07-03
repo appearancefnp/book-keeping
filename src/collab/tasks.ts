@@ -13,11 +13,13 @@ export async function createTask(tx: PoolClient, ctx: TenantContext, input: { ti
   await appendAudit(tx, ctx, { action: 'create', entityType: 'task', entityId: id, before: null, after: { title: input.title } });
   return { id };
 }
-export async function listTasks(tx: PoolClient, ctx: TenantContext, filter: { status?: 'open' | 'resolved' } = {}): Promise<TaskRow[]> {
+export async function listTasks(tx: PoolClient, ctx: TenantContext, filter: { status?: 'open' | 'resolved'; limit?: number; offset?: number } = {}): Promise<TaskRow[]> {
+  // LIMIT NULL / OFFSET NULL are no-ops in Postgres, so omitted paging keeps the old behavior.
   const res = await tx.query(
     `SELECT id, title, detail, status FROM tasks
-     WHERE client_company_id = $1 AND ($2::text IS NULL OR status = $2) ORDER BY created_at`,
-    [ctx.clientCompanyId, filter.status ?? null],
+     WHERE client_company_id = $1 AND ($2::text IS NULL OR status = $2) ORDER BY created_at
+     LIMIT $3::int OFFSET $4::int`,
+    [ctx.clientCompanyId, filter.status ?? null, filter.limit ?? null, filter.offset ?? null],
   );
   return res.rows;
 }

@@ -3,23 +3,26 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMessages } from '@/app/lib/i18n-context';
+import { NavIcon, type NavIconName } from './NavIcon';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
   key: 'nav.queue' | 'nav.documents' | 'nav.overview' | 'nav.tasks' | 'nav.notifications' | 'nav.admin';
+  /** Compact label for the mobile bottom tab bar, where six full-length LV/RU labels can't fit. */
+  shortKey: 'nav.short.queue' | 'nav.short.documents' | 'nav.short.overview' | 'nav.short.tasks' | 'nav.short.notifications' | 'nav.short.admin';
   href: string;
-  icon: string;
+  icon: NavIconName;
 }
 
 const BASE_ITEMS: NavItem[] = [
-  { key: 'nav.queue',          href: '/',              icon: '◉' },
-  { key: 'nav.documents',      href: '/documents',     icon: '📄' },
-  { key: 'nav.overview',       href: '/overview',      icon: '📊' },
-  { key: 'nav.tasks',          href: '/tasks',         icon: '✓' },
-  { key: 'nav.notifications',  href: '/notifications', icon: '🔔' },
+  { key: 'nav.queue',          shortKey: 'nav.short.queue',          href: '/',              icon: 'queue' },
+  { key: 'nav.documents',      shortKey: 'nav.short.documents',      href: '/documents',     icon: 'documents' },
+  { key: 'nav.overview',       shortKey: 'nav.short.overview',       href: '/overview',      icon: 'overview' },
+  { key: 'nav.tasks',          shortKey: 'nav.short.tasks',          href: '/tasks',         icon: 'tasks' },
+  { key: 'nav.notifications',  shortKey: 'nav.short.notifications',  href: '/notifications', icon: 'notifications' },
 ];
 
-const ADMIN_ITEM: NavItem = { key: 'nav.admin', href: '/admin', icon: '⚙' };
+const ADMIN_ITEM: NavItem = { key: 'nav.admin', shortKey: 'nav.short.admin', href: '/admin', icon: 'admin' };
 
 const ADMIN_ROLES = new Set(['accountant', 'firm_admin']);
 
@@ -46,7 +49,7 @@ export function Sidebar({ role, unreadCount = 0 }: SidebarProps) {
       </div>
 
       <ul className={styles.navList} role="list">
-        {items.map(({ key, href, icon }) => {
+        {items.map(({ key, shortKey, href, icon }) => {
           const active = isActive(href);
           const isNotif = href === '/notifications';
           const label = t(key);
@@ -63,7 +66,7 @@ export function Sidebar({ role, unreadCount = 0 }: SidebarProps) {
                 aria-label={ariaLabel}
               >
                 <span className={styles.iconWrap}>
-                  <span className={styles.icon} aria-hidden="true">{icon}</span>
+                  <NavIcon name={icon} />
                   {isNotif && unreadCount > 0 && (
                     <span className={styles.badge} aria-hidden="true">
                       {unreadCount > 99 ? '99+' : unreadCount}
@@ -71,6 +74,7 @@ export function Sidebar({ role, unreadCount = 0 }: SidebarProps) {
                   )}
                 </span>
                 <span className={styles.label}>{label}</span>
+                <span className={styles.labelShort} aria-hidden="true">{t(shortKey)}</span>
               </Link>
             </li>
           );

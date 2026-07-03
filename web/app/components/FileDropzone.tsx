@@ -37,6 +37,7 @@ function isAccepted(file: File): boolean {
 export function FileDropzone({ clientCompanyId, uploadLabel, onUploaded, onToast }: FileDropzoneProps) {
   const { t } = useMessages();
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -68,6 +69,7 @@ export function FileDropzone({ clientCompanyId, uploadLabel, onUploaded, onToast
       setUploading(false);
       setFileName(null);
       if (inputRef.current) inputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
     }
   }, [clientCompanyId, onToast, onUploaded, t]);
 
@@ -103,6 +105,7 @@ export function FileDropzone({ clientCompanyId, uploadLabel, onUploaded, onToast
   }, []);
 
   return (
+    <div className={styles.wrap}>
     <div
       className={[styles.zone, dragging ? styles.dragging : '', uploading ? styles.uploading : ''].filter(Boolean).join(' ')}
       onDragOver={onDragOver}
@@ -162,6 +165,38 @@ export function FileDropzone({ clientCompanyId, uploadLabel, onUploaded, onToast
           {t('docs.hint')}
         </span>
       )}
+    </div>
+
+    {/* Camera path — visible only on coarse-pointer (touch) devices via CSS.
+        capture="environment" opens the rear camera directly on phones. */}
+    <input
+      ref={cameraInputRef}
+      type="file"
+      accept="image/*"
+      capture="environment"
+      className={styles.hiddenInput}
+      onChange={onInputChange}
+      tabIndex={-1}
+      aria-hidden="true"
+      disabled={uploading}
+    />
+    <button
+      type="button"
+      className={styles.cameraBtn}
+      onClick={() => !uploading && cameraInputRef.current?.click()}
+      disabled={uploading}
+    >
+      <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path
+          d="M2 5.5A1.5 1.5 0 013.5 4h1.4l.8-1.3a1 1 0 01.85-.47h2.9a1 1 0 01.85.47l.8 1.3h1.4A1.5 1.5 0 0114 5.5v6A1.5 1.5 0 0112.5 13h-9A1.5 1.5 0 012 11.5v-6z"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinejoin="round"
+        />
+        <circle cx="8" cy="8.25" r="2.25" stroke="currentColor" strokeWidth="1.25" />
+      </svg>
+      {t('docs.takePhoto')}
+    </button>
     </div>
   );
 }

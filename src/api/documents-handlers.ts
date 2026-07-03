@@ -1,12 +1,13 @@
 import { withTenant } from '../db/pool.js';
-import { authed } from './handlers.js';
+import { authed, pagingFromParams } from './handlers.js';
 import type { AuthedRequest, ApiResponse } from './types.js';
 import { listDocuments, getDocument, type DocumentStatus } from '../documents/documents.js';
 
 export function documentsHandler(req: AuthedRequest): Promise<ApiResponse> {
   return authed(req, async (ctx) => {
     const status = (req.params?.status as DocumentStatus | undefined) ?? undefined;
-    const documents = await withTenant(ctx, (tx) => listDocuments(tx, ctx, status ? { status } : {}));
+    const paging = pagingFromParams(req.params);
+    const documents = await withTenant(ctx, (tx) => listDocuments(tx, ctx, { ...(status && { status }), ...paging }));
     return { status: 200, body: { documents } };
   });
 }

@@ -6,6 +6,7 @@ import { resolveTenantContext } from '@domain/auth/context.js';
 import { withTenant } from '@domain/db/pool.js';
 import { listNotifications } from '@domain/collab/notifications.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
+import { parsePaging } from '@/app/lib/paging';
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
@@ -15,11 +16,12 @@ export async function GET(req: NextRequest) {
   if (!clientCompanyId) return NextResponse.json({ error: 'missing clientCompanyId' }, { status: 400 });
 
   const unreadOnly = req.nextUrl.searchParams.get('unreadOnly') === 'true';
+  const paging = parsePaging(req.nextUrl.searchParams);
 
   try {
     const ctx = await resolveTenantContext(token, clientCompanyId, nowUnix());
     const notifications = await withTenant(ctx, async (tx) => {
-      return listNotifications(tx, ctx, ctx.actorId, { unreadOnly });
+      return listNotifications(tx, ctx, ctx.actorId, { unreadOnly, ...paging });
     });
     return NextResponse.json({ notifications }, { status: 200 });
   } catch (err) {

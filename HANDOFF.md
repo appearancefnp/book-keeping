@@ -1,0 +1,228 @@
+# Handoff — next steps
+
+Status as of 2026-07-03. Written after a full audit of the repo against
+`Gramatvedibas_sistemas_koncepcija.docx` (the concept spec) plus four UI passes
+(harden → adapt → clarify → polish).
+
+## Where things stand
+
+The **MVP presentation layer and its tested backend are done**: ledger, VAT
+compute + declaration, bank import (camt.053) + AI matching, AI document intake
+(real Claude/Gemini/Ollama extraction), the proposal/approval workflow with
+inline rationale, the shared cabinet (roles, tasks, comments, notifications,
+audit), 2FA, and RLS multi-tenancy. 146 backend tests pass. The web UI is
+trilingual (LV/RU/EN), responsive, and accessible.
+
+What remains is **not polish** — it's substantive feature work in two buckets:
+
+1. **Wire the two stubbed integrations to real networks** (Peppol, VID/EDS).
+   These are the product's strategic reason to exist and are the critical path.
+2. **Build the missing UI over the existing tested API**, then the absent
+   accounting modules (payroll, fixed assets, warehouse, annual report).
+
+The architecture was shaped so these plug in rather than require rework: the
+Access Point, VID client, and extractor are all interfaces with stub
+implementations; the domain layer is imported into Next.js routes via
+`@domain/*`. Follow the existing patterns — don't invent new ones.
+
+Priority order below is deliberate: it front-loads the regulatory critical path
+(#1, #2) and the invoicing UI (#3) that unlocks the client-employee role, then
+the operational modules.
+
+---
+
+## 1. Peppol Access Point — real network connectivity  ⟶ critical path
+
+**Why first:** the entire market wedge (spec §2.1) is native Peppol + near-real-
+time VID. Everything else is table stakes; this is the differentiator, and the
+2028 B2B mandate is the clock.
+
+**What exists (all real except the wire):**
+- `src/einvoice/ubl.ts` — `buildUblInvoice` / `parseUblInvoice`, EN 16931 /
+  Peppol BIS Billing 3.0, `EInvoice` type.
+- `src/einvoice/validate.ts` — EN 16931 field/structure validation.
+- `src/einvoice/inbound.ts` — receive → parse → create posting proposal.
+- `src/einvoice/outbound.ts` — `sendInvoice(...)` builds UBL, posts the
+  receivable, sends via the Access Point, records the Peppol message id.
+- `src/einvoice/access-point.ts` — **the seam.** `interface AccessPoint {
+  send(ublXml, recipient); receive(); }` with an in-memory `StubAccessPoint`.
+- `migrations/015_einvoices.sql` — einvoice records with Peppol + VID status.
+
+**What to build:**
+- A real `AccessPoint` implementation against an accredited LV Peppol service
+  provider (decision deferred in spec §10.3 — pick provider first: accredited
+  SP vs. direct SMP/SML connection). Keep it behind the existing interface.
+- Participant lookup (SML/SMP) to resolve a recipient's Peppol ID.
+- Inbound polling or webhook ingestion → feed `inbound.ts`.
+- Delivery/error state on `einvoices` (MDN/ack handling, retries).
+- Config: endpoint URL, credentials/cert, sender Peppol ID — via env, injected
+  the way `StubAccessPoint` is today (constructor/DI, not hard-coded).
+
+**Acceptance:** send a real invoice to a Peppol test participant and receive one
+back through the sandbox network, with status transitions recorded and audited.
+Keep `StubAccessPoint` for tests.
+
+**Open questions to resolve first:** provider choice; certificate/onboarding;
+whether we register as our own AP or resell an SP's.
+
+---
+
+## 2. VID / EDS submission — real filing  ⟶ critical path
+
+**Why:** spec §2.1/§6.8 — invoice data to VID within 5 working days, near real
+time; declarations filed through EDS. Today it's tracked but nothing leaves the
+building.
+
+**What exists:**
+- `src/einvoice/vid.ts` — **the seam.** `interface VidClient { submit(ublXml):
+  Promise<{ ok; detail }> }`, `submitToVid(...)` records attempts + status,
+  `addWorkingDays()` for the 5-day due date (⚠️ **skips weekends only — LR public
+  holidays are deferred**; wire in the holiday calendar here).
+- `src/einvoice/outbound.ts` — overdue-VID detection.
+- `migrations/016_vid_submission_attempts.sql` — attempt audit trail.
+- `src/tax/vat-declaration.ts` — assembles the VAT declaration and exports XML
+  (⚠️ **representative mock; exact VID element names not finalised** — see the
+  Plan 6 note in that file).
+
+**What to build:**
+- A real `VidClient` against the VID/EDS API (auth, submission, status poll).
+- Finalise the EDS declaration XML to the real schema (VAT return + annexes),
+  replacing the mock. **Do this with a practising LV accountant/tax consultant**
+  (spec §10.1) — the exact forms and norm references are not something to guess.
+- A submission scheduler: enqueue within the 5-working-day window, retry on
+  failure, surface overdue items to the accountant.
+- The 5-day due-date calc needs the **LR public-holiday calendar** (currently
+  only weekends are skipped).
+
+**Acceptance:** file a VAT declaration and push invoice data to the VID test
+environment; attempts recorded, overdue detection drives a notification/task.
+
+---
+
+## 3. Invoice creation UI + issue flow  ⟶ unlocks the client-employee role
+
+**Why:** the backend can build/validate/post/send outbound invoices, but there
+is **no screen to create one**. The spec's client-employee role ("izraksta
+rēķinus", §5) literally cannot do its job today. This is the highest-value UI gap.
+
+**What exists:**
+- `src/einvoice/outbound.ts` `sendInvoice(...)` — the whole issue pipeline.
+- `src/einvoice/ubl.ts` `EInvoice` — the shape to collect: invoiceNumber,
+  issueDate, currency, supplier, customer, lines (desc/net/vatRate/vat),
+  net/vat/grand totals.
+- `src/parties/parties.ts` — customer lookup for the recipient.
+- `src/tax/rules.ts` — effective VAT rate for line defaults.
+
+**What to build:**
+- An **invoice composer** page/route: pick customer (from parties), add lines,
+  auto-compute VAT from `tax/rules`, live totals (reuse the tabular-numeral
+  table styling from `PostingLines`), then Issue.
+- A new API route `web/app/api/einvoices/...` following the existing pattern
+  (see any route in `web/app/api/` — session via `getSessionToken()`, tenant via
+  `resolveTenantContext`, domain call inside `withTenant`). None exists yet;
+  `einvoice` is not currently exposed over HTTP.
+- An **outbox / invoice list** view with Peppol + VID status per invoice
+  (depends on #1/#2 for live status; ship with status column now).
+- Credit notes (backend gap too — no credit-note support yet).
+
+**Acceptance:** an employee creates an invoice, it posts the receivable, renders
+valid EN 16931 UBL, and (once #1 lands) sends via Peppol.
+
+---
+
+## 4. Remaining MVP-tier UI over existing tested API
+
+These backends are done; the UI is missing. Follow the `web/app/(cabinet)/*`
+page pattern and the `@domain/*` route pattern.
+
+- **Bank statement upload** — `src/banking/import.ts importStatement(...)` +
+  `camt-parser.ts` are real; there's no upload screen. Add a camt.053 upload +
+  imported-transactions view + the match-review UI (matching proposals already
+  flow through the approval queue).
+- **Payment orders** — `src/banking/sepa.ts generateSepaCreditTransfer(...)`
+  generates pain.001 but nothing submits it or exposes a UI. Build the payment-
+  order screen; bank submission is a separate integration decision.
+- **VID/deadline view** — surface the 5-working-day windows and overdue items
+  (data from #2) as a calm deadline strip (DESIGN.md principle 3).
+- **Journal / entry browser** — no way to view posted `journal_entries`.
+- **Period management UI** — `src/ledger/periods.ts` open/close exists; no UI.
+- **Party (customer/vendor) management UI** — `src/parties/parties.ts` CRUD
+  exists; no UI. Needed by #3.
+- **Autonomy-settings UI** — `src/autonomy/autonomy.ts` policy engine exists;
+  no UI to configure the per-operation thresholds (spec §4.1's core dial).
+- **Admin is read-only** — spec §5 wants the admin to manage clients, tariffs,
+  permissions, templates. Tariffs and templates don't exist anywhere (backend +
+  UI); scope them.
+- **Settings / 2FA enrolment** — TOTP secrets exist server-side but there's no
+  user-facing setup/recovery, no profile/settings page.
+
+---
+
+## 5. Absent accounting modules (spec §6, Phase 2–3)
+
+Net-new backend + UI. Each needs migrations, a `src/<module>/`, tests, API
+routes, and pages. **Engage the accountant/tax consultant (spec §10.1)** for
+LR-specific rules in every one.
+
+- **Payroll & HR (§6.3)** — salary, VSAOI + IIN (the 15th-of-month filing),
+  sick leave, vacation, advances; employee self-service portal.
+- **Fixed assets (§6.5)** — asset register, accounting + tax depreciation with
+  automatic postings, disposal.
+- **Warehouse / inventory (§6.4)** — receipts/issues/transfers, FIFO, batches,
+  cost, links to purchase/sales.
+- **Annual report + closing (§6.8)** — period-closing entries, retained-earnings
+  rollover, balance sheet, P&L per LR accounting rules.
+- **UIN (corporate income tax) and MUN (micro-enterprise tax) (§6.2)** — today
+  VAT is the only tax; both are alternative regimes to model.
+- **Multi-currency (§6.1)** — single base currency per client today; add FX and
+  exchange-rate differences.
+- **Assistant capabilities (§6.9)** — cash-flow forecast, anomaly/fraud
+  detection, proactive deadline reminders. The agentic chat + tools exist
+  (`src/assistant/`); these are new tools/jobs on top.
+
+Smaller VAT gaps to fold in: reverse charge / intra-EU, exemptions, monthly-vs-
+quarterly periodicity logic.
+
+---
+
+## Cross-cutting, before or alongside the above
+
+- **GDPR (§7/§9)** — data export + erasure workflows; none exist.
+- **E-signature (§6.7)** — document signing; not implemented.
+- **Push dispatch** — `src/push/device-tokens.ts` queues, but no APNs/FCM send.
+- **Native mobile app + offline queue (§4.3)** — today it's a responsive web
+  app with camera capture (added in the adapt pass); the spec wants a native
+  app with offline photo queueing.
+- **Open API + marketplace (§9, Phase 4)** — future ecosystem.
+- **Rate limiting on login, audit-log tamper detection (hash chain)** — security
+  hardening flagged in the audit.
+
+---
+
+## Conventions (so the next person matches the codebase)
+
+- **Domain logic** in `src/<module>/`, pure functions taking `(tx, ctx, ...)`;
+  every mutation calls `appendAudit(...)`. RLS is enforced at the DB layer via
+  `withTenant(ctx, ...)` — never bypass it.
+- **Money** as integer cents through `src/db/money.ts`; never floats.
+- **Web API routes** (`web/app/api/.../route.ts`): `getSessionToken()` →
+  `resolveTenantContext(token, clientCompanyId, nowUnix())` → domain call inside
+  `withTenant`. Copy an existing route; keep the 401/403 mapping.
+- **Ledger is append-only** (DB triggers). Corrections are reversals, not edits.
+- **i18n**: every user-facing string goes in all three catalogs in
+  `web/app/lib/i18n.ts` (typed `Record<keyof typeof EN, string>` — TS fails the
+  build if a language misses a key). Dates via `LOCALE_FOR[lang]`.
+- **Icons**: inline stroked SVG, `currentColor`, ~1.5px — see
+  `web/app/components/NavIcon.tsx`. No emoji, no icon-font.
+- **External integrations** stay behind an interface with a stub for tests —
+  mirror `AccessPoint`/`StubAccessPoint` and `VidClient`.
+- **New feature = migration + domain + tests + API route + page**, in that order.
+  Run `npm test` (root) and `npx tsc --noEmit` in both root and `web/`.
+
+## First decisions to unblock work (spec §10)
+
+1. Peppol connection model + accredited provider (#1).
+2. VID/EDS connection method + the exact norm/form list, with an accountant (#2).
+3. Bank list + statement formats for MVP integrations.
+4. Monetisation model (drives tariffs/templates in admin, #4).
+5. AI approach — own models vs. external API with a private data boundary.

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMessages } from '@/app/lib/i18n-context';
+import { LOCALE_FOR, type Lang, type MsgKey } from '@/app/lib/i18n';
 import { EmptyState } from './EmptyState';
 import styles from './AdminTables.module.css';
 
@@ -38,9 +39,9 @@ interface AdminTablesProps {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtDate(iso: string): string {
+function fmtDate(iso: string, lang: Lang): string {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    return new Date(iso).toLocaleDateString(LOCALE_FOR[lang], {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -48,6 +49,54 @@ function fmtDate(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+// Known machine values → message keys. Unknown values fall back to the raw
+// string so new audit vocabulary degrades visibly instead of breaking.
+const ROLE_KEYS: Record<string, MsgKey> = {
+  accountant: 'role.accountant',
+  firm_admin: 'role.firm_admin',
+  owner: 'role.owner',
+  employee: 'role.employee',
+};
+
+const ACTION_KEYS: Record<string, MsgKey> = {
+  create: 'audit.action.create',
+  update: 'audit.action.update',
+  status: 'audit.action.status',
+  resolve: 'audit.action.resolve',
+  extract: 'audit.action.extract',
+  import: 'audit.action.import',
+  post: 'audit.action.post',
+  posted: 'audit.action.posted',
+  send: 'audit.action.send',
+  set: 'audit.action.set',
+  vid_submit: 'audit.action.vid_submit',
+  assistant_answer: 'audit.action.assistant_answer',
+  suggested: 'audit.action.suggested',
+  pending_approval: 'audit.action.pending_approval',
+  approved: 'audit.action.approved',
+  rejected: 'audit.action.rejected',
+};
+
+const ENTITY_KEYS: Record<string, MsgKey> = {
+  document: 'audit.entity.document',
+  party: 'audit.entity.party',
+  proposal: 'audit.entity.proposal',
+  task: 'audit.entity.task',
+  bank_statement: 'audit.entity.bank_statement',
+  journal_entry: 'audit.entity.journal_entry',
+  bank_match: 'audit.entity.bank_match',
+  einvoice: 'audit.entity.einvoice',
+  autonomy_policy: 'audit.entity.autonomy_policy',
+  chat: 'audit.entity.chat',
+  account: 'audit.entity.account',
+  period: 'audit.entity.period',
+};
+
+function translated(map: Record<string, MsgKey>, raw: string, t: (k: MsgKey) => string): string {
+  const key = map[raw];
+  return key ? t(key) : raw;
 }
 
 // ── Clients table ─────────────────────────────────────────────────────────────
@@ -101,7 +150,7 @@ function UsersTable({ users }: { users: UserRow[] }) {
           {users.map((u) => (
             <tr key={u.id}>
               <td>{u.email}</td>
-              <td className={styles.role}>{u.role}</td>
+              <td className={styles.role}>{translated(ROLE_KEYS, u.role, t)}</td>
             </tr>
           ))}
         </tbody>
@@ -112,11 +161,14 @@ function UsersTable({ users }: { users: UserRow[] }) {
 
 // ── Audit table ───────────────────────────────────────────────────────────────
 
-function AuditTable({ audit }: { audit: AuditRow[] }) {
-  const { t } = useMessages();
+function AuditTable({ audit, users }: { audit: AuditRow[]; users: UserRow[] }) {
+  const { t, lang } = useMessages();
   if (audit.length === 0) {
     return <EmptyState message={t('admin.noAudit')} detail={t('admin.noAuditDetail')} />;
   }
+  // Resolve actor UUIDs to emails; a UUID means the user is no longer in the
+  // firm's list — show a short fragment rather than the full opaque id.
+  const emailById = new Map(users.map((u) => [u.id, u.email]));
   return (
     <div className={styles.tableWrapper}>
       <table className={styles.table}>
@@ -131,10 +183,14 @@ function AuditTable({ audit }: { audit: AuditRow[] }) {
         <tbody>
           {audit.map((row, i) => (
             <tr key={i}>
-              <td className={styles.mono}>{row.action}</td>
-              <td>{row.entityType}</td>
-              <td className={styles.mono}>{row.actorId}</td>
-              <td className={styles.colDate}>{fmtDate(row.createdAt)}</td>
+              <td>{translated(ACTION_KEYS, row.action, t)}</td>
+              <td>{translated(ENTITY_KEYS, row.entityType, t)}</td>
+              <td>
+                {emailById.get(row.actorId) ?? (
+                  <code className={styles.mono}>{row.actorId.slice(0, 8)}…</code>
+                )}
+              </td>
+              <td className={styles.colDate}>{fmtDate(row.createdAt, lang)}</td>
             </tr>
           ))}
         </tbody>
@@ -161,7 +217,7 @@ export function AdminTables({ clients, users, audit }: AdminTablesProps) {
 
       <section className={styles.section} aria-labelledby="admin-audit-heading">
         <h2 id="admin-audit-heading" className={styles.sectionHeading}>{t('admin.audit')}</h2>
-        <AuditTable audit={audit} />
+        <AuditTable audit={audit} users={users} />
       </section>
     </div>
   );

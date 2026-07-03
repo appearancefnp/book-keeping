@@ -1,5 +1,6 @@
 'use client';
 
+import { useMessages } from '../lib/i18n-context';
 import styles from './ErrorState.module.css';
 
 export interface ErrorStateProps {
@@ -8,6 +9,7 @@ export interface ErrorStateProps {
 }
 
 export function ErrorState({ message, onRetry }: ErrorStateProps) {
+  const { t } = useMessages();
   return (
     <div className={styles.root} role="alert">
       <span className={styles.icon} aria-hidden="true">
@@ -22,10 +24,8 @@ export function ErrorState({ message, onRetry }: ErrorStateProps) {
           <circle cx="20" cy="26.5" r="1.25" fill="currentColor" />
         </svg>
       </span>
-      <h2 className={styles.heading}>Couldn't load the approval queue.</h2>
-      <p className={styles.body}>
-        Something went wrong while fetching proposals. Check your connection and try again.
-      </p>
+      <h2 className={styles.heading}>{t('state.errorTitle')}</h2>
+      <p className={styles.body}>{t('state.errorDetail')}</p>
       {message && (
         <p className={styles.detail}>{message}</p>
       )}
@@ -34,7 +34,7 @@ export function ErrorState({ message, onRetry }: ErrorStateProps) {
         className={styles.btnRetry}
         onClick={onRetry}
       >
-        Retry
+        {t('state.retry')}
       </button>
     </div>
   );

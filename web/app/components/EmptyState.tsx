@@ -1,3 +1,6 @@
+'use client';
+
+import { useMessages } from '../lib/i18n-context';
 import styles from './EmptyState.module.css';
 
 export interface EmptyStateProps {
@@ -5,10 +8,10 @@ export interface EmptyStateProps {
   detail?: string;
 }
 
-export function EmptyState({
-  message = 'Nothing awaiting approval.',
-  detail = "You're all caught up for this client.",
-}: EmptyStateProps = {}) {
+export function EmptyState({ message, detail }: EmptyStateProps = {}) {
+  const { t } = useMessages();
+  const heading = message ?? t('queue.empty');
+  const body = detail === undefined ? t('queue.emptyDetail') : detail;
   return (
     <div className={styles.root} role="status">
       <span className={styles.icon} aria-hidden="true">
@@ -23,8 +26,8 @@ export function EmptyState({
           />
         </svg>
       </span>
-      <h2 className={styles.heading}>{message}</h2>
-      {detail && <p className={styles.body}>{detail}</p>}
+      <h2 className={styles.heading}>{heading}</h2>
+      {body && <p className={styles.body}>{body}</p>}
     </div>
   );
 }

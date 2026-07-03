@@ -20,9 +20,20 @@ export async function authed(req: AuthedRequest, fn: (ctx: import('../tenancy/co
   return fn(ctx);
 }
 
+/** Parses optional limit/offset string params into a paging filter. Limit is clamped to 200. */
+export function pagingFromParams(params?: Record<string, string>): { limit?: number; offset?: number } {
+  const out: { limit?: number; offset?: number } = {};
+  const limit = Number.parseInt(params?.limit ?? '', 10);
+  if (Number.isFinite(limit) && limit > 0) out.limit = Math.min(limit, 200);
+  const offset = Number.parseInt(params?.offset ?? '', 10);
+  if (Number.isFinite(offset) && offset > 0) out.offset = offset;
+  return out;
+}
+
 export function approvalQueueHandler(req: AuthedRequest): Promise<ApiResponse> {
   return authed(req, async (ctx) => {
-    const proposals = await withTenant(ctx, (tx) => listProposals(tx, ctx, { status: 'pending_approval' }));
+    const paging = pagingFromParams(req.params);
+    const proposals = await withTenant(ctx, (tx) => listProposals(tx, ctx, { status: 'pending_approval', ...paging }));
     return { status: 200, body: { proposals } };
   });
 }

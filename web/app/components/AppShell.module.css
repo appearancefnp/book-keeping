@@ -14,7 +14,7 @@
   flex-direction: column;
   min-width: 0;
   /* Reserve space for the sidebar */
-  margin-left: 220px;
+  margin-left: 248px;
 }
 
 .main {
@@ -92,8 +92,8 @@
 @media (max-width: 639px) {
   .body {
     margin-left: 0;
-    /* Leave room for the bottom tab bar */
-    padding-bottom: 56px;
+    /* Leave room for the bottom tab bar + home indicator */
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
   }
 
   .assistant {

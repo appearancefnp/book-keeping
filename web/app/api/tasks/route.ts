@@ -6,6 +6,7 @@ import { resolveTenantContext } from '@domain/auth/context.js';
 import { withTenant } from '@domain/db/pool.js';
 import { listTasks, createTask } from '@domain/collab/tasks.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
+import { parsePaging } from '@/app/lib/paging';
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
@@ -15,11 +16,12 @@ export async function GET(req: NextRequest) {
   if (!clientCompanyId) return NextResponse.json({ error: 'missing clientCompanyId' }, { status: 400 });
 
   const status = req.nextUrl.searchParams.get('status') as 'open' | 'resolved' | null;
+  const paging = parsePaging(req.nextUrl.searchParams);
 
   try {
     const ctx = await resolveTenantContext(token, clientCompanyId, nowUnix());
     const tasks = await withTenant(ctx, async (tx) => {
-      return listTasks(tx, ctx, status ? { status } : {});
+      return listTasks(tx, ctx, { ...(status && { status }), ...paging });
     });
     return NextResponse.json({ tasks }, { status: 200 });
   } catch (err) {

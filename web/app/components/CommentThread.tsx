@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMessages } from '@/app/lib/i18n-context';
+import { LOCALE_FOR, type Lang, type MsgKey } from '@/app/lib/i18n';
 import styles from './CommentThread.module.css';
 
 interface CommentRow {
@@ -11,19 +12,19 @@ interface CommentRow {
   createdAt: string;
 }
 
-function formatRelativeDate(iso: string): string {
+function formatRelativeDate(iso: string, t: (k: MsgKey) => string, lang: Lang): string {
   try {
     const date = new Date(iso);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return 'just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffMin < 1) return t('time.justNow');
+    if (diffMin < 60) return `${diffMin}${t('time.minutesAgo')}`;
     const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) return `${diffHr}h ago`;
+    if (diffHr < 24) return `${diffHr}${t('time.hoursAgo')}`;
     const diffDay = Math.floor(diffHr / 24);
-    if (diffDay < 7) return `${diffDay}d ago`;
-    return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date);
+    if (diffDay < 7) return `${diffDay}${t('time.daysAgo')}`;
+    return new Intl.DateTimeFormat(LOCALE_FOR[lang], { month: 'short', day: 'numeric' }).format(date);
   } catch {
     return iso;
   }
@@ -35,7 +36,7 @@ export interface CommentThreadProps {
 }
 
 export function CommentThread({ taskId, clientCompanyId }: CommentThreadProps) {
-  const { t } = useMessages();
+  const { t, lang } = useMessages();
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [composerBody, setComposerBody] = useState('');
@@ -94,7 +95,7 @@ export function CommentThread({ taskId, clientCompanyId }: CommentThreadProps) {
       )}
 
       {!loading && comments.length === 0 && (
-        <p className={styles.noComments}>{t('tasks.comment')}</p>
+        <p className={styles.noComments}>{t('tasks.noComments')}</p>
       )}
 
       {!loading && comments.length > 0 && (
@@ -104,7 +105,7 @@ export function CommentThread({ taskId, clientCompanyId }: CommentThreadProps) {
               <div className={styles.commentMeta}>
                 <span className={styles.commentAuthor}>{c.author}</span>
                 <time className={styles.commentTime} dateTime={c.createdAt}>
-                  {formatRelativeDate(c.createdAt)}
+                  {formatRelativeDate(c.createdAt, t, lang)}
                 </time>
               </div>
               <p className={styles.commentBody}>{c.body}</p>

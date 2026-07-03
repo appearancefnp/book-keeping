@@ -47,13 +47,16 @@ export async function getProposal(tx: PoolClient, ctx: TenantContext, id: string
 }
 
 export async function listProposals(
-  tx: PoolClient, ctx: TenantContext, filter: { status?: ProposalStatus } = {},
+  tx: PoolClient, ctx: TenantContext,
+  filter: { status?: ProposalStatus; limit?: number; offset?: number } = {},
 ): Promise<ProposalRow[]> {
+  // LIMIT NULL / OFFSET NULL are no-ops in Postgres, so omitted paging keeps the old behavior.
   const res = await tx.query(
     `SELECT ${SELECT_COLS} FROM proposals
      WHERE client_company_id = $1 AND ($2::text IS NULL OR status = $2)
-     ORDER BY created_at ASC`,
-    [ctx.clientCompanyId, filter.status ?? null],
+     ORDER BY created_at ASC
+     LIMIT $3::int OFFSET $4::int`,
+    [ctx.clientCompanyId, filter.status ?? null, filter.limit ?? null, filter.offset ?? null],
   );
   return res.rows;
 }

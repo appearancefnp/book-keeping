@@ -1,3 +1,9 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 .zone {
   display: flex;
   flex-direction: column;
@@ -59,6 +65,40 @@
 .hint {
   font-size: 0.8125rem;
   color: var(--ink-soft);
+}
+
+/* Camera button — only offered where the pointer is a finger; desktops with a
+   mouse keep the plain file dialog. */
+.cameraBtn {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .cameraBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    padding: var(--space-2) var(--space-4);
+    font: inherit;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--primary-ink);
+    background: var(--primary);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+
+  .cameraBtn:active {
+    background: var(--primary-deep);
+  }
+
+  .cameraBtn:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
 }
 
 /* Upload spinner */

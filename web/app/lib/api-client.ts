@@ -20,9 +20,11 @@ export async function fetchClients(): Promise<{ clients: ClientCompany[]; role: 
   return data as { clients: ClientCompany[]; role: string };
 }
 
-export async function fetchProposals(clientCompanyId: string): Promise<Proposal[]> {
+export async function fetchProposals(clientCompanyId: string, limit?: number): Promise<Proposal[]> {
+  const params = new URLSearchParams({ clientCompanyId });
+  if (limit !== undefined) params.set('limit', String(limit));
   const data = await jsonOrThrow(
-    await fetch(`/api/proposals?clientCompanyId=${encodeURIComponent(clientCompanyId)}`, { cache: 'no-store' }),
+    await fetch(`/api/proposals?${params.toString()}`, { cache: 'no-store' }),
   );
   return (data as { proposals: Proposal[] }).proposals;
 }

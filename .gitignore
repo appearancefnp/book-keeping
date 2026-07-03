@@ -10,3 +10,6 @@ graphify-out/
 # Playwright MCP browser-QA artifacts (screenshots, snapshots, console logs)
 .playwright-mcp/
 *.png
+
+# Local dev document blobs
+web/.blob-store/

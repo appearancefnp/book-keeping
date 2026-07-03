@@ -1,3 +1,5 @@
+'use client';
+
 import type { DocumentStatus } from '@domain/documents/documents.js';
 import { useMessages } from '@/app/lib/i18n-context';
 import { EmptyState } from './EmptyState';
@@ -42,6 +44,30 @@ function mimeLabel(mime: string): string {
   return mime;
 }
 
+// Defensive read of the AI extraction (ExtractedInvoice shape) — older or
+// unprocessed documents have none, and the table must not depend on it.
+interface ExtractedSummary {
+  supplierName?: string;
+  date?: string;
+  amount?: string;
+}
+
+function extractedSummary(data: unknown): ExtractedSummary {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+  const obj = data as Record<string, unknown>;
+  const out: ExtractedSummary = {};
+  if (typeof obj['supplierName'] === 'string' && obj['supplierName']) out.supplierName = obj['supplierName'];
+  if (typeof obj['date'] === 'string' && obj['date']) out.date = obj['date'];
+  if (typeof obj['grandTotal'] === 'string' && obj['grandTotal']) {
+    const currency = typeof obj['currency'] === 'string' ? obj['currency'] : '';
+    const num = Number(obj['grandTotal']);
+    out.amount = isNaN(num)
+      ? `${obj['grandTotal']}${currency ? ` ${currency}` : ''}`
+      : new Intl.NumberFormat('lv-LV', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num) + (currency ? ` ${currency}` : '');
+  }
+  return out;
+}
+
 interface StatusChipProps {
   status: DocumentStatus;
 }
@@ -68,7 +94,7 @@ export function DocumentList({ documents }: DocumentListProps) {
   const { t } = useMessages();
 
   if (documents.length === 0) {
-    return <EmptyState message={t('docs.empty')} />;
+    return <EmptyState message={t('docs.empty')} detail={t('docs.emptyDetail')} />;
   }
 
   return (
@@ -76,27 +102,40 @@ export function DocumentList({ documents }: DocumentListProps) {
       <table className={styles.table}>
         <thead>
           <tr>
-            <th scope="col" className={styles.thId}>ID</th>
-            <th scope="col" className={styles.thType}>Type</th>
-            <th scope="col" className={styles.thStatus}>Status</th>
+            <th scope="col" className={styles.thSupplier}>{t('rat.supplier')}</th>
+            <th scope="col" className={styles.thDate}>{t('post.date')}</th>
+            <th scope="col" className={styles.thAmount}>{t('bank.amount')}</th>
+            <th scope="col" className={styles.thType}>{t('docs.col.type')}</th>
+            <th scope="col" className={styles.thStatus}>{t('docs.col.status')}</th>
           </tr>
         </thead>
         <tbody>
-          {documents.map((doc, i) => (
-            <tr
-              key={doc.id}
-              className={styles.row}
-              style={{ animationDelay: `${i * 40}ms` }}
-            >
-              <td className={styles.tdId}>
-                <code className={styles.idCode}>{shortId(doc.id)}</code>
-              </td>
-              <td className={styles.tdType}>{mimeLabel(doc.mime)}</td>
-              <td className={styles.tdStatus}>
-                <StatusChip status={doc.status} />
-              </td>
-            </tr>
-          ))}
+          {documents.map((doc, i) => {
+            const extracted = extractedSummary(doc.extractedData);
+            return (
+              <tr
+                key={doc.id}
+                className={styles.row}
+                style={{ animationDelay: `${i * 40}ms` }}
+              >
+                <td className={styles.tdSupplier}>
+                  {extracted.supplierName ?? (
+                    <code className={styles.idCode}>{shortId(doc.id)}</code>
+                  )}
+                </td>
+                <td className={styles.tdDate}>
+                  {extracted.date ?? <span className={styles.nil}>—</span>}
+                </td>
+                <td className={styles.tdAmount}>
+                  {extracted.amount ?? <span className={styles.nil}>—</span>}
+                </td>
+                <td className={styles.tdType}>{mimeLabel(doc.mime)}</td>
+                <td className={styles.tdStatus}>
+                  <StatusChip status={doc.status} />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

@@ -2,10 +2,18 @@
 
 import { useRouter } from 'next/navigation';
 import { useMessages } from '@/app/lib/i18n-context';
+import type { MsgKey } from '@/app/lib/i18n';
 import { logout } from '@/app/lib/api-client';
 import type { ClientCompany } from '@/app/lib/api-client';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import styles from './TopBar.module.css';
+
+const ROLE_KEYS: Record<string, MsgKey> = {
+  accountant: 'role.accountant',
+  firm_admin: 'role.firm_admin',
+  owner: 'role.owner',
+  employee: 'role.employee',
+};
 
 interface TopBarProps {
   clients: ClientCompany[];
@@ -67,7 +75,7 @@ export function TopBar({ clients, activeClientId, onClientChange, role, onAsk }:
         </button>
 
         <div className={styles.userArea}>
-          <span className={styles.roleTag}>{role}</span>
+          <span className={styles.roleTag}>{ROLE_KEYS[role] ? t(ROLE_KEYS[role]) : role}</span>
           <button
             type="button"
             className={styles.signOutBtn}

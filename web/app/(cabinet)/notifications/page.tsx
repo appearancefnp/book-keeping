@@ -7,7 +7,11 @@ import { NotificationList, type NotificationRow } from '@/app/components/Notific
 import { SkeletonCard } from '@/app/components/SkeletonCard';
 import { ErrorState } from '@/app/components/ErrorState';
 import { EmptyState } from '@/app/components/EmptyState';
+import { LoadMoreButton } from '@/app/components/LoadMoreButton';
 import styles from './page.module.css';
+
+// Growing-window pagination: "show more" refetches with a larger limit.
+const PAGE_SIZE = 50;
 
 function NotificationsInner() {
   const searchParams = useSearchParams();
@@ -17,12 +21,17 @@ function NotificationsInner() {
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const load = useCallback(async (id: string) => {
-    setLoading(true);
+  const load = useCallback(async (id: string, max: number, quiet = false) => {
+    if (quiet) setLoadingMore(true);
+    else setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/notifications?clientCompanyId=${encodeURIComponent(id)}`);
+      const res = await fetch(
+        `/api/notifications?clientCompanyId=${encodeURIComponent(id)}&limit=${max}`,
+      );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
@@ -34,12 +43,23 @@ function NotificationsInner() {
       setError(e.message ?? t('state.error'));
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [t]);
 
   useEffect(() => {
-    if (clientCompanyId) load(clientCompanyId);
+    if (clientCompanyId) {
+      setLimit(PAGE_SIZE);
+      load(clientCompanyId, PAGE_SIZE);
+    }
   }, [clientCompanyId, load]);
+
+  function handleLoadMore() {
+    if (!clientCompanyId || loadingMore) return;
+    const next = limit + PAGE_SIZE;
+    setLimit(next);
+    load(clientCompanyId, next, true);
+  }
 
   return (
     <div className={styles.page}>
@@ -55,7 +75,7 @@ function NotificationsInner() {
         {clientCompanyId && error && (
           <ErrorState
             message={error}
-            onRetry={() => clientCompanyId && load(clientCompanyId)}
+            onRetry={() => clientCompanyId && load(clientCompanyId, limit)}
           />
         )}
 
@@ -70,11 +90,16 @@ function NotificationsInner() {
 
         {/* Notification list */}
         {!error && !loading && clientCompanyId && (
-          <NotificationList
-            notifications={notifications}
-            clientCompanyId={clientCompanyId}
-            onChanged={() => load(clientCompanyId)}
-          />
+          <>
+            <NotificationList
+              notifications={notifications}
+              clientCompanyId={clientCompanyId}
+              onChanged={() => load(clientCompanyId, limit)}
+            />
+            {notifications.length >= limit && (
+              <LoadMoreButton onClick={handleLoadMore} busy={loadingMore} />
+            )}
+          </>
         )}
       </main>
     </div>

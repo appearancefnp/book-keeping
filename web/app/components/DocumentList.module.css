@@ -26,9 +26,11 @@
   white-space: nowrap;
 }
 
-.thId { width: 8rem; }
-.thType { width: 6rem; }
-.thStatus { /* fills remaining */ }
+.thSupplier { /* fills remaining */ }
+.thDate { width: 7.5rem; }
+.thAmount { width: 9rem; text-align: right; }
+.thType { width: 5.5rem; }
+.thStatus { width: 10rem; }
 
 .row {
   border-bottom: 1px solid var(--border);
@@ -66,8 +68,24 @@
   vertical-align: middle;
 }
 
-.tdId {
+.tdSupplier {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.tdDate {
   white-space: nowrap;
+  color: var(--ink-soft);
+}
+
+/* Money right-aligns so figures reconcile down the column. */
+.tdAmount {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.nil {
+  color: var(--ink-soft);
 }
 
 .idCode {

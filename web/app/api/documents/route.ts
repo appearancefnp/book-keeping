@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { documentsHandler } from '@domain/api/documents-handlers.js';
 import type { AuthedRequest } from '@domain/api/types.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
+import { parsePaging, pagingParams } from '@/app/lib/paging';
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
@@ -15,7 +16,10 @@ export async function GET(req: NextRequest) {
   const authedReq: AuthedRequest = {
     token,
     clientCompanyId,
-    params: status ? { status } : {},
+    params: {
+      ...(status && { status }),
+      ...pagingParams(parsePaging(req.nextUrl.searchParams)),
+    },
     atUnixSeconds: nowUnix(),
   };
   const res = await documentsHandler(authedReq);

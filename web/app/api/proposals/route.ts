@@ -6,13 +6,15 @@ import { approvalQueueHandler } from '@domain/api/handlers.js';
 import { withTenant } from '@domain/db/pool.js';
 import { resolveTenantContext } from '@domain/auth/context.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
+import { parsePaging, pagingParams } from '@/app/lib/paging';
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
   if (!token) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
   const clientCompanyId = req.nextUrl.searchParams.get('clientCompanyId');
   if (!clientCompanyId) return NextResponse.json({ error: 'missing clientCompanyId' }, { status: 400 });
-  const res = await approvalQueueHandler({ token, clientCompanyId, atUnixSeconds: nowUnix() });
+  const params = pagingParams(parsePaging(req.nextUrl.searchParams));
+  const res = await approvalQueueHandler({ token, clientCompanyId, params, atUnixSeconds: nowUnix() });
 
   if (res.status === 200) {
     const body = res.body as { proposals?: Array<{ id: string; [k: string]: unknown }> };

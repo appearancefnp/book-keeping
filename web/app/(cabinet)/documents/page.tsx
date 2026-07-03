@@ -8,9 +8,13 @@ import { DocumentList } from '@/app/components/DocumentList';
 import { FileDropzone } from '@/app/components/FileDropzone';
 import { SkeletonCard } from '@/app/components/SkeletonCard';
 import { ErrorState } from '@/app/components/ErrorState';
+import { LoadMoreButton } from '@/app/components/LoadMoreButton';
 import { Toast } from '@/app/components/Toast';
 import type { ToastKind } from '@/app/components/Toast';
 import styles from './page.module.css';
+
+// Growing-window pagination: "show more" refetches with a larger limit.
+const PAGE_SIZE = 50;
 
 interface ToastEntry {
   id: number;
@@ -31,6 +35,8 @@ function DocumentsInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastEntry[]>([]);
+  const [limit, setLimit] = useState(PAGE_SIZE);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   function pushToast(message: string, kind: ToastKind) {
     const id = ++toastCounter;
@@ -41,11 +47,15 @@ function DocumentsInner() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }
 
-  const loadDocuments = useCallback(async (cid: string) => {
-    setLoading(true);
+  const loadDocuments = useCallback(async (cid: string, max: number, quiet = false) => {
+    if (quiet) setLoadingMore(true);
+    else setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/documents?clientCompanyId=${encodeURIComponent(cid)}`, { cache: 'no-store' });
+      const res = await fetch(
+        `/api/documents?clientCompanyId=${encodeURIComponent(cid)}&limit=${max}`,
+        { cache: 'no-store' },
+      );
       const data = (await res.json()) as { documents?: DocumentRow[]; error?: string };
       if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
       setDocuments(data.documents ?? []);
@@ -54,19 +64,30 @@ function DocumentsInner() {
       setError(e.message ?? t('state.error'));
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [t]);
 
   useEffect(() => {
-    if (clientCompanyId) loadDocuments(clientCompanyId);
+    if (clientCompanyId) {
+      setLimit(PAGE_SIZE);
+      loadDocuments(clientCompanyId, PAGE_SIZE);
+    }
   }, [clientCompanyId, loadDocuments]);
 
   function handleRetry() {
-    if (clientCompanyId) loadDocuments(clientCompanyId);
+    if (clientCompanyId) loadDocuments(clientCompanyId, limit);
   }
 
   function handleUploaded() {
-    if (clientCompanyId) loadDocuments(clientCompanyId);
+    if (clientCompanyId) loadDocuments(clientCompanyId, limit);
+  }
+
+  function handleLoadMore() {
+    if (!clientCompanyId || loadingMore) return;
+    const next = limit + PAGE_SIZE;
+    setLimit(next);
+    loadDocuments(clientCompanyId, next, true);
   }
 
   return (
@@ -101,12 +122,17 @@ function DocumentsInner() {
 
         {/* Document list */}
         {!loading && !error && clientCompanyId && (
-          <DocumentList documents={documents} />
+          <>
+            <DocumentList documents={documents} />
+            {documents.length >= limit && (
+              <LoadMoreButton onClick={handleLoadMore} busy={loadingMore} />
+            )}
+          </>
         )}
       </main>
 
       {/* Toast region */}
-      <div className={styles.toastRegion} aria-label="Notifications">
+      <div className={styles.toastRegion} aria-label={t('nav.notifications')}>
         {toasts.map((entry) => (
           <Toast
             key={entry.id}
