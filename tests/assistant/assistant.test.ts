@@ -46,4 +46,5 @@ test('a model that never finishes is bounded by the step budget', async () => {
   await withTenant(ctx(t), async (tx) => { await createAccount(tx, ctx(t), { code: '2310', name: 'D', type: 'asset' }); });
   const out = await withTenant(ctx(t), (tx) => runAssistant(tx, ctx(t), { question: 'loop', model: loopy, tools: buildAssistantTools(config), maxSteps: 3 }));
   expect(out.answer).toBeTruthy(); // returns a bounded fallback, does not hang
+  expect(out.answer).toContain('I can only answer from your bookkeeping data.');
 });
