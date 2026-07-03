@@ -8,6 +8,7 @@ import { fetchClients } from '@/app/lib/api-client';
 import type { ClientCompany } from '@/app/lib/api-client';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+import { ChatPanel } from './ChatPanel';
 import styles from './AppShell.module.css';
 
 interface AppShellProps {
@@ -76,14 +77,24 @@ function AppShellInner({ role, children }: AppShellProps) {
         </main>
       </div>
 
-      {/* Assistant slide-over host — Task 5 fills this panel */}
+      {/* Assistant slide-over host */}
       <aside
         className={`${styles.assistant}${assistantOpen ? ` ${styles.assistantOpen}` : ''}`}
         aria-label="Assistant"
         aria-hidden={!assistantOpen}
       >
+        <div className={styles.assistantHeader}>
+          <span className={styles.assistantTitle}>Assistant</span>
+          <button
+            className={styles.assistantClose}
+            onClick={() => setAssistantOpen(false)}
+            aria-label="Close assistant"
+          >
+            ✕
+          </button>
+        </div>
         <div className={styles.assistantInner}>
-          {/* Task 5 mounts the panel here */}
+          <ChatPanel clientCompanyId={activeClientId} />
         </div>
       </aside>
     </div>

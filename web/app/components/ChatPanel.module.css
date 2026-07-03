@@ -1,0 +1,200 @@
+/* ── ChatPanel layout ─────────────────────────────────────────── */
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ── Message list ─────────────────────────────────────────────── */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  /* Ensure scroll works inside fixed-height containers */
+  min-height: 0;
+}
+
+/* ── Message bubbles ──────────────────────────────────────────── */
+.msgUser,
+.msgAsst {
+  display: flex;
+  flex-direction: column;
+  max-width: 88%;
+}
+
+.msgUser {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.msgAsst {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.msgText {
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.msgUser .msgText {
+  background: var(--primary);
+  color: var(--primary-ink);
+  border-bottom-right-radius: var(--radius-sm);
+}
+
+.msgAsst .msgText {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: var(--radius-sm);
+}
+
+/* ── Thinking indicator ───────────────────────────────────────── */
+.thinking {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+  font-style: italic;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  border-bottom-left-radius: var(--radius-sm);
+}
+
+/* ── Citations ────────────────────────────────────────────────── */
+.citations {
+  margin-top: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: 100%;
+}
+
+.citationsLabel {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin-bottom: var(--space-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.citationList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.citationItem {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.citationKey {
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  min-width: 6rem;
+}
+
+.citationVal {
+  font-size: 0.875rem;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+/* ── Inline error ─────────────────────────────────────────────── */
+.errorNotice {
+  font-size: 0.875rem;
+  color: var(--danger);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  align-self: stretch;
+}
+
+/* ── Composer ─────────────────────────────────────────────────── */
+.composer {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.textarea {
+  flex: 1;
+  resize: none;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  line-height: 1.5;
+  min-height: 2.75rem;
+  max-height: 8rem;
+  overflow-y: auto;
+  transition: border-color 120ms ease;
+}
+
+.textarea:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  border-color: var(--primary);
+}
+
+.textarea::placeholder {
+  color: var(--ink-soft);
+}
+
+.textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sendBtn {
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--primary-ink);
+  background: var(--primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  height: 2.75rem;
+  transition: background 120ms ease, opacity 120ms ease;
+}
+
+.sendBtn:hover:not(:disabled) {
+  background: var(--primary-deep);
+}
+
+.sendBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sendBtn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
