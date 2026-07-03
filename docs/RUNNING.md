@@ -43,7 +43,8 @@ npm run seed
 non-empty: firm **Demo Grāmatvedības Birojs**, two clients (**SIA Ziemeļvējs**, **SIA Baltic
 Coffee**), an **accountant** (sees both) and an **owner** (sees the first), a Latvian chart of
 accounts, open Feb/Mar 2026 periods, parties, documents, and a full **approval queue** per client
-(2 purchase-posting proposals + 1 bank-match + 1 VAT-declaration), plus a task and a notification.
+(2 purchase-posting proposals + 1 bank-match + 1 VAT-declaration), plus two tasks (one open with
+a comment, one resolved) and two notifications for the accountant.
 
 It prints login credentials at the end:
 - `accountant@demo.lv` / `owner@demo.lv`, password **`password123`**
@@ -54,9 +55,6 @@ It prints login credentials at the end:
 
 ## 2. Local — web cabinet (`web/`)
 
-> The `web/` Next.js app is being built now (approval-queue screen + API routes + a dev bootstrap).
-> Once it lands, this is the flow (reconcile against `web/README.md` if it differs):
-
 ```bash
 docker compose up -d db              # from repo root — same Postgres
 npm run seed                         # from repo root — seed the demo dataset (recommended)
@@ -66,22 +64,53 @@ cp .env.local.example .env.local 2>/dev/null || echo "DATABASE_URL=postgres://bo
 npm run dev                          # http://localhost:3000
 ```
 
-Then either:
-- **log in** at the app with `accountant@demo.lv` / `password123` + a 2FA code from `npm run seed`, or
-- hit **`http://localhost:3000/api/dev/bootstrap`** once — a dev-only route that ensures migrations,
-  seeds a minimal firm/accountant/client, signs you in (sets the session cookie), and redirects to `/`.
+### Logging in
 
-The web route handlers import the backend domain directly and talk to the **same** Postgres, so the
-seeded data shows up in the cabinet immediately.
+Go to **`http://localhost:3000/login`** and enter:
 
-### OCR / extraction for the POC
+| Field | Value |
+|---|---|
+| Email | `accountant@demo.lv` (sees both clients) or `owner@demo.lv` (sees the first) |
+| Password | `password123` |
+| 2FA code | printed by `npm run seed` — a 6-digit TOTP code (30s window) |
 
-The pipeline runs with a **StubExtractor by default — no LLM, no key needed** (the demo works as-is).
-For *real* extraction, pick a free option and wire it at the capture-handler factory (details +
-trade-offs in [`docs/oss-poc-options.md`](./oss-poc-options.md)):
-- **Local, free, private (recommended):** `ollama serve` + `ollama pull qwen2.5vl`, use `OllamaExtractor`.
-- **Hosted free tier (zero setup):** set `GEMINI_API_KEY`, use `GeminiExtractor` (not zero-retention).
-- **Paid, zero-retention:** set `ANTHROPIC_API_KEY`, use `AnthropicExtractor`.
+2FA is mandatory. If the printed code expires before you log in, re-run `npm run seed` (it prints a fresh code) or add the `otpauth://` URI to an authenticator app (e.g. Google Authenticator, Aegis) and use that going forward.
+
+Alternatively, hit **`http://localhost:3000/api/dev/bootstrap`** once — a dev-only route that
+migrates, seeds a minimal dataset, signs you in automatically, and redirects to `/`. Handy for
+quick iteration; skip this in production.
+
+### Cabinet navigation
+
+After login the cabinet shows a client-switcher (accountant only) and a sidebar with:
+
+| Screen | What it shows |
+|---|---|
+| **Queue** | Approval queue — pending posting, bank-match, and VAT-declaration proposals |
+| **Documents** | Uploaded documents; upload new ones for OCR extraction |
+| **Overview** | Trial balance, VAT summary, open receivables |
+| **Tasks** | Task list with open/resolved filter; click a task to read/add comments |
+| **Notifications** | Inbox — mark individual or all notifications read |
+| **Admin** | Firm clients, users, and the audit log (accountant role only) |
+| **Ask** (slide-over) | AI assistant chat — summarises the client's financial data on demand |
+
+A **language switcher** (LV / EN) is in the top bar. The UI and all labels flip between
+Latvian and English; data (account names, memos) stays as seeded.
+
+### AI assistant and OCR extraction
+
+Both default to **Stub mode — no LLM or API key required**; the demo is fully functional without one.
+
+For real responses, set one of these env vars in `web/.env.local`:
+
+| Env var | Provider | Notes |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Anthropic Claude | Paid; zero-retention tier available |
+| `GEMINI_API_KEY` | Google Gemini | Free tier; not zero-retention |
+| `OLLAMA_HOST` | Local Ollama | Free + private; run `ollama serve` locally |
+
+The assistant and the document extractor each pick up whichever key is set (Anthropic takes
+precedence, then Gemini, then Ollama, else Stub).
 
 ---
 
@@ -123,5 +152,5 @@ The `web/` Next.js app deploys to Vercel; the backend domain ships with it (rout
 | `npm run seed` | **wipe** + seed demo data (prints logins + 2FA) |
 | `npm test` | full backend suite |
 | `npm run typecheck` | type-check backend |
-| `cd web && npm run dev` | run the cabinet UI (once `web/` is built) |
+| `cd web && npm run dev` | run the cabinet UI at http://localhost:3000 |
 | `cd web && npm run build` | production build of the UI |
