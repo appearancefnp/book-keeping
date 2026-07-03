@@ -7,9 +7,9 @@ import { NavIcon, type NavIconName } from './NavIcon';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
-  key: 'nav.queue' | 'nav.documents' | 'nav.overview' | 'nav.tasks' | 'nav.notifications' | 'nav.admin';
+  key: 'nav.queue' | 'nav.documents' | 'nav.overview' | 'nav.tasks' | 'nav.notifications' | 'nav.admin' | 'nav.parties';
   /** Compact label for the mobile bottom tab bar, where six full-length LV/RU labels can't fit. */
-  shortKey: 'nav.short.queue' | 'nav.short.documents' | 'nav.short.overview' | 'nav.short.tasks' | 'nav.short.notifications' | 'nav.short.admin';
+  shortKey: 'nav.short.queue' | 'nav.short.documents' | 'nav.short.overview' | 'nav.short.tasks' | 'nav.short.notifications' | 'nav.short.admin' | 'nav.short.parties';
   href: string;
   icon: NavIconName;
 }
@@ -20,6 +20,7 @@ const BASE_ITEMS: NavItem[] = [
   { key: 'nav.overview',       shortKey: 'nav.short.overview',       href: '/overview',      icon: 'overview' },
   { key: 'nav.tasks',          shortKey: 'nav.short.tasks',          href: '/tasks',         icon: 'tasks' },
   { key: 'nav.notifications',  shortKey: 'nav.short.notifications',  href: '/notifications', icon: 'notifications' },
+  { key: 'nav.parties',        shortKey: 'nav.short.parties',        href: '/parties',       icon: 'parties' },
 ];
 
 const ADMIN_ITEM: NavItem = { key: 'nav.admin', shortKey: 'nav.short.admin', href: '/admin', icon: 'admin' };

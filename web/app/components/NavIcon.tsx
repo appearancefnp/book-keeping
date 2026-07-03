@@ -8,7 +8,8 @@ export type NavIconName =
   | 'overview'
   | 'tasks'
   | 'notifications'
-  | 'admin';
+  | 'admin'
+  | 'parties';
 
 const PATHS: Record<NavIconName, React.ReactNode> = {
   // Checklist / approval queue
@@ -56,6 +57,15 @@ const PATHS: Record<NavIconName, React.ReactNode> = {
         d="M10 2.75l.9 1.9 2-.55.35 2.05 1.95.75-.95 1.85.95 1.85-1.95.75-.35 2.05-2-.55-.9 1.9-.9-1.9-2 .55-.35-2.05-1.95-.75.95-1.85-.95-1.85 1.95-.75.35-2.05 2 .55z"
         strokeLinejoin="round"
       />
+    </>
+  ),
+  // Two-person silhouette / parties
+  parties: (
+    <>
+      <circle cx="7.5" cy="7" r="2.5" />
+      <path d="M3.5 16.5c0-2.5 1.8-4 4-4s4 1.5 4 4" strokeLinecap="round" />
+      <circle cx="13.75" cy="7.75" r="2" />
+      <path d="M13 12.75c2 0 3.5 1.4 3.5 3.5" strokeLinecap="round" />
     </>
   ),
 };
