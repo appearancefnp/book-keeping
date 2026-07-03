@@ -10,5 +10,5 @@ export async function GET() {
   if (!token) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
   const session = await validateSession(token, nowUnix());
   if (!session) return NextResponse.json({ error: 'Session invalid or expired' }, { status: 401 });
-  return NextResponse.json(session, { status: 200 });
+  return NextResponse.json({ userId: session.userId, firmId: session.firmId, role: session.role }, { status: 200 });
 }

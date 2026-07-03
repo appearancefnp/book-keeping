@@ -46,7 +46,7 @@ export function LoginForm() {
           setCode('');
         }
       } else {
-        setError(e.message ?? t('login.badCode'));
+        setError(e.message ?? t('state.error'));
       }
     } finally {
       setBusy(false);
