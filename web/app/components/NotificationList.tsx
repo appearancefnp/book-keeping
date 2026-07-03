@@ -33,6 +33,11 @@ function formatDate(iso: string, t: (k: import('@/app/lib/i18n').MsgKey) => stri
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+function prettyKind(k: string): string {
+  const s = k.replace(/_/g, ' ').toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 export function NotificationList({ notifications, clientCompanyId, onChanged }: NotificationListProps) {
   const { t } = useMessages();
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
@@ -127,7 +132,7 @@ export function NotificationList({ notifications, clientCompanyId, onChanged }: 
                     {!notif.read && (
                       <span className={styles.unreadDot} aria-hidden="true" />
                     )}
-                    <span className={styles.kind}>{notif.kind}</span>
+                    <span className={styles.kind}>{prettyKind(notif.kind)}</span>
                     <span className={styles.time}>{formatDate(notif.createdAt, t)}</span>
                   </div>
                   {!notif.read && (
