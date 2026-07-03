@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
+import { useMessages } from '@/app/lib/i18n-context';
 import styles from './FileDropzone.module.css';
 
 export interface FileDropzoneProps {
@@ -34,6 +35,7 @@ function isAccepted(file: File): boolean {
 }
 
 export function FileDropzone({ clientCompanyId, uploadLabel, onUploaded, onToast }: FileDropzoneProps) {
+  const { t } = useMessages();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -41,7 +43,7 @@ export function FileDropzone({ clientCompanyId, uploadLabel, onUploaded, onToast
 
   const processFile = useCallback(async (file: File) => {
     if (!isAccepted(file)) {
-      onToast('Only images and PDF files are accepted.', 'error');
+      onToast(t('docs.badType'), 'error');
       return;
     }
     setFileName(file.name);
@@ -57,17 +59,17 @@ export function FileDropzone({ clientCompanyId, uploadLabel, onUploaded, onToast
       if (!res.ok) {
         throw new Error(data.error ?? `Upload failed (${res.status})`);
       }
-      onToast('Document uploaded — proposal created.', 'ok');
+      onToast(t('docs.uploaded'), 'ok');
       onUploaded();
     } catch (err) {
       const e = err as Error;
-      onToast(e.message ?? 'Upload failed.', 'error');
+      onToast(e.message ?? t('docs.uploadFailed'), 'error');
     } finally {
       setUploading(false);
       setFileName(null);
       if (inputRef.current) inputRef.current.value = '';
     }
-  }, [clientCompanyId, onToast, onUploaded]);
+  }, [clientCompanyId, onToast, onUploaded, t]);
 
   // ── Drag handlers ────────────────────────────────────────────────────────
 
@@ -151,13 +153,13 @@ export function FileDropzone({ clientCompanyId, uploadLabel, onUploaded, onToast
 
       <span className={styles.label}>
         {uploading
-          ? (fileName ? `Uploading ${fileName}…` : 'Uploading…')
+          ? (fileName ? `${t('docs.uploading').replace('…', '')} ${fileName}…` : t('docs.uploading'))
           : uploadLabel}
       </span>
 
       {!uploading && (
         <span className={styles.hint}>
-          PDF or image · drag and drop or click to browse
+          {t('docs.hint')}
         </span>
       )}
     </div>

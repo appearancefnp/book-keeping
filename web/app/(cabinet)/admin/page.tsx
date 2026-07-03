@@ -93,8 +93,8 @@ function AdminInner() {
         {/* Forbidden */}
         {forbidden && (
           <EmptyState
-            message="Admin access is restricted."
-            detail="This section is only available to accountants and firm administrators."
+            message={t('admin.restricted')}
+            detail={t('admin.restrictedDetail')}
           />
         )}
 

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import { LanguageProvider } from '@/app/lib/i18n-context';
+import { LanguageProvider, useMessages } from '@/app/lib/i18n-context';
 import { fetchClients } from '@/app/lib/api-client';
 import type { ClientCompany } from '@/app/lib/api-client';
 import { Sidebar } from './Sidebar';
@@ -19,6 +19,7 @@ interface AppShellProps {
 function AppShellInner({ role, children }: AppShellProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useMessages();
 
   const [clients, setClients] = useState<ClientCompany[]>([]);
   const [activeClientId, setActiveClientId] = useState<string | null>(
@@ -99,15 +100,15 @@ function AppShellInner({ role, children }: AppShellProps) {
       {/* Assistant slide-over host */}
       <aside
         className={`${styles.assistant}${assistantOpen ? ` ${styles.assistantOpen}` : ''}`}
-        aria-label="Assistant"
+        aria-label={t('asst.title')}
         aria-hidden={!assistantOpen}
       >
         <div className={styles.assistantHeader}>
-          <span className={styles.assistantTitle}>Assistant</span>
+          <span className={styles.assistantTitle}>{t('asst.title')}</span>
           <button
             className={styles.assistantClose}
             onClick={() => setAssistantOpen(false)}
-            aria-label="Close assistant"
+            aria-label={t('asst.title')}
           >
             ✕
           </button>

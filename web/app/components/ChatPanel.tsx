@@ -59,7 +59,7 @@ export function ChatPanel({ clientCompanyId }: ChatPanelProps) {
     const question = draft.trim();
     if (!question || thinking) return;
     if (!clientCompanyId) {
-      setError('No client selected.');
+      setError(t('asst.noClient'));
       return;
     }
 

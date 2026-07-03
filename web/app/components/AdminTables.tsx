@@ -55,7 +55,7 @@ function fmtDate(iso: string): string {
 function ClientsTable({ clients }: { clients: ClientCompany[] }) {
   const { t } = useMessages();
   if (clients.length === 0) {
-    return <EmptyState message="No clients found." detail="No client companies are registered for this firm." />;
+    return <EmptyState message={t('admin.noClients')} detail={t('admin.noClientsDetail')} />;
   }
   return (
     <div className={styles.tableWrapper}>
@@ -64,7 +64,7 @@ function ClientsTable({ clients }: { clients: ClientCompany[] }) {
           <tr>
             <th scope="col">{t('top.client')}</th>
             <th scope="col">{t('admin.regNo')}</th>
-            <th scope="col" className={styles.colCurrency}>Currency</th>
+            <th scope="col" className={styles.colCurrency}>{t('admin.currency')}</th>
           </tr>
         </thead>
         <tbody>
@@ -86,7 +86,7 @@ function ClientsTable({ clients }: { clients: ClientCompany[] }) {
 function UsersTable({ users }: { users: UserRow[] }) {
   const { t } = useMessages();
   if (users.length === 0) {
-    return <EmptyState message="No users found." detail="No users are registered for this firm." />;
+    return <EmptyState message={t('admin.noUsers')} detail={t('admin.noUsersDetail')} />;
   }
   return (
     <div className={styles.tableWrapper}>
@@ -115,17 +115,17 @@ function UsersTable({ users }: { users: UserRow[] }) {
 function AuditTable({ audit }: { audit: AuditRow[] }) {
   const { t } = useMessages();
   if (audit.length === 0) {
-    return <EmptyState message="No audit entries." detail="No activity has been recorded for this client yet." />;
+    return <EmptyState message={t('admin.noAudit')} detail={t('admin.noAuditDetail')} />;
   }
   return (
     <div className={styles.tableWrapper}>
       <table className={styles.table}>
         <thead>
           <tr>
-            <th scope="col">Action</th>
-            <th scope="col">Entity type</th>
-            <th scope="col">Actor</th>
-            <th scope="col" className={styles.colDate}>{t('admin.audit')}</th>
+            <th scope="col">{t('admin.action')}</th>
+            <th scope="col">{t('admin.entityType')}</th>
+            <th scope="col">{t('admin.actor')}</th>
+            <th scope="col" className={styles.colDate}>{t('admin.date')}</th>
           </tr>
         </thead>
         <tbody>

@@ -48,7 +48,7 @@ function NotificationsInner() {
 
         {/* No client selected */}
         {!clientCompanyId && (
-          <EmptyState message={t('notif.title')} detail="Select a client to view notifications." />
+          <EmptyState message={t('notif.title')} detail={t('notif.selectClient')} />
         )}
 
         {/* Error */}

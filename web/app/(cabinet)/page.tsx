@@ -144,12 +144,12 @@ function ApprovalQueue() {
       setTimeout(() => {
         setProposals((prev) => prev.filter((p) => p.id !== id));
         clearCardState(id);
-        pushToast('Approved — posted to the ledger.', 'ok');
+        pushToast(t('queue.approved'), 'ok');
       }, 250);
     } catch (err) {
       setCardBusy(id, false);
       const e = err as Error;
-      setCardError(id, e.message ?? 'Failed to approve');
+      setCardError(id, e.message ?? t('queue.approveFailed'));
     }
   }
 
@@ -166,12 +166,12 @@ function ApprovalQueue() {
       setTimeout(() => {
         setProposals((prev) => prev.filter((p) => p.id !== id));
         clearCardState(id);
-        pushToast('Rejected.', 'ok');
+        pushToast(t('queue.rejected'), 'ok');
       }, 250);
     } catch (err) {
       setCardBusy(id, false);
       const e = err as Error;
-      setCardError(id, e.message ?? 'Failed to reject');
+      setCardError(id, e.message ?? t('queue.rejectFailed'));
     }
   }
 
@@ -212,7 +212,7 @@ function ApprovalQueue() {
         {/* Proposal list */}
         {!proposalsError && !proposalsLoading && proposals.length > 0 && (
           <section aria-labelledby="queue-heading">
-            <h2 id="queue-heading" className="sr-only">Proposals awaiting approval</h2>
+            <h2 id="queue-heading" className="sr-only">{t('queue.awaiting')}</h2>
             <ul className={styles.list}>
               {proposals.map((proposal, i) => {
                 const cs = cardStates[proposal.id];
@@ -249,7 +249,7 @@ function ApprovalQueue() {
       </main>
 
       {/* Toast region — screen-reader live region */}
-      <div className={styles.toastRegion} aria-label="Notifications">
+      <div className={styles.toastRegion} aria-label={t('nav.notifications')}>
         {toasts.map((t) => (
           <Toast
             key={t.id}

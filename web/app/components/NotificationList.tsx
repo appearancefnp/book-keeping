@@ -19,17 +19,17 @@ export interface NotificationListProps {
   onChanged: () => void;
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, t: (k: import('@/app/lib/i18n').MsgKey) => string): string {
   const d = new Date(iso);
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffMins < 1) return t('time.justNow');
+  if (diffMins < 60) return `${diffMins}${t('time.minutesAgo')}`;
   const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffHours < 24) return `${diffHours}${t('time.hoursAgo')}`;
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 7) return `${diffDays}${t('time.daysAgo')}`;
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
@@ -128,7 +128,7 @@ export function NotificationList({ notifications, clientCompanyId, onChanged }: 
                       <span className={styles.unreadDot} aria-hidden="true" />
                     )}
                     <span className={styles.kind}>{notif.kind}</span>
-                    <span className={styles.time}>{formatDate(notif.createdAt)}</span>
+                    <span className={styles.time}>{formatDate(notif.createdAt, t)}</span>
                   </div>
                   {!notif.read && (
                     <button

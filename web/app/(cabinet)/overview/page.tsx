@@ -134,8 +134,8 @@ function OverviewInner() {
         {/* Empty */}
         {!error && !loading && data && data.trialBalance.length === 0 && (
           <EmptyState
-            message="No ledger entries yet."
-            detail="Once transactions are posted for this client, the trial balance will appear here."
+            message={t('over.empty')}
+            detail={t('over.emptyDetail')}
           />
         )}
 
