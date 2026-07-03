@@ -154,7 +154,7 @@ function OverviewInner() {
                   },
                 ]}
                 caption={[
-                  data.vat.rule.value ? `${(Number(data.vat.rule.value) * 100).toFixed(0)} %` : null,
+                  data.vat.rule.value ? `${data.vat.rule.value} %` : null,
                   formatDateRange(data.period.fromDate, data.period.toDate),
                 ].filter(Boolean).join(' · ') || undefined}
               />
