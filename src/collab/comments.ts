@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
 
-export interface CommentRow { id: string; author: string; body: string; }
+export interface CommentRow { id: string; author: string; body: string; createdAt: string; }
 
 export async function addComment(tx: PoolClient, ctx: TenantContext, input: { entityType: string; entityId: string; body: string }): Promise<{ id: string }> {
   const res = await tx.query(
@@ -12,7 +12,7 @@ export async function addComment(tx: PoolClient, ctx: TenantContext, input: { en
 }
 export async function listComments(tx: PoolClient, ctx: TenantContext, entityType: string, entityId: string): Promise<CommentRow[]> {
   const res = await tx.query(
-    `SELECT id, author, body FROM comments
+    `SELECT id, author, body, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS "createdAt" FROM comments
      WHERE client_company_id = $1 AND entity_type = $2 AND entity_id = $3 ORDER BY seq`,
     [ctx.clientCompanyId, entityType, entityId],
   );

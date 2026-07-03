@@ -26,7 +26,8 @@ import { createProposal, type Rationale } from '../proposals/proposals.js';
 import { importStatement } from '../banking/import.js';
 import { proposeMatches } from '../banking/match.js';
 import { createVatDeclarationProposal } from '../tax/vat-proposal.js';
-import { createTask } from '../collab/tasks.js';
+import { createTask, resolveTask } from '../collab/tasks.js';
+import { addComment } from '../collab/comments.js';
 import { notify } from '../collab/notifications.js';
 
 const VAT_CONFIG = { outputVatAccount: '5721', inputVatAccount: '5722' };
@@ -114,9 +115,17 @@ async function seedClient(ctx: TenantContext, clientName: string): Promise<void>
     // VAT declaration proposal for March (always human-approved).
     await createVatDeclarationProposal(tx, ctx, { fromDate: '2026-03-01', toDate: '2026-03-31', config: VAT_CONFIG });
 
-    // A task/request and a notification.
-    await createTask(tx, ctx, { title: 'Trūkst līguma pie AS Enerģija rēķina', detail: 'Lūdzu augšupielādēt piegādes līgumu, lai varam klasificēt izdevumu.' });
+    // Tasks: one open (needs action) + one already resolved (archived), with a comment on each.
+    const taskOpen = await createTask(tx, ctx, { title: 'Trūkst līguma pie AS Enerģija rēķina', detail: 'Lūdzu augšupielādēt piegādes līgumu, lai varam klasificēt izdevumu.' });
+    await addComment(tx, ctx, { entityType: 'task', entityId: taskOpen.id, body: 'Esmu nosūtījis pieprasījumu klientam — gaidu atbildi.' });
+
+    const taskDone = await createTask(tx, ctx, { title: 'Pārbaudīt bankas konta bilanci uz 28.02.2026', detail: 'Salīdzināt grāmatvedības atlikumu ar bankas izrakstu un apstiprināt mēneša slēgumu.' });
+    await addComment(tx, ctx, { entityType: 'task', entityId: taskDone.id, body: 'Bilances sakrīt. Februāra periods slēgts.' });
+    await resolveTask(tx, ctx, taskDone.id);
+
+    // Notifications: one unread (approval needed) + one already informational (task resolved).
     await notify(tx, ctx, { recipient: ctx.actorId, kind: 'approval_needed', message: 'Vairāki grāmatojumi gaida apstiprinājumu.' });
+    await notify(tx, ctx, { recipient: ctx.actorId, kind: 'task_resolved', message: `Uzdevums "${taskDone.id.slice(0, 8)}" tika atrisināts — februāra periods slēgts.` });
   });
 }
 

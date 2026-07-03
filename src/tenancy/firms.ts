@@ -31,3 +31,12 @@ export async function createClientCompany(
   );
   return res.rows[0];
 }
+
+export async function listClientCompaniesForFirm(firmId: string): Promise<ClientCompany[]> {
+  const res = await appPool.query(
+    `SELECT id, firm_id AS "firmId", name, reg_no AS "regNo", base_currency AS "baseCurrency"
+     FROM client_companies WHERE firm_id = $1 ORDER BY name ASC`,
+    [firmId],
+  );
+  return res.rows;
+}

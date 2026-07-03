@@ -35,3 +35,12 @@ export async function findUserByEmail(email: string): Promise<(UserRow & { passw
   );
   return res.rows[0] ?? null;
 }
+
+export async function listUsersForFirm(firmId: string): Promise<UserRow[]> {
+  const res = await appPool.query(
+    `SELECT id, firm_id AS "firmId", email, role, language
+     FROM users WHERE firm_id = $1 ORDER BY email ASC`,
+    [firmId],
+  );
+  return res.rows;
+}

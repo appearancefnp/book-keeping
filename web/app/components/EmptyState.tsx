@@ -1,6 +1,14 @@
 import styles from './EmptyState.module.css';
 
-export function EmptyState() {
+export interface EmptyStateProps {
+  message?: string;
+  detail?: string;
+}
+
+export function EmptyState({
+  message = 'Nothing awaiting approval.',
+  detail = "You're all caught up for this client.",
+}: EmptyStateProps = {}) {
   return (
     <div className={styles.root} role="status">
       <span className={styles.icon} aria-hidden="true">
@@ -15,8 +23,8 @@ export function EmptyState() {
           />
         </svg>
       </span>
-      <h2 className={styles.heading}>Nothing awaiting approval.</h2>
-      <p className={styles.body}>You're all caught up for this client.</p>
+      <h2 className={styles.heading}>{message}</h2>
+      {detail && <p className={styles.body}>{detail}</p>}
     </div>
   );
 }

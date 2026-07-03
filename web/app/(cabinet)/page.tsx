@@ -1,22 +1,20 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import type { Proposal } from './lib/proposal-types';
-import type { ClientCompany } from './lib/api-client';
+import { useSearchParams } from 'next/navigation';
+import type { Proposal } from '@/app/lib/proposal-types';
 import {
-  fetchClients,
   fetchProposals,
   approveProposal,
   rejectProposal,
-} from './lib/api-client';
-import { AppHeader } from './components/AppHeader';
-import { ProposalCard } from './components/ProposalCard';
-import { SkeletonCard } from './components/SkeletonCard';
-import { EmptyState } from './components/EmptyState';
-import { ErrorState } from './components/ErrorState';
-import { Toast } from './components/Toast';
-import type { ToastKind } from './components/Toast';
+} from '@/app/lib/api-client';
+import { useMessages } from '@/app/lib/i18n-context';
+import { ProposalCard } from '@/app/components/ProposalCard';
+import { SkeletonCard } from '@/app/components/SkeletonCard';
+import { EmptyState } from '@/app/components/EmptyState';
+import { ErrorState } from '@/app/components/ErrorState';
+import { Toast } from '@/app/components/Toast';
+import type { ToastKind } from '@/app/components/Toast';
 import styles from './page.module.css';
 
 // ── Toast state ──────────────────────────────────────────────────────────────
@@ -40,20 +38,11 @@ interface CardState {
 // Reads useSearchParams — must be inside the Suspense boundary.
 
 function ApprovalQueue() {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useMessages();
 
-  // Clients
-  const [clients, setClients] = useState<ClientCompany[]>([]);
-  const [role, setRole] = useState<string | null>(null);
-  const [clientsLoading, setClientsLoading] = useState(true);
-  const [clientsError, setClientsError] = useState<string | null>(null);
-  const [is401, setIs401] = useState(false);
-
-  // Selected client
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(
-    searchParams.get('client'),
-  );
+  // Active client comes from the shell via ?client= URL param
+  const selectedClientId = searchParams.get('client');
 
   // Proposals
   const [proposals, setProposals] = useState<Proposal[]>([]);
@@ -70,7 +59,6 @@ function ApprovalQueue() {
   const [cardErrors, setCardErrors] = useState<Record<string, string>>({});
 
   // Track whether proposals have loaded at least once for this client
-  // (to distinguish "initial loading" from "re-fetching")
   const loadedClientRef = useRef<string | null>(null);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -112,41 +100,6 @@ function ApprovalQueue() {
     });
   }
 
-  // ── Load clients on mount ──────────────────────────────────────────────────
-
-  const loadClients = useCallback(async () => {
-    setClientsLoading(true);
-    setClientsError(null);
-    setIs401(false);
-    try {
-      const { clients: loaded, role: loadedRole } = await fetchClients();
-      setClients(loaded);
-      setRole(loadedRole);
-      // If no client in URL, default to first
-      const urlClient = searchParams.get('client');
-      if (!urlClient && loaded.length > 0) {
-        const first = loaded[0];
-        if (first) {
-          setSelectedClientId(first.id);
-          router.replace(`/?client=${encodeURIComponent(first.id)}`);
-        }
-      }
-    } catch (err) {
-      const e = err as Error & { status?: number };
-      if (e.status === 401) {
-        setIs401(true);
-      }
-      setClientsError(e.message ?? 'Failed to load clients');
-    } finally {
-      setClientsLoading(false);
-    }
-  }, [router, searchParams]);
-
-  useEffect(() => {
-    loadClients();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // ── Load proposals when client changes ────────────────────────────────────
 
   const loadProposals = useCallback(async (clientId: string) => {
@@ -155,7 +108,6 @@ function ApprovalQueue() {
     loadedClientRef.current = clientId;
     try {
       const loaded = await fetchProposals(clientId);
-      // Only update if the client hasn't changed mid-flight
       if (loadedClientRef.current === clientId) {
         setProposals(loaded);
         setCardStates({});
@@ -164,27 +116,20 @@ function ApprovalQueue() {
     } catch (err) {
       if (loadedClientRef.current === clientId) {
         const e = err as Error & { status?: number };
-        setProposalsError(e.message ?? 'Failed to load proposals');
+        setProposalsError(e.message ?? t('state.error'));
       }
     } finally {
       if (loadedClientRef.current === clientId) {
         setProposalsLoading(false);
       }
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (selectedClientId) {
       loadProposals(selectedClientId);
     }
   }, [selectedClientId, loadProposals]);
-
-  // ── Client selection ───────────────────────────────────────────────────────
-
-  function handleSelectClient(id: string) {
-    setSelectedClientId(id);
-    router.push(`/?client=${encodeURIComponent(id)}`);
-  }
 
   // ── Approve flow ───────────────────────────────────────────────────────────
 
@@ -199,12 +144,12 @@ function ApprovalQueue() {
       setTimeout(() => {
         setProposals((prev) => prev.filter((p) => p.id !== id));
         clearCardState(id);
-        pushToast('Approved — posted to the ledger.', 'ok');
+        pushToast(t('queue.approved'), 'ok');
       }, 250);
     } catch (err) {
       setCardBusy(id, false);
       const e = err as Error;
-      setCardError(id, e.message ?? 'Failed to approve');
+      setCardError(id, e.message ?? t('queue.approveFailed'));
     }
   }
 
@@ -221,63 +166,38 @@ function ApprovalQueue() {
       setTimeout(() => {
         setProposals((prev) => prev.filter((p) => p.id !== id));
         clearCardState(id);
-        pushToast('Rejected.', 'ok');
+        pushToast(t('queue.rejected'), 'ok');
       }, 250);
     } catch (err) {
       setCardBusy(id, false);
       const e = err as Error;
-      setCardError(id, e.message ?? 'Failed to reject');
+      setCardError(id, e.message ?? t('queue.rejectFailed'));
     }
   }
 
   // ── Retry ──────────────────────────────────────────────────────────────────
 
   function handleRetry() {
-    if (clientsError) {
-      loadClients();
-    } else if (proposalsError && selectedClientId) {
+    if (proposalsError && selectedClientId) {
       loadProposals(selectedClientId);
     }
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  const isLoading = clientsLoading || proposalsLoading;
-  const error = clientsError ?? proposalsError;
-
   return (
     <div className={styles.page}>
-      <AppHeader
-        clients={clients}
-        selectedClientId={selectedClientId}
-        onSelectClient={handleSelectClient}
-        role={role}
-        language="LV"
-      />
-
       <main className={styles.main}>
-        <h1 className={styles.queueHeading}>Approval queue</h1>
+        <h1 className={styles.queueHeading}>{t('nav.queue')}</h1>
 
-        {/* 401 / not signed in */}
-        {is401 && (
-          <div className={styles.authNotice} role="alert">
-            <h2>Not signed in</h2>
-            <p>
-              No active session found. To sign in for local development, visit{' '}
-              <code>/api/dev/bootstrap</code> — it seeds the database, creates a session, and
-              redirects back here.
-            </p>
-          </div>
-        )}
-
-        {/* General error (non-401) */}
-        {!is401 && error && (
-          <ErrorState message={error} onRetry={handleRetry} />
+        {/* General error */}
+        {proposalsError && (
+          <ErrorState message={proposalsError} onRetry={handleRetry} />
         )}
 
         {/* Loading skeletons */}
-        {!error && isLoading && (
-          <ul className={styles.list} aria-label="Loading proposals">
+        {!proposalsError && proposalsLoading && (
+          <ul className={styles.list} aria-label={t('state.loading')}>
             <li><SkeletonCard /></li>
             <li><SkeletonCard /></li>
             <li><SkeletonCard /></li>
@@ -285,14 +205,14 @@ function ApprovalQueue() {
         )}
 
         {/* Empty state */}
-        {!error && !isLoading && selectedClientId && proposals.length === 0 && (
+        {!proposalsError && !proposalsLoading && selectedClientId && proposals.length === 0 && (
           <EmptyState />
         )}
 
         {/* Proposal list */}
-        {!error && !isLoading && proposals.length > 0 && (
+        {!proposalsError && !proposalsLoading && proposals.length > 0 && (
           <section aria-labelledby="queue-heading">
-            <h2 id="queue-heading" className="sr-only">Proposals awaiting approval</h2>
+            <h2 id="queue-heading" className="sr-only">{t('queue.awaiting')}</h2>
             <ul className={styles.list}>
               {proposals.map((proposal, i) => {
                 const cs = cardStates[proposal.id];
@@ -329,7 +249,7 @@ function ApprovalQueue() {
       </main>
 
       {/* Toast region — screen-reader live region */}
-      <div className={styles.toastRegion} aria-label="Notifications">
+      <div className={styles.toastRegion} aria-label={t('nav.notifications')}>
         {toasts.map((t) => (
           <Toast
             key={t.id}
@@ -348,11 +268,6 @@ function ApprovalQueue() {
 function QueueSkeleton() {
   return (
     <div className={styles.page}>
-      <div style={{
-        background: 'var(--surface)',
-        borderBottom: '1px solid var(--border)',
-        height: 56,
-      }} />
       <main className={styles.main}>
         <ul className={styles.list}>
           <li><SkeletonCard /></li>
@@ -364,9 +279,7 @@ function QueueSkeleton() {
   );
 }
 
-// ── Default export: thin Suspense wrapper ─────────────────────────────────────
-// Required because ApprovalQueue uses useSearchParams(), which must be inside
-// a Suspense boundary in Next.js 16 / React 19 or the build will fail.
+// ── Default export ────────────────────────────────────────────────────────────
 
 export default function Page() {
   return (
