@@ -25,6 +25,7 @@ function AppShellInner({ role, children }: AppShellProps) {
     searchParams.get('client'),
   );
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const loadClients = useCallback(async () => {
     try {
@@ -45,10 +46,28 @@ function AppShellInner({ role, children }: AppShellProps) {
     }
   }, [router, searchParams]);
 
+  const loadUnreadCount = useCallback(async (clientId: string) => {
+    try {
+      const res = await fetch(
+        `/api/notifications?clientCompanyId=${encodeURIComponent(clientId)}&unreadOnly=true`,
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as { notifications: unknown[] };
+      setUnreadCount(data.notifications.length);
+    } catch {
+      // Badge staleness is acceptable; silently ignore
+    }
+  }, []);
+
   useEffect(() => {
     loadClients();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (activeClientId) loadUnreadCount(activeClientId);
+    else setUnreadCount(0);
+  }, [activeClientId, loadUnreadCount]);
 
   function handleClientChange(id: string) {
     setActiveClientId(id);
@@ -63,7 +82,7 @@ function AppShellInner({ role, children }: AppShellProps) {
 
   return (
     <div className={styles.shell}>
-      <Sidebar role={role} />
+      <Sidebar role={role} unreadCount={unreadCount} />
       <div className={styles.body}>
         <TopBar
           clients={clients}

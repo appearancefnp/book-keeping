@@ -25,9 +25,10 @@ const ADMIN_ROLES = new Set(['accountant', 'firm_admin']);
 
 interface SidebarProps {
   role: string;
+  unreadCount?: number;
 }
 
-export function Sidebar({ role }: SidebarProps) {
+export function Sidebar({ role, unreadCount = 0 }: SidebarProps) {
   const pathname = usePathname();
   const { t } = useMessages();
 
@@ -47,15 +48,29 @@ export function Sidebar({ role }: SidebarProps) {
       <ul className={styles.navList} role="list">
         {items.map(({ key, href, icon }) => {
           const active = isActive(href);
+          const isNotif = href === '/notifications';
+          const label = t(key);
+          const ariaLabel = isNotif && unreadCount > 0
+            ? `${label} (${unreadCount} unread)`
+            : label;
+
           return (
             <li key={href}>
               <Link
                 href={href}
                 className={`${styles.navLink}${active ? ` ${styles.navLinkActive}` : ''}`}
                 aria-current={active ? 'page' : undefined}
+                aria-label={ariaLabel}
               >
-                <span className={styles.icon} aria-hidden="true">{icon}</span>
-                <span className={styles.label}>{t(key)}</span>
+                <span className={styles.iconWrap}>
+                  <span className={styles.icon} aria-hidden="true">{icon}</span>
+                  {isNotif && unreadCount > 0 && (
+                    <span className={styles.badge} aria-hidden="true">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                </span>
+                <span className={styles.label}>{label}</span>
               </Link>
             </li>
           );

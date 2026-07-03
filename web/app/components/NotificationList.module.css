@@ -1,0 +1,175 @@
+/* ── NotificationList ────────────────────────────────────────── */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Toolbar (mark-all row) ─────────────────────────────────── */
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btnMarkAll {
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink);
+  transition: background-color 120ms ease;
+  white-space: nowrap;
+}
+
+.btnMarkAll:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+.btnMarkAll:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Global error ───────────────────────────────────────────── */
+.globalError {
+  font-size: 0.875rem;
+  color: var(--danger);
+  line-height: 1.5;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+
+/* ── List ───────────────────────────────────────────────────── */
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+}
+
+/* ── Item ───────────────────────────────────────────────────── */
+.item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+/* Unread: slightly elevated surface, no side stripe */
+.itemUnread {
+  background: var(--bg);
+}
+
+.itemContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-5);
+}
+
+@media (max-width: 600px) {
+  .itemContent {
+    padding: var(--space-3) var(--space-4);
+  }
+}
+
+/* ── Item header row ────────────────────────────────────────── */
+.itemHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.itemMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Small unread dot */
+.unreadDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+}
+
+.kind {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.time {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Mark-read button ───────────────────────────────────────── */
+.btnRead {
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink);
+  transition: background-color 120ms ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btnRead:hover:not(:disabled) {
+  background: var(--surface);
+}
+
+.btnRead:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Message text ───────────────────────────────────────────── */
+.message {
+  font-size: 0.9375rem;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  word-break: break-word;
+  margin: 0;
+}
+
+.messageUnread {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* ── Row-level error ────────────────────────────────────────── */
+.rowError {
+  font-size: 0.8125rem;
+  color: var(--danger);
+  line-height: 1.5;
+  margin: 0;
+}
