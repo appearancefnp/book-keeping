@@ -40,6 +40,7 @@ export function CommentThread({ taskId, clientCompanyId }: CommentThreadProps) {
   const [loading, setLoading] = useState(true);
   const [composerBody, setComposerBody] = useState('');
   const [posting, setPosting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const load = useCallback(async () => {
@@ -65,6 +66,7 @@ export function CommentThread({ taskId, clientCompanyId }: CommentThreadProps) {
     const body = composerBody.trim();
     if (!body || posting) return;
     setPosting(true);
+    setSubmitError(null);
     try {
       const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/comments`, {
         method: 'POST',
@@ -74,7 +76,12 @@ export function CommentThread({ taskId, clientCompanyId }: CommentThreadProps) {
       if (res.ok) {
         setComposerBody('');
         await load();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setSubmitError((data as { error?: string }).error ?? t('state.error'));
       }
+    } catch {
+      setSubmitError(t('state.error'));
     } finally {
       setPosting(false);
     }
@@ -111,7 +118,7 @@ export function CommentThread({ taskId, clientCompanyId }: CommentThreadProps) {
           ref={textareaRef}
           className={styles.textarea}
           value={composerBody}
-          onChange={(e) => setComposerBody(e.target.value)}
+          onChange={(e) => { setComposerBody(e.target.value); setSubmitError(null); }}
           placeholder={t('tasks.addComment')}
           disabled={posting}
           rows={2}
@@ -124,6 +131,9 @@ export function CommentThread({ taskId, clientCompanyId }: CommentThreadProps) {
         >
           {t('tasks.addComment')}
         </button>
+        {submitError && (
+          <p className={styles.submitError} role="alert">{submitError}</p>
+        )}
       </form>
     </div>
   );

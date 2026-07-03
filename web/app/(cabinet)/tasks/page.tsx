@@ -6,6 +6,7 @@ import { useMessages } from '@/app/lib/i18n-context';
 import { TaskList, type TaskRow } from '@/app/components/TaskList';
 import { SkeletonCard } from '@/app/components/SkeletonCard';
 import { ErrorState } from '@/app/components/ErrorState';
+import { EmptyState } from '@/app/components/EmptyState';
 import styles from './page.module.css';
 
 // ── Inner component (reads useSearchParams) ───────────────────
@@ -53,8 +54,13 @@ function TasksInner() {
       <main className={styles.main}>
         <h1 className={styles.pageHeading}>{t('tasks.title')}</h1>
 
+        {/* No client selected */}
+        {!clientCompanyId && (
+          <EmptyState message={t('tasks.title')} detail="Select a client to view tasks." />
+        )}
+
         {/* Error */}
-        {error && (
+        {clientCompanyId && error && (
           <ErrorState
             message={error}
             onRetry={() => clientCompanyId && load(clientCompanyId)}
@@ -62,7 +68,7 @@ function TasksInner() {
         )}
 
         {/* Loading */}
-        {!error && loading && (
+        {clientCompanyId && !error && loading && (
           <div className={styles.skeletons}>
             <SkeletonCard />
             <SkeletonCard />

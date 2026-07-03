@@ -141,3 +141,9 @@
   background: var(--bg);
   color: var(--ink);
 }
+
+.resolveError {
+  font-size: 0.875rem;
+  color: var(--danger);
+  line-height: 1.5;
+}

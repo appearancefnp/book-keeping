@@ -23,6 +23,7 @@ export function TaskList({ tasks, clientCompanyId, onTaskResolved }: TaskListPro
   const { t } = useMessages();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
+  const [resolveErrors, setResolveErrors] = useState<Record<string, string>>({});
 
   if (tasks.length === 0) {
     return <EmptyState message={t('tasks.empty')} />;
@@ -35,6 +36,7 @@ export function TaskList({ tasks, clientCompanyId, onTaskResolved }: TaskListPro
   async function handleMarkDone(id: string) {
     if (resolvingIds.has(id)) return;
     setResolvingIds((prev) => new Set(prev).add(id));
+    setResolveErrors((prev) => { const next = { ...prev }; delete next[id]; return next; });
     try {
       const res = await fetch(`/api/tasks/${encodeURIComponent(id)}/resolve`, {
         method: 'POST',
@@ -43,7 +45,11 @@ export function TaskList({ tasks, clientCompanyId, onTaskResolved }: TaskListPro
       });
       if (res.ok) {
         onTaskResolved(id);
+      } else {
+        setResolveErrors((prev) => ({ ...prev, [id]: t('state.error') }));
       }
+    } catch {
+      setResolveErrors((prev) => ({ ...prev, [id]: t('state.error') }));
     } finally {
       setResolvingIds((prev) => {
         const next = new Set(prev);
@@ -59,6 +65,7 @@ export function TaskList({ tasks, clientCompanyId, onTaskResolved }: TaskListPro
         const isResolved = task.status === 'resolved';
         const isExpanded = expandedId === task.id;
         const isBusy = resolvingIds.has(task.id);
+        const resolveError = resolveErrors[task.id] ?? null;
 
         return (
           <li
@@ -90,7 +97,7 @@ export function TaskList({ tasks, clientCompanyId, onTaskResolved }: TaskListPro
                     className={`${styles.btnExpand} ${isExpanded ? styles.btnExpandOpen : ''}`}
                     onClick={() => toggleExpand(task.id)}
                     aria-expanded={isExpanded}
-                    aria-label={t('tasks.comment')}
+                    aria-label={`${isExpanded ? 'Collapse' : 'Expand'} comments: ${task.title}`}
                   >
                     <svg
                       width="16"
@@ -113,6 +120,9 @@ export function TaskList({ tasks, clientCompanyId, onTaskResolved }: TaskListPro
 
               {task.detail && (
                 <p className={styles.taskDetail}>{task.detail}</p>
+              )}
+              {resolveError && (
+                <p className={styles.resolveError} role="alert">{resolveError}</p>
               )}
             </div>
 
