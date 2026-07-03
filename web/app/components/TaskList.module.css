@@ -1,0 +1,143 @@
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0;
+  margin: 0;
+}
+
+/* ── Task item ──────────────────────────────────────────────── */
+.item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.itemResolved {
+  opacity: 0.6;
+}
+
+/* ── Card (top portion) ─────────────────────────────────────── */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-6);
+}
+
+@media (max-width: 600px) {
+  .card {
+    padding: var(--space-3) var(--space-4);
+  }
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.taskTitle {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.taskDetail {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+/* ── Resolved chip (StatusBadge style) ─────────────────────── */
+.resolvedChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Card actions ───────────────────────────────────────────── */
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* Mark done button — quiet secondary */
+.btnDone {
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink);
+  transition: background-color 120ms ease;
+  white-space: nowrap;
+}
+
+.btnDone:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+.btnDone:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Expand/collapse chevron button */
+.btnExpand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+  flex-shrink: 0;
+}
+
+.btnExpand svg {
+  transition: transform 180ms ease;
+}
+
+.btnExpandOpen svg {
+  transform: rotate(180deg);
+}
+
+.btnExpand:hover {
+  background: var(--bg);
+  color: var(--ink);
+}
