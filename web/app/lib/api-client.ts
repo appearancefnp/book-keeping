@@ -2,6 +2,8 @@ import type { Proposal } from './proposal-types';
 
 export interface ClientCompany { id: string; name: string; regNo: string; baseCurrency: string; }
 
+export interface SessionInfo { userId: string; firmId: string; role: string; }
+
 async function jsonOrThrow(res: Response): Promise<unknown> {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -37,4 +39,23 @@ export async function rejectProposal(id: string, clientCompanyId: string, reason
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ clientCompanyId, reason }),
   }));
+}
+
+export async function login(email: string, password: string, code: string): Promise<void> {
+  await jsonOrThrow(await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email, password, code }),
+  }));
+}
+
+export async function logout(): Promise<void> {
+  await jsonOrThrow(await fetch('/api/auth/logout', { method: 'POST' }));
+}
+
+export async function fetchMe(): Promise<SessionInfo | null> {
+  const res = await fetch('/api/auth/me', { cache: 'no-store' });
+  if (res.status === 401) return null;
+  const data = await jsonOrThrow(res);
+  return data as SessionInfo;
 }
