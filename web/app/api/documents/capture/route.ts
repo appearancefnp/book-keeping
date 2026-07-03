@@ -5,6 +5,10 @@ import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { makeCaptureHandler } from '@domain/api/capture-handler.js';
 import { LocalBlobStore } from '@domain/blob/blob-store.js';
 import { StubExtractor } from '@domain/intake/extractor.js';
+import { AnthropicExtractor } from '@domain/intake/anthropic-extractor.js';
+import { GeminiExtractor } from '@domain/intake/gemini-extractor.js';
+import { OllamaExtractor } from '@domain/intake/ollama-extractor.js';
+import type { DocumentExtractor } from '@domain/intake/extractor.js';
 import type { PostingTemplate } from '@domain/intake/map-posting.js';
 
 const CANNED = {
@@ -17,9 +21,17 @@ const CANNED = {
   confidence: { supplierName: 0.98, grandTotal: 0.95 },
 };
 const TEMPLATE: PostingTemplate = { expenseAccount: '7710', vatInputAccount: '5721', payablesAccount: '5310' };
+
+function selectExtractor(): DocumentExtractor {
+  if (process.env.ANTHROPIC_API_KEY) return new AnthropicExtractor();
+  if (process.env.GEMINI_API_KEY) return new GeminiExtractor();
+  if (process.env.OLLAMA_HOST) return new OllamaExtractor();
+  return new StubExtractor(CANNED);
+}
+
 const handler = makeCaptureHandler({
   blob: new LocalBlobStore(process.env.BLOB_DIR ?? '.blob-store'),
-  extractor: new StubExtractor(CANNED),
+  extractor: selectExtractor(),
   resolveTemplate: () => TEMPLATE,
 });
 export async function POST(req: Request) {
