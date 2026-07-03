@@ -1,0 +1,80 @@
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sectionHeading {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  letter-spacing: 0;
+}
+
+/* ── Table wrapper ───────────────────────────────────────────────── */
+
+.tableWrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  max-width: 100%;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.table thead th {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  background: var(--bg);
+}
+
+.table tbody tr + tr td {
+  border-top: 1px solid var(--border);
+}
+
+.table td {
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink);
+  vertical-align: middle;
+}
+
+/* ── Modifiers ───────────────────────────────────────────────────── */
+
+.mono {
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+}
+
+.role {
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.colCurrency {
+  text-align: center !important;
+  min-width: 70px;
+}
+
+.colDate {
+  white-space: nowrap;
+  min-width: 110px;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+}
