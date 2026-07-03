@@ -92,10 +92,10 @@ function AppShellInner({ role, children }: AppShellProps) {
 
 export function AppShell({ role, children }: AppShellProps) {
   return (
-    <LanguageProvider>
-      <Suspense>
+    <Suspense>
+      <LanguageProvider>
         <AppShellInner role={role}>{children}</AppShellInner>
-      </Suspense>
-    </LanguageProvider>
+      </LanguageProvider>
+    </Suspense>
   );
 }
