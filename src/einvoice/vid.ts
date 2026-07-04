@@ -63,3 +63,32 @@ export async function findOverdueVidSubmissions(
   );
   return res.rows;
 }
+
+export interface VidDeadline {
+  einvoiceId: string;
+  invoiceNumber: string;
+  dueDate: string;
+  overdue: boolean;
+}
+
+/** Outbound invoices still awaiting VID submission, with their 5-working-day
+ *  due date (stored one if present, else computed from issue date). */
+export async function upcomingVidDeadlines(
+  tx: PoolClient,
+  ctx: TenantContext,
+  asOf: string,
+): Promise<VidDeadline[]> {
+  const res = await tx.query(
+    `SELECT id, invoice_number,
+            to_char(issue_date, 'YYYY-MM-DD') AS issue_date,
+            to_char(vid_due_date, 'YYYY-MM-DD') AS vid_due_date
+       FROM einvoices
+      WHERE client_company_id = $1 AND direction = 'outbound' AND vid_status = 'pending'
+      ORDER BY issue_date ASC`,
+    [ctx.clientCompanyId],
+  );
+  return res.rows.map((r) => {
+    const dueDate: string = r.vid_due_date ?? addWorkingDays(r.issue_date, 5);
+    return { einvoiceId: r.id, invoiceNumber: r.invoice_number, dueDate, overdue: dueDate < asOf };
+  });
+}
