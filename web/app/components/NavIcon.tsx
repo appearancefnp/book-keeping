@@ -11,7 +11,8 @@ export type NavIconName =
   | 'admin'
   | 'parties'
   | 'invoices'
-  | 'bank';
+  | 'bank'
+  | 'journal';
 
 const PATHS: Record<NavIconName, React.ReactNode> = {
   // Checklist / approval queue
@@ -83,6 +84,13 @@ const PATHS: Record<NavIconName, React.ReactNode> = {
       <path d="M3.5 8h13L10 3.5 3.5 8z" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M5.5 8v6M10 8v6M14.5 8v6" strokeLinecap="round" />
       <path d="M3.5 16.5h13" strokeLinecap="round" />
+    </>
+  ),
+  // Open ledger book
+  journal: (
+    <>
+      <path d="M10 4.5c-1.5-1.2-3.5-1.5-6-1.2V15c2.5-.3 4.5 0 6 1.2 1.5-1.2 3.5-1.5 6-1.2V3.3c-2.5-.3-4.5 0-6 1.2z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 4.5v11.7" strokeLinecap="round" />
     </>
   ),
 };
