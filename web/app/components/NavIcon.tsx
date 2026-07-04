@@ -10,7 +10,8 @@ export type NavIconName =
   | 'notifications'
   | 'admin'
   | 'parties'
-  | 'invoices';
+  | 'invoices'
+  | 'bank';
 
 const PATHS: Record<NavIconName, React.ReactNode> = {
   // Checklist / approval queue
@@ -74,6 +75,14 @@ const PATHS: Record<NavIconName, React.ReactNode> = {
       <path d="M3.5 16.5c0-2.5 1.8-4 4-4s4 1.5 4 4" strokeLinecap="round" />
       <circle cx="13.75" cy="7.75" r="2" />
       <path d="M13 12.75c2 0 3.5 1.4 3.5 3.5" strokeLinecap="round" />
+    </>
+  ),
+  // Bank: pediment + columns
+  bank: (
+    <>
+      <path d="M3.5 8h13L10 3.5 3.5 8z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5.5 8v6M10 8v6M14.5 8v6" strokeLinecap="round" />
+      <path d="M3.5 16.5h13" strokeLinecap="round" />
     </>
   ),
 };

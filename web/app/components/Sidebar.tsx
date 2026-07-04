@@ -7,9 +7,9 @@ import { NavIcon, type NavIconName } from './NavIcon';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
-  key: 'nav.queue' | 'nav.documents' | 'nav.overview' | 'nav.tasks' | 'nav.notifications' | 'nav.admin' | 'nav.parties' | 'nav.invoices';
+  key: 'nav.queue' | 'nav.documents' | 'nav.overview' | 'nav.tasks' | 'nav.notifications' | 'nav.admin' | 'nav.parties' | 'nav.invoices' | 'nav.bank';
   /** Compact label for the mobile bottom tab bar, where six full-length LV/RU labels can't fit. */
-  shortKey: 'nav.short.queue' | 'nav.short.documents' | 'nav.short.overview' | 'nav.short.tasks' | 'nav.short.notifications' | 'nav.short.admin' | 'nav.short.parties' | 'nav.short.invoices';
+  shortKey: 'nav.short.queue' | 'nav.short.documents' | 'nav.short.overview' | 'nav.short.tasks' | 'nav.short.notifications' | 'nav.short.admin' | 'nav.short.parties' | 'nav.short.invoices' | 'nav.short.bank';
   href: string;
   icon: NavIconName;
 }
@@ -18,6 +18,7 @@ const BASE_ITEMS: NavItem[] = [
   { key: 'nav.queue',          shortKey: 'nav.short.queue',          href: '/',              icon: 'queue' },
   { key: 'nav.documents',      shortKey: 'nav.short.documents',      href: '/documents',     icon: 'documents' },
   { key: 'nav.invoices',       shortKey: 'nav.short.invoices',       href: '/invoices',      icon: 'invoices' },
+  { key: 'nav.bank',           shortKey: 'nav.short.bank',           href: '/bank',          icon: 'bank' },
   { key: 'nav.overview',       shortKey: 'nav.short.overview',       href: '/overview',      icon: 'overview' },
   { key: 'nav.tasks',          shortKey: 'nav.short.tasks',          href: '/tasks',         icon: 'tasks' },
   { key: 'nav.notifications',  shortKey: 'nav.short.notifications',  href: '/notifications', icon: 'notifications' },
