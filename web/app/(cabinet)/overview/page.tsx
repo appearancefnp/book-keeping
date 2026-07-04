@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMessages } from '@/app/lib/i18n-context';
-import type { MsgKey } from '@/app/lib/i18n';
+import { LOCALE_FOR, type MsgKey } from '@/app/lib/i18n';
 import { FigureRows } from '@/app/components/FigureRows';
 import { SkeletonCard } from '@/app/components/SkeletonCard';
 import { ErrorState } from '@/app/components/ErrorState';
@@ -25,6 +25,13 @@ interface VatRule {
   ruleType: string;
   value: string;
   effectiveFrom: string;
+}
+
+interface VidDeadline {
+  einvoiceId: string;
+  invoiceNumber: string;
+  dueDate: string;
+  overdue: boolean;
 }
 
 interface OverviewData {
@@ -82,10 +89,11 @@ function TrialBalanceTable({ rows, t }: { rows: TrialBalanceRow[]; t: (k: MsgKey
 
 function OverviewInner() {
   const searchParams = useSearchParams();
-  const { t } = useMessages();
+  const { t, lang } = useMessages();
   const clientCompanyId = searchParams.get('client');
 
   const [data, setData] = useState<OverviewData | null>(null);
+  const [deadlines, setDeadlines] = useState<VidDeadline[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,6 +107,10 @@ function OverviewInner() {
         throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
       }
       setData(await res.json());
+      try {
+        const dRes = await fetch(`/api/vid/deadlines?clientCompanyId=${encodeURIComponent(id)}`, { cache: 'no-store' });
+        if (dRes.ok) setDeadlines(((await dRes.json()) as { deadlines: VidDeadline[] }).deadlines);
+      } catch { /* strip is optional; ignore */ }
     } catch (err) {
       const e = err as Error;
       setError(e.message ?? t('state.error'));
@@ -142,6 +154,29 @@ function OverviewInner() {
         {/* Data */}
         {!error && !loading && data && data.trialBalance.length > 0 && (
           <div className={styles.sections}>
+
+            {/* VID deadline strip */}
+            <section className={styles.section} aria-labelledby="vid-strip-heading">
+              <h2 id="vid-strip-heading" className={styles.sectionHeading}>{t('vid.strip')}</h2>
+              <p className={styles.stripHint}>{t('vid.stripHint')}</p>
+              {(!deadlines || deadlines.length === 0) ? (
+                <p className={styles.stripAllClear}>{t('vid.allClear')}</p>
+              ) : (
+                <ul className={styles.strip}>
+                  {deadlines.map((d) => (
+                    <li key={d.einvoiceId} className={d.overdue ? styles.stripItemOverdue : styles.stripItem}>
+                      <span className={styles.stripInvoice}>{d.invoiceNumber}</span>
+                      <span className={styles.stripDue}>
+                        {(d.overdue ? t('vid.overdue') : t('vid.due')).replace(
+                          '{date}',
+                          new Intl.DateTimeFormat(LOCALE_FOR[lang], { day: 'numeric', month: 'short' }).format(new Date(d.dueDate)),
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
 
             {/* VAT position */}
             <section className={styles.section} aria-labelledby="vat-heading">

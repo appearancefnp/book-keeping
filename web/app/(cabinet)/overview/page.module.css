@@ -120,3 +120,14 @@
   white-space: nowrap;
   vertical-align: middle;
 }
+
+/* ── VID deadline strip ──────────────────────────────────────── */
+
+.stripHint { color: var(--ink-soft); font-size: 0.875rem; margin: 0 0 var(--space-3); }
+.stripAllClear { color: var(--ink-soft); margin: 0; }
+.strip { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.stripItem, .stripItemOverdue { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); background: var(--surface); }
+.stripItemOverdue { border-color: var(--attention); }
+.stripInvoice { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.875rem; color: var(--ink); }
+.stripDue { font-size: 0.8125rem; color: var(--ink-soft); }
+.stripItemOverdue .stripDue { color: var(--attention); }
