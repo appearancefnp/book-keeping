@@ -35,3 +35,15 @@ export async function periodStatusFor(
   );
   return (res.rows[0]?.status as PeriodStatus) ?? 'none';
 }
+
+export interface PeriodRow { year: number; month: number; status: 'open' | 'closed'; }
+
+export async function listPeriods(tx: PoolClient, ctx: TenantContext): Promise<PeriodRow[]> {
+  const res = await tx.query(
+    `SELECT year, month, status FROM accounting_periods
+      WHERE client_company_id = $1
+      ORDER BY year DESC, month DESC`,
+    [ctx.clientCompanyId],
+  );
+  return res.rows.map((r) => ({ year: r.year, month: r.month, status: r.status }));
+}

@@ -40,3 +40,24 @@ export async function resolveAutonomy(
   if (opts.amountCents >= BigInt(row.threshold)) return 'approval'; // material-sum guardrail
   return 'auto';
 }
+
+export interface AutonomyPolicyRow {
+  operationType: string;
+  mode: AutonomyMode;
+  materialThresholdCents: string;
+}
+
+export async function listAutonomyPolicies(tx: PoolClient, ctx: TenantContext): Promise<AutonomyPolicyRow[]> {
+  const res = await tx.query(
+    `SELECT operation_type, mode, material_threshold_cents::text AS material_threshold_cents
+       FROM autonomy_policy
+      WHERE client_company_id = $1
+      ORDER BY operation_type`,
+    [ctx.clientCompanyId],
+  );
+  return res.rows.map((r) => ({
+    operationType: r.operation_type,
+    mode: r.mode,
+    materialThresholdCents: r.material_threshold_cents,
+  }));
+}
