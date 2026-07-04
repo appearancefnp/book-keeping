@@ -12,7 +12,8 @@ export type NavIconName =
   | 'parties'
   | 'invoices'
   | 'bank'
-  | 'journal';
+  | 'journal'
+  | 'settings';
 
 const PATHS: Record<NavIconName, React.ReactNode> = {
   // Checklist / approval queue
@@ -91,6 +92,15 @@ const PATHS: Record<NavIconName, React.ReactNode> = {
     <>
       <path d="M10 4.5c-1.5-1.2-3.5-1.5-6-1.2V15c2.5-.3 4.5 0 6 1.2 1.5-1.2 3.5-1.5 6-1.2V3.3c-2.5-.3-4.5 0-6 1.2z" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M10 4.5v11.7" strokeLinecap="round" />
+    </>
+  ),
+  // Sliders / settings
+  settings: (
+    <>
+      <path d="M3.5 6h13M3.5 10h13M3.5 14h13" strokeLinecap="round" />
+      <circle cx="8" cy="6" r="1.75" fill="var(--surface, #fff)" />
+      <circle cx="12.5" cy="10" r="1.75" fill="var(--surface, #fff)" />
+      <circle cx="6.5" cy="14" r="1.75" fill="var(--surface, #fff)" />
     </>
   ),
 };
