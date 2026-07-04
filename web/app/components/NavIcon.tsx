@@ -9,7 +9,8 @@ export type NavIconName =
   | 'tasks'
   | 'notifications'
   | 'admin'
-  | 'parties';
+  | 'parties'
+  | 'invoices';
 
 const PATHS: Record<NavIconName, React.ReactNode> = {
   // Checklist / approval queue
@@ -57,6 +58,13 @@ const PATHS: Record<NavIconName, React.ReactNode> = {
         d="M10 2.75l.9 1.9 2-.55.35 2.05 1.95.75-.95 1.85.95 1.85-1.95.75-.35 2.05-2-.55-.9 1.9-.9-1.9-2 .55-.35-2.05-1.95-.75.95-1.85-.95-1.85 1.95-.75.35-2.05 2 .55z"
         strokeLinejoin="round"
       />
+    </>
+  ),
+  // Invoice: document with ruled lines
+  invoices: (
+    <>
+      <path d="M5.5 2.75h9A1.25 1.25 0 0115.75 4v13.25l-2.25-1.5-1.75 1.5-1.75-1.5-1.75 1.5-2.25-1.5V4A1.25 1.25 0 015.5 2.75z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7.5 6.5h5M7.5 9.25h5M7.5 12h3" strokeLinecap="round" />
     </>
   ),
   // Two-person silhouette / parties
