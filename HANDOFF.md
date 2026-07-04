@@ -99,7 +99,16 @@ environment; attempts recorded, overdue detection drives a notification/task.
 
 ---
 
-## 3. Invoice creation UI + issue flow  ⟶ unlocks the client-employee role
+## 3. Invoice creation UI + issue flow  ⟶ ✅ SHIPPED 2026-07-04 (except credit notes)
+
+> Shipped in the MVP-UI pass (see `docs/superpowers/plans/2026-07-03-mvp-ui-over-tested-api.md`):
+> invoice composer at `/invoices/new` (customer picker from parties, VAT auto-compute
+> from `tax_rules`, live cent-safe totals), issue flow through `POST /api/einvoices`
+> (→ `sendInvoice`, StubAccessPoint until #1 lands), outbox at `/invoices` with
+> Peppol + VID status columns, and `GET /api/vat-rate`. **Still open: credit notes**
+> (backend + UI — needs UBL CreditNote document type; scope as its own plan).
+
+## 3-original. Invoice creation UI + issue flow  ⟶ unlocks the client-employee role
 
 **Why:** the backend can build/validate/post/send outbound invoices, but there
 is **no screen to create one**. The spec's client-employee role ("izraksta
@@ -135,21 +144,26 @@ valid EN 16931 UBL, and (once #1 lands) sends via Peppol.
 These backends are done; the UI is missing. Follow the `web/app/(cabinet)/*`
 page pattern and the `@domain/*` route pattern.
 
-- **Bank statement upload** — `src/banking/import.ts importStatement(...)` +
-  `camt-parser.ts` are real; there's no upload screen. Add a camt.053 upload +
-  imported-transactions view + the match-review UI (matching proposals already
-  flow through the approval queue).
-- **Payment orders** — `src/banking/sepa.ts generateSepaCreditTransfer(...)`
-  generates pain.001 but nothing submits it or exposes a UI. Build the payment-
-  order screen; bank submission is a separate integration decision.
-- **VID/deadline view** — surface the 5-working-day windows and overdue items
-  (data from #2) as a calm deadline strip (DESIGN.md principle 3).
-- **Journal / entry browser** — no way to view posted `journal_entries`.
-- **Period management UI** — `src/ledger/periods.ts` open/close exists; no UI.
-- **Party (customer/vendor) management UI** — `src/parties/parties.ts` CRUD
-  exists; no UI. Needed by #3.
-- **Autonomy-settings UI** — `src/autonomy/autonomy.ts` policy engine exists;
-  no UI to configure the per-operation thresholds (spec §4.1's core dial).
+Shipped 2026-07-04 (MVP-UI pass):
+
+- ✅ **Bank statement upload** — `/bank`: camt.053 upload (`POST /api/bank/import`),
+  imported-transactions view (`GET /api/bank/transactions`, `listBankTransactions`);
+  match proposals continue to flow through the approval queue.
+- ✅ **Payment orders** — `/bank`: pain.001 composer + download
+  (`POST /api/bank/payment-orders`, audited). Bank submission remains a separate
+  integration decision.
+- ✅ **VID/deadline view** — calm deadline strip on `/overview`
+  (`upcomingVidDeadlines` in `src/einvoice/vid.ts`, `GET /api/vid/deadlines`).
+- ✅ **Journal / entry browser** — `/journal` (`listJournalEntries` in
+  `src/ledger/query.ts`, `GET /api/journal`).
+- ✅ **Period management UI** — `/settings` (admin-gated; `listPeriods` +
+  open/close via `GET/POST /api/periods`).
+- ✅ **Party (customer/vendor) management UI** — `/parties`
+  (`GET/POST /api/parties`, `PATCH /api/parties/:id`).
+- ✅ **Autonomy-settings UI** — `/settings` (admin-gated; `listAutonomyPolicies` +
+  `setAutonomy` via `GET/POST /api/autonomy`).
+
+Still open in this bucket:
 - **Admin is read-only** — spec §5 wants the admin to manage clients, tariffs,
   permissions, templates. Tariffs and templates don't exist anywhere (backend +
   UI); scope them.
@@ -196,6 +210,19 @@ quarterly periodicity logic.
 - **Open API + marketplace (§9, Phase 4)** — future ecosystem.
 - **Rate limiting on login, audit-log tamper detection (hash chain)** — security
   hardening flagged in the audit.
+- **Role-gating on mutating API routes** — the settings screens (`/settings`:
+  periods, autonomy) are gated in the UI (Sidebar shows them only to
+  accountant/firm_admin), but the routes themselves (`/api/periods`,
+  `/api/autonomy`, and the other new mutating routes) only run
+  `resolveTenantContext` — no role check. This matches the existing posture
+  (tasks/notifications/proposals routes are the same; only `/api/admin/*` is
+  role-gated), so it is not a regression, but a client-assigned `employee` could
+  call these directly. Add server-side role checks when tightening authz.
+- **Uniform error-status mapping** — most routes map caught errors to
+  `/session/i ? 401 : 403`. The einvoices POST additionally maps validation/
+  posting failures to 400. Other mutating routes (e.g. parties POST on a
+  duplicate `UNIQUE(client, kind, reg_no)`) return 403 for what is really a
+  400/409. Fold a shared error→status helper in when hardening.
 
 ---
 
