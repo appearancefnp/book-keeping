@@ -63,6 +63,10 @@ function AdminInner() {
         const b = await usersRes.json().catch(() => ({}));
         throw new Error((b as { error?: string }).error ?? `HTTP ${usersRes.status}`);
       }
+      if (!tariffsRes.ok) {
+        const b = await tariffsRes.json().catch(() => ({}));
+        throw new Error((b as { error?: string }).error ?? `HTTP ${tariffsRes.status}`);
+      }
 
       const [clientsJson, usersJson, auditJson] = await Promise.all([
         clientsRes.json(),

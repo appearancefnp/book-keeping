@@ -35,10 +35,10 @@ export function TariffTable({ tariffs, role, onSaved }: TariffTableProps) {
       <table className={styles.table}>
         <thead>
           <tr>
-            <th>{t('admin.tariffs.client')}</th>
-            <th className={styles.num}>{t('admin.tariffs.retainer')}</th>
-            <th className={styles.num}>{t('admin.tariffs.vat')}</th>
-            <th>{t('admin.tariffs.effectiveFrom')}</th>
+            <th scope="col">{t('admin.tariffs.client')}</th>
+            <th scope="col" className={styles.num}>{t('admin.tariffs.retainer')}</th>
+            <th scope="col" className={styles.num}>{t('admin.tariffs.vat')}</th>
+            <th scope="col">{t('admin.tariffs.effectiveFrom')}</th>
             {canEdit && <th aria-hidden="true" />}
           </tr>
         </thead>
@@ -94,10 +94,12 @@ function TariffForm({ row, onCancel, onSaved }: {
   const [error, setError] = useState(false);
 
   async function save() {
+    const n = Number(amount);
+    if (amount.trim() === '' || Number.isNaN(n) || n < 0) { setError(true); return; }
     setSaving(true);
     setError(false);
     try {
-      const cents = Math.round(Number(amount) * 100);
+      const cents = Math.round(n * 100);
       const res = await fetch('/api/admin/tariffs', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
