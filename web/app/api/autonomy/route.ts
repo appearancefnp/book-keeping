@@ -7,6 +7,7 @@ import { withTenant } from '@domain/db/pool.js';
 import { listAutonomyPolicies, setAutonomy } from '@domain/autonomy/autonomy.js';
 import type { AutonomyMode } from '@domain/autonomy/autonomy.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
+import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ policies }, { status: 200 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: /session/i.test(msg) ? 401 : 403 });
+    return NextResponse.json({ error: msg }, { status: errorToStatus(msg) });
   }
 }
 
@@ -49,6 +50,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const ctx = await resolveTenantContext(token, body.clientCompanyId, nowUnix());
+    assertRoleAllowed(ctx.actorRole, 'autonomy.write');
     await withTenant(ctx, (tx) =>
       setAutonomy(tx, ctx, {
         operationType: body.operationType!.trim(),
@@ -59,6 +61,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: /session/i.test(msg) ? 401 : 403 });
+    return NextResponse.json({ error: msg }, { status: errorToStatus(msg) });
   }
 }

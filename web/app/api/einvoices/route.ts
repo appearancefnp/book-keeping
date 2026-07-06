@@ -9,6 +9,7 @@ import { sendInvoice } from '@domain/einvoice/outbound.js';
 import type { EInvoice } from '@domain/einvoice/ubl.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { accessPoint } from '@/app/lib/access-point';
+import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
 
 // Default LV chart-of-accounts codes; override per deployment via env.
 const RECEIVABLE_ACCOUNT = process.env.EINVOICE_RECEIVABLE_ACCOUNT ?? '2310';
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ einvoices }, { status: 200 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: /session/i.test(msg) ? 401 : 403 });
+    return NextResponse.json({ error: msg }, { status: errorToStatus(msg) });
   }
 }
 
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const ctx = await resolveTenantContext(token, body.clientCompanyId, nowUnix());
+    assertRoleAllowed(ctx.actorRole, 'einvoice.issue');
     const result = await withTenant(ctx, (tx) =>
       sendInvoice(tx, ctx, {
         invoice: body.invoice!,
@@ -66,8 +68,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     // Validation/posting failures (EN 16931 issues, closed period, missing
-    // account) are client-fixable → 400, not 403.
-    const httpStatus = /session/i.test(msg) ? 401 : /forbidden|denied|not assigned/i.test(msg) ? 403 : 400;
-    return NextResponse.json({ error: msg }, { status: httpStatus });
+    // account) are client-fixable → 400; role/assignment failures → 403.
+    return NextResponse.json({ error: msg }, { status: errorToStatus(msg) });
   }
 }

@@ -7,6 +7,7 @@ import { withTenant } from '@domain/db/pool.js';
 import { updateParty } from '@domain/parties/parties.js';
 import type { PartyKind } from '@domain/parties/parties.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
+import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const token = await getSessionToken();
@@ -20,6 +21,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   try {
     const tctx = await resolveTenantContext(token, body.clientCompanyId, nowUnix());
+    assertRoleAllowed(tctx.actorRole, 'parties.write');
     await withTenant(tctx, (tx) =>
       updateParty(tx, tctx, id, {
         ...(body.name !== undefined && { name: body.name }),
@@ -31,6 +33,6 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: /session/i.test(msg) ? 401 : 403 });
+    return NextResponse.json({ error: msg }, { status: errorToStatus(msg) });
   }
 }

@@ -7,6 +7,7 @@ import { withTenant } from '@domain/db/pool.js';
 import { generateSepaCreditTransfer } from '@domain/banking/sepa.js';
 import { appendAudit } from '@domain/audit/audit.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
+import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
 
 interface PaymentIn { iban?: string; amount?: string; reference?: string; }
 
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const ctx = await resolveTenantContext(token, body.clientCompanyId, nowUnix());
+    assertRoleAllowed(ctx.actorRole, 'bank.write');
     const xml = generateSepaCreditTransfer(payments);
     await withTenant(ctx, (tx) =>
       appendAudit(tx, ctx, {
@@ -37,6 +39,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ xml }, { status: 200 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: /session/i.test(msg) ? 401 : 403 });
+    return NextResponse.json({ error: msg }, { status: errorToStatus(msg) });
   }
 }
