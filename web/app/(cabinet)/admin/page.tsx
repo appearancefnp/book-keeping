@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMessages } from '@/app/lib/i18n-context';
 import { AdminTables, type ClientCompany, type UserRow, type AuditRow } from '@/app/components/AdminTables';
+import { TariffTable, type FirmTariffRow } from '@/app/components/TariffTable';
 import { SkeletonCard } from '@/app/components/SkeletonCard';
 import { ErrorState } from '@/app/components/ErrorState';
 import { EmptyState } from '@/app/components/EmptyState';
@@ -15,6 +16,8 @@ interface AdminData {
   clients: ClientCompany[];
   users: UserRow[];
   audit: AuditRow[];
+  tariffs: FirmTariffRow[];
+  role: string;
 }
 
 // ── Inner (reads useSearchParams) ─────────────────────────────────────────────
@@ -39,14 +42,15 @@ function AdminInner() {
         ? fetch(`/api/audit?clientCompanyId=${encodeURIComponent(clientCompanyId)}`)
         : Promise.resolve(new Response('{"audit":[]}', { status: 200 }));
 
-      const [clientsRes, usersRes, auditRes] = await Promise.all([
+      const [clientsRes, usersRes, auditRes, tariffsRes] = await Promise.all([
         fetch('/api/admin/clients'),
         fetch('/api/admin/users'),
         auditFetch,
+        fetch('/api/admin/tariffs'),
       ]);
 
       // Role gate: if either firm-level endpoint returns 403, show restricted notice
-      if (clientsRes.status === 403 || usersRes.status === 403) {
+      if (clientsRes.status === 403 || usersRes.status === 403 || tariffsRes.status === 403) {
         setForbidden(true);
         return;
       }
@@ -65,11 +69,14 @@ function AdminInner() {
         usersRes.json(),
         auditRes.json(),
       ]);
+      const tariffsBody = tariffsRes.ok ? await tariffsRes.json() : { tariffs: [], role: '' };
 
       setData({
         clients: (clientsJson as { clients: ClientCompany[] }).clients,
         users: (usersJson as { users: UserRow[] }).users,
         audit: (auditJson as { audit: AuditRow[] }).audit ?? [],
+        tariffs: (tariffsBody as { tariffs: FirmTariffRow[] }).tariffs,
+        role: (tariffsBody as { role: string }).role,
       });
     } catch (err) {
       const e = err as Error;
@@ -114,11 +121,14 @@ function AdminInner() {
 
         {/* Data */}
         {!forbidden && !error && !loading && data && (
-          <AdminTables
-            clients={data.clients}
-            users={data.users}
-            audit={data.audit}
-          />
+          <>
+            <AdminTables
+              clients={data.clients}
+              users={data.users}
+              audit={data.audit}
+            />
+            <TariffTable tariffs={data.tariffs} role={data.role} onSaved={load} />
+          </>
         )}
       </main>
     </div>
