@@ -52,8 +52,12 @@ CREATE INDEX client_tariffs_lookup_idx
   Mirrors `tax_rules` (`UNIQUE(rule_type, effective_from)`, DESC lookup index).
 - **No RLS** (see Decisions). The table is not tenant-scoped; correctness relies on the
   firm-scoping join in every read/write path.
-- **Grants:** `GRANT SELECT, INSERT ON client_tariffs TO bookkeeping_app;` (the app role;
-  no UPDATE/DELETE — the table is append-only like the ledger's dated-row pattern).
+- **Grants:** `GRANT SELECT, INSERT, UPDATE ON client_tariffs TO bookkeeping_app;` (the
+  app role; no DELETE). Append-across-dates: a rate change on a *new* `effective_from` is
+  a new row. A repeat set on an *existing* `effective_from` **upserts** (corrects that
+  day's rate in place) via `ON CONFLICT (client_company_id, effective_from) DO UPDATE` —
+  same pattern as `setAutonomy`. History across distinct dates is preserved; only a
+  same-day correction overwrites.
 - **Money** as integer cents (`monthly_amount_cents bigint`), never floats. **VAT rate**
   stored as a decimal string percent (same representation as `tax_rules.value`).
 
@@ -156,7 +160,8 @@ and its two access paths.
 - G4 template slices (onboarding, invoice/document, notification).
 - Free-text service-scope note on the tariff (deferred; trivial to add as a nullable
   column later).
-- Editing/deleting historical tariff rows (append-only; corrections are new dated rows).
+- Deleting tariff rows (no DELETE). Corrections on a new date are new rows; a same-day
+  correction upserts that date's row.
 
 ## Follow-ups (noted, not built)
 
