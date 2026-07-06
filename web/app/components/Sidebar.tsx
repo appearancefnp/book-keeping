@@ -7,9 +7,9 @@ import { NavIcon, type NavIconName } from './NavIcon';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
-  key: 'nav.queue' | 'nav.documents' | 'nav.overview' | 'nav.tasks' | 'nav.notifications' | 'nav.admin' | 'nav.parties' | 'nav.invoices' | 'nav.bank' | 'nav.journal' | 'nav.settings';
+  key: 'nav.home' | 'nav.queue' | 'nav.documents' | 'nav.overview' | 'nav.tasks' | 'nav.notifications' | 'nav.admin' | 'nav.parties' | 'nav.invoices' | 'nav.bank' | 'nav.journal' | 'nav.settings';
   /** Compact label for the mobile bottom tab bar, where six full-length LV/RU labels can't fit. */
-  shortKey: 'nav.short.queue' | 'nav.short.documents' | 'nav.short.overview' | 'nav.short.tasks' | 'nav.short.notifications' | 'nav.short.admin' | 'nav.short.parties' | 'nav.short.invoices' | 'nav.short.bank' | 'nav.short.journal' | 'nav.short.settings';
+  shortKey: 'nav.short.home' | 'nav.short.queue' | 'nav.short.documents' | 'nav.short.overview' | 'nav.short.tasks' | 'nav.short.notifications' | 'nav.short.admin' | 'nav.short.parties' | 'nav.short.invoices' | 'nav.short.bank' | 'nav.short.journal' | 'nav.short.settings';
   href: string;
   icon: NavIconName;
 }
@@ -33,6 +33,12 @@ const ADMIN_ITEMS: NavItem[] = [
   ADMIN_ITEM,
 ];
 
+const OWNER_ITEMS: NavItem[] = [
+  { key: 'nav.home',          shortKey: 'nav.short.home',          href: '/',              icon: 'overview' },
+  { key: 'nav.documents',     shortKey: 'nav.short.documents',     href: '/documents',     icon: 'documents' },
+  { key: 'nav.notifications', shortKey: 'nav.short.notifications', href: '/notifications', icon: 'notifications' },
+];
+
 const ADMIN_ROLES = new Set(['accountant', 'firm_admin']);
 
 interface SidebarProps {
@@ -44,7 +50,11 @@ export function Sidebar({ role, unreadCount = 0 }: SidebarProps) {
   const pathname = usePathname();
   const { t } = useMessages();
 
-  const items = ADMIN_ROLES.has(role) ? [...BASE_ITEMS, ...ADMIN_ITEMS] : BASE_ITEMS;
+  const items = role === 'owner'
+    ? OWNER_ITEMS
+    : ADMIN_ROLES.has(role)
+      ? [...BASE_ITEMS, ...ADMIN_ITEMS]
+      : BASE_ITEMS;
 
   function isActive(href: string) {
     if (href === '/') return pathname === '/';

@@ -1,9 +1,9 @@
 export const EN = {
-  'nav.queue': 'Approval queue', 'nav.documents': 'Documents', 'nav.overview': 'Overview',
+  'nav.home': 'Home', 'nav.queue': 'Approval queue', 'nav.documents': 'Documents', 'nav.overview': 'Overview',
   'nav.tasks': 'Tasks', 'nav.notifications': 'Notifications', 'nav.admin': 'Admin',
   'nav.parties': 'Customers & vendors', 'nav.invoices': 'Invoices', 'nav.bank': 'Bank',
   'nav.journal': 'Journal',
-  'nav.short.queue': 'Queue', 'nav.short.documents': 'Docs', 'nav.short.overview': 'Overview',
+  'nav.short.home': 'Home', 'nav.short.queue': 'Queue', 'nav.short.documents': 'Docs', 'nav.short.overview': 'Overview',
   'nav.short.tasks': 'Tasks', 'nav.short.notifications': 'Alerts', 'nav.short.admin': 'Admin',
   'nav.short.parties': 'Parties', 'nav.short.invoices': 'Invoices', 'nav.short.bank': 'Bank',
   'nav.short.journal': 'Journal',
@@ -216,11 +216,11 @@ export const EN = {
 } as const;
 
 export const LV: Record<keyof typeof EN, string> = {
-  'nav.queue': 'Apstiprināšanas rinda', 'nav.documents': 'Dokumenti', 'nav.overview': 'Pārskats',
+  'nav.home': 'Sākums', 'nav.queue': 'Apstiprināšanas rinda', 'nav.documents': 'Dokumenti', 'nav.overview': 'Pārskats',
   'nav.tasks': 'Uzdevumi', 'nav.notifications': 'Paziņojumi', 'nav.admin': 'Administrēšana',
   'nav.parties': 'Klienti un piegādātāji', 'nav.invoices': 'Rēķini', 'nav.bank': 'Banka',
   'nav.journal': 'Žurnāls',
-  'nav.short.queue': 'Rinda', 'nav.short.documents': 'Dokumenti', 'nav.short.overview': 'Pārskats',
+  'nav.short.home': 'Sākums', 'nav.short.queue': 'Rinda', 'nav.short.documents': 'Dokumenti', 'nav.short.overview': 'Pārskats',
   'nav.short.tasks': 'Uzdevumi', 'nav.short.notifications': 'Paziņojumi', 'nav.short.admin': 'Admin',
   'nav.short.parties': 'Partneri', 'nav.short.invoices': 'Rēķini', 'nav.short.bank': 'Banka',
   'nav.short.journal': 'Žurnāls',
@@ -433,11 +433,11 @@ export const LV: Record<keyof typeof EN, string> = {
 };
 
 export const RU: Record<keyof typeof EN, string> = {
-  'nav.queue': 'Очередь согласования', 'nav.documents': 'Документы', 'nav.overview': 'Обзор',
+  'nav.home': 'Главная', 'nav.queue': 'Очередь согласования', 'nav.documents': 'Документы', 'nav.overview': 'Обзор',
   'nav.tasks': 'Задачи', 'nav.notifications': 'Уведомления', 'nav.admin': 'Администрирование',
   'nav.parties': 'Клиенты и поставщики', 'nav.invoices': 'Счета', 'nav.bank': 'Банк',
   'nav.journal': 'Журнал',
-  'nav.short.queue': 'Очередь', 'nav.short.documents': 'Документы', 'nav.short.overview': 'Обзор',
+  'nav.short.home': 'Главная', 'nav.short.queue': 'Очередь', 'nav.short.documents': 'Документы', 'nav.short.overview': 'Обзор',
   'nav.short.tasks': 'Задачи', 'nav.short.notifications': 'Уведомления', 'nav.short.admin': 'Админ',
   'nav.short.parties': 'Партнёры', 'nav.short.invoices': 'Счета', 'nav.short.bank': 'Банк',
   'nav.short.journal': 'Журнал',
