@@ -221,6 +221,7 @@ export const EN = {
   'owner.approvals.empty': 'Nothing needs your approval right now.',
   'owner.upload': 'Add a document',
   'owner.loadError': 'Could not load your overview.',
+  'owner.actionFailed': 'Could not complete that action.',
 } as const;
 
 export const LV: Record<keyof typeof EN, string> = {
@@ -446,6 +447,7 @@ export const LV: Record<keyof typeof EN, string> = {
   'owner.approvals.empty': 'Šobrīd nekas nav jāapstiprina.',
   'owner.upload': 'Pievienot dokumentu',
   'owner.loadError': 'Neizdevās ielādēt pārskatu.',
+  'owner.actionFailed': 'Neizdevās pabeigt darbību.',
 };
 
 export const RU: Record<keyof typeof EN, string> = {
@@ -671,6 +673,7 @@ export const RU: Record<keyof typeof EN, string> = {
   'owner.approvals.empty': 'Сейчас одобрять нечего.',
   'owner.upload': 'Добавить документ',
   'owner.loadError': 'Не удалось загрузить обзор.',
+  'owner.actionFailed': 'Не удалось выполнить действие.',
 };
 
 export type Lang = 'lv' | 'en' | 'ru';

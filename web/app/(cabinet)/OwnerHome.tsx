@@ -31,8 +31,8 @@ function OwnerHomeInner() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; kind: ToastKind } | null>(null);
 
-  const load = useCallback(async (cid: string) => {
-    setLoading(true);
+  const load = useCallback(async (cid: string, quiet = false) => {
+    if (!quiet) setLoading(true);
     setError(false);
     try {
       const [ovRes, appr] = await Promise.all([
@@ -57,12 +57,13 @@ function OwnerHomeInner() {
     try {
       await approveProposal(id, clientId);
       setApprovals((prev) => prev.filter((p) => p.id !== id));
+      await load(clientId, true);
     } catch {
-      setToast({ message: t('owner.loadError'), kind: 'error' });
+      setToast({ message: t('owner.actionFailed'), kind: 'error' });
     } finally {
       setBusyId(null);
     }
-  }, [clientId, t]);
+  }, [clientId, t, load]);
 
   const onReject = useCallback(async (id: string, reason: string) => {
     if (!clientId) return;
@@ -70,12 +71,13 @@ function OwnerHomeInner() {
     try {
       await rejectProposal(id, clientId, reason);
       setApprovals((prev) => prev.filter((p) => p.id !== id));
+      await load(clientId, true);
     } catch {
-      setToast({ message: t('owner.loadError'), kind: 'error' });
+      setToast({ message: t('owner.actionFailed'), kind: 'error' });
     } finally {
       setBusyId(null);
     }
-  }, [clientId, t]);
+  }, [clientId, t, load]);
 
   return (
     <div className={styles.page}>
