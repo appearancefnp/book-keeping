@@ -5,6 +5,17 @@ next session: fix the gaps the coverage audit surfaced. It excludes the two
 externally-blocked buckets (live Peppol delivery, real VID/EDS filing) — those wait on
 provider + accountant decisions (see `HANDOFF.md` §1/§2 and §"First decisions"), not on us.
 
+> **Progress 2026-07-06 (this session):** ✅ **G1** (route-level role gating —
+> `src/authz/policy.ts` matrix + `assertRoleAllowed` wired into periods/autonomy/bank/
+> einvoice/parties routes), ✅ **G2** (uniform `errorToStatus` in `web/app/lib/authz.ts`;
+> duplicate party now 409 not 403), ✅ **G6** (LR public-holiday calendar —
+> `src/einvoice/holidays.ts` threaded into `addWorkingDays`), and ✅ **all Priority-3
+> cosmetics** (removed 5 unused i18n keys, disabled bank file input mid-import, parties
+> `kind` enum validated at the route). Commits `fa3ea74`, `6de4df0`, `626a45c`. Full
+> suite 185/185; root+web typecheck clean; G1/G2 verified end-to-end via per-role HTTP
+> smoke on the dev server. **Still open below:** credit notes, G5 (2FA enrolment), and
+> the decision-gated G3/G4/WCAG items.
+
 ## Read first
 - `docs/SPEC-AUDIT.md` — the coverage snapshot these fixes come from (gaps **G1–G6** + minors).
 - `docs/superpowers/plans/2026-07-03-mvp-ui-over-tested-api.md` — the just-executed plan;
