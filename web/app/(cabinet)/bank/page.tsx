@@ -138,6 +138,7 @@ function BankInner() {
             accept=".xml,text/xml,application/xml"
             className="sr-only"
             id="camt-file"
+            disabled={importing}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) importFile(f); }}
           />
           <label htmlFor="camt-file" className={styles.primaryBtn} aria-disabled={importing}>
