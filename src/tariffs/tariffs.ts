@@ -53,7 +53,7 @@ export async function setTariff(
   return { id };
 }
 
-/** The client's tariff in effect at `asOf` (greatest effective_from <= asOf), or null. */
+/** The client's tariff in effect at `asOf` (greatest effective_from <= asOf), or null. No RLS on client_tariffs: callers must have firm-verified ctx.clientCompanyId (see POST /api/admin/tariffs). */
 export async function getCurrentTariff(
   tx: PoolClient, ctx: TenantContext, asOf: string,
 ): Promise<TariffRow | null> {
