@@ -35,6 +35,18 @@ test('addWorkingDays skips weekends', () => {
   expect(addWorkingDays('2026-03-10', 5)).toBe('2026-03-17');
 });
 
+test('addWorkingDays skips LR public holidays', () => {
+  // Good Friday 2026-04-03 and Easter Monday 2026-04-06 are holidays; 2026-04-05 is
+  // Easter Sunday. From Thu 2026-04-02, +1 working day would be Fri 04-03 (Good Friday)
+  // — skipped — then Sat/Sun and Easter Monday, landing on Tue 2026-04-07.
+  expect(addWorkingDays('2026-04-02', 1)).toBe('2026-04-07');
+});
+
+test('addWorkingDays honours an injected holiday predicate', () => {
+  // With no holidays, +1 working day from Thu 2026-04-02 is Fri 2026-04-03.
+  expect(addWorkingDays('2026-04-02', 1, () => false)).toBe('2026-04-03');
+});
+
 test('successful VID submission marks the einvoice submitted and records an attempt', async () => {
   const t = await makeFirmAndClient();
   const { einvoiceId } = await send(t);

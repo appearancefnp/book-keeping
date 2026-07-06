@@ -1,18 +1,26 @@
 import type { PoolClient } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
 import { appendAudit } from '../audit/audit.js';
+import { isLatvianHoliday } from './holidays.js';
 
 export interface VidClient { submit(ublXml: string): Promise<{ ok: boolean; detail: string }>; }
 
-/** Add N working days (skip Sat/Sun). LR public holidays are deferred (documented). Returns 'YYYY-MM-DD'. */
-export function addWorkingDays(date: string, n: number): string {
+/**
+ * Add N working days, skipping Sat/Sun and Latvian public holidays. Returns 'YYYY-MM-DD'.
+ * `isHoliday` is injectable (defaults to the LR statutory calendar) so the holiday set
+ * stays accountant-confirmable without changing this arithmetic (spec §10.1).
+ */
+export function addWorkingDays(
+  date: string, n: number, isHoliday: (d: string) => boolean = isLatvianHoliday,
+): string {
   const [y, m, d] = date.split('-').map(Number);
   const dt = new Date(Date.UTC(y!, m! - 1, d!));
   let added = 0;
   while (added < n) {
     dt.setUTCDate(dt.getUTCDate() + 1);
     const day = dt.getUTCDay();
-    if (day !== 0 && day !== 6) added++;
+    const iso = dt.toISOString().slice(0, 10);
+    if (day !== 0 && day !== 6 && !isHoliday(iso)) added++;
   }
   return dt.toISOString().slice(0, 10);
 }
