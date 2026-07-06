@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import type { Proposal } from '@/app/lib/proposal-types';
 import { fetchMaterialApprovals, approveProposal, rejectProposal } from '@/app/lib/api-client';
 import { useMessages } from '@/app/lib/i18n-context';
+import { formatDecimal, formatCents } from '@/app/lib/format';
 import { ProposalCard } from '@/app/components/ProposalCard';
 import { FileDropzone } from '@/app/components/FileDropzone';
 import { SkeletonCard } from '@/app/components/SkeletonCard';
@@ -90,11 +91,11 @@ function OwnerHomeInner() {
           <div className={styles.cards}>
             <div className={styles.statCard}>
               <p className={styles.statLabel}>{t('owner.vat')}</p>
-              <p className={styles.statValue}>{overview?.vat.netPayable ?? '—'}</p>
+              <p className={styles.statValue}>{overview ? (formatDecimal(overview.vat.netPayable) ?? '—') : '—'}</p>
             </div>
             <div className={styles.statCard}>
               <p className={styles.statLabel}>{t('owner.receivables')}</p>
-              <p className={styles.statValue}>{overview?.receivables.balanceCents ?? '—'}</p>
+              <p className={styles.statValue}>{overview ? (formatCents(overview.receivables.balanceCents) ?? '—') : '—'}</p>
             </div>
           </div>
         )}
