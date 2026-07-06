@@ -29,6 +29,14 @@ export async function fetchProposals(clientCompanyId: string, limit?: number): P
   return (data as { proposals: Proposal[] }).proposals;
 }
 
+export async function fetchMaterialApprovals(clientCompanyId: string): Promise<Proposal[]> {
+  const params = new URLSearchParams({ clientCompanyId });
+  const data = await jsonOrThrow(
+    await fetch(`/api/proposals/material?${params.toString()}`, { cache: 'no-store' }),
+  );
+  return (data as { proposals: Proposal[] }).proposals;
+}
+
 export async function approveProposal(id: string, clientCompanyId: string): Promise<void> {
   await jsonOrThrow(await fetch(`/api/proposals/${encodeURIComponent(id)}/approve`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
