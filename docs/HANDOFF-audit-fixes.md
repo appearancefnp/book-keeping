@@ -25,8 +25,21 @@ provider + accountant decisions (see `HANDOFF.md` §1/§2 and §"First decisions
 > server-side page-read gating for the owner (an owner can still type `/journal`; nav
 > hiding is calm-by-default, not access control — mutations are already G1-gated).
 > **G4** (tariffs & templates) is specced next (decisions captured: per-client monthly
-> retainer; onboarding + invoice/document + notification templates). **Still open:**
-> credit notes, G5 (2FA enrolment), G4 build, WCAG automated check.
+> retainer; onboarding + invoice/document + notification templates).
+>
+> **Update 2026-07-06 (cont.):** ✅ **G4 slice 1 — per-client tariffs** shipped via
+> subagent-driven plan `docs/superpowers/plans/2026-07-06-tariffs.md` (spec
+> `docs/superpowers/specs/2026-07-06-tariffs-design.md`). New `client_tariffs` table
+> (effective-dated, VAT + currency, **no RLS** — firm-scoped like the rest of `/admin`,
+> cross-firm isolation unit-tested), `src/tariffs/tariffs.ts` domain, `GET/POST
+> /api/admin/tariffs` (read = accountant/firm_admin; **write = firm_admin only**;
+> firm-scoping check before write), and a tariff table + inline edit form on `/admin`.
+> Store-rate-only (no invoice/posting/billing). Full suite 193/193; root+web typecheck +
+> web build clean; per-role HTTP smoke verified (firm_admin GET 200 / POST 201 / GET
+> reflects rate / cross-firm 403 / negative 400; accountant GET 200 / POST 403; no-cookie
+> 401). **G4 remaining slices (each own spec→plan→build):** (2) client-onboarding
+> templates, (3) invoice/document templates, (4) notification/email templates. **Still
+> open:** credit notes, G5 (2FA enrolment), WCAG automated check.
 
 ## Read first
 - `docs/SPEC-AUDIT.md` — the coverage snapshot these fixes come from (gaps **G1–G6** + minors).
