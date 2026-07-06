@@ -213,6 +213,14 @@ export const EN = {
   'settings.op.bank_match': 'Bank matches',
   'settings.op.declaration': 'Declarations',
   'settings.saved': 'Saved',
+  'owner.title': 'Your business',
+  'owner.position': 'Position at a glance',
+  'owner.vat': 'VAT to pay',
+  'owner.receivables': 'Awaiting payment',
+  'owner.approvals': 'Needs your approval',
+  'owner.approvals.empty': 'Nothing needs your approval right now.',
+  'owner.upload': 'Add a document',
+  'owner.loadError': 'Could not load your overview.',
 } as const;
 
 export const LV: Record<keyof typeof EN, string> = {
@@ -430,6 +438,14 @@ export const LV: Record<keyof typeof EN, string> = {
   'settings.op.bank_match': 'Bankas saistīšana',
   'settings.op.declaration': 'Deklarācijas',
   'settings.saved': 'Saglabāts',
+  'owner.title': 'Jūsu uzņēmums',
+  'owner.position': 'Stāvoklis īsumā',
+  'owner.vat': 'Maksājamais PVN',
+  'owner.receivables': 'Gaida apmaksu',
+  'owner.approvals': 'Nepieciešams jūsu apstiprinājums',
+  'owner.approvals.empty': 'Šobrīd nekas nav jāapstiprina.',
+  'owner.upload': 'Pievienot dokumentu',
+  'owner.loadError': 'Neizdevās ielādēt pārskatu.',
 };
 
 export const RU: Record<keyof typeof EN, string> = {
@@ -647,6 +663,14 @@ export const RU: Record<keyof typeof EN, string> = {
   'settings.op.bank_match': 'Сопоставление банка',
   'settings.op.declaration': 'Декларации',
   'settings.saved': 'Сохранено',
+  'owner.title': 'Ваш бизнес',
+  'owner.position': 'Положение вкратце',
+  'owner.vat': 'НДС к уплате',
+  'owner.receivables': 'Ожидает оплаты',
+  'owner.approvals': 'Требует вашего одобрения',
+  'owner.approvals.empty': 'Сейчас одобрять нечего.',
+  'owner.upload': 'Добавить документ',
+  'owner.loadError': 'Не удалось загрузить обзор.',
 };
 
 export type Lang = 'lv' | 'en' | 'ru';
