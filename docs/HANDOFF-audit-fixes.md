@@ -13,8 +13,20 @@ provider + accountant decisions (see `HANDOFF.md` §1/§2 and §"First decisions
 > cosmetics** (removed 5 unused i18n keys, disabled bank file input mid-import, parties
 > `kind` enum validated at the route). Commits `fa3ea74`, `6de4df0`, `626a45c`. Full
 > suite 185/185; root+web typecheck clean; G1/G2 verified end-to-end via per-role HTTP
-> smoke on the dev server. **Still open below:** credit notes, G5 (2FA enrolment), and
-> the decision-gated G3/G4/WCAG items.
+> smoke on the dev server.
+>
+> **Update 2026-07-06:** ✅ **G3** (owner-calm view) shipped via subagent-driven plan
+> `docs/superpowers/plans/2026-07-06-owner-calm-view.md`: dedicated OwnerHome at `/`
+> (role-branch), curated owner nav (Home/Documents/Notifications), material-approvals
+> query (`src/proposals/material.ts`) + `GET /api/proposals/material`. Owner approves
+> material items (≥ autonomy threshold ∪ declarations) inline. Full suite 189/189;
+> root+web typecheck + web build clean; per-role HTTP smoke verified (owner→OwnerHome +
+> 3-item nav + approve cycle; accountant→queue unchanged). **Recorded follow-up:**
+> server-side page-read gating for the owner (an owner can still type `/journal`; nav
+> hiding is calm-by-default, not access control — mutations are already G1-gated).
+> **G4** (tariffs & templates) is specced next (decisions captured: per-client monthly
+> retainer; onboarding + invoice/document + notification templates). **Still open:**
+> credit notes, G5 (2FA enrolment), G4 build, WCAG automated check.
 
 ## Read first
 - `docs/SPEC-AUDIT.md` — the coverage snapshot these fixes come from (gaps **G1–G6** + minors).
