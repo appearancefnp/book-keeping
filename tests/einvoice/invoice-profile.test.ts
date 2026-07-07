@@ -28,18 +28,25 @@ test('setInvoiceProfile upserts (second set overwrites) and audits', async () =>
   expect(p!.defaultLines[0]!.net).toBe('500.00');
   const audit = await withTenant(c, (tx) =>
     tx.query(`SELECT count(*)::int AS n FROM audit_log WHERE entity_type='invoice_profile'`));
-  expect(audit.rows[0].n).toBeGreaterThanOrEqual(1);
+  expect(audit.rows[0].n).toBe(2);
   // upsert, not duplicate rows
   const rows = await withTenant(c, (tx) =>
     tx.query(`SELECT count(*)::int AS n FROM invoice_profiles`));
   expect(rows.rows[0].n).toBe(1);
 });
 
-test('RLS isolates profiles per client', async () => {
+test('RLS isolates profiles per client (unfiltered query sees nothing cross-tenant)', async () => {
   const a = await makeFirmAndClient('A');
   const b = await makeFirmAndClient('B');
   const ca = ctx(a); const cb = ctx(b);
   await withTenant(ca, (tx) => setInvoiceProfile(tx, ca, sample));
-  const fromB = await withTenant(cb, (tx) => getInvoiceProfile(tx, cb));
-  expect(fromB).toBeNull();
+  // Under client A's session, the row is visible.
+  const seenByA = await withTenant(ca, (tx) => tx.query('SELECT count(*)::int AS n FROM invoice_profiles'));
+  expect(seenByA.rows[0].n).toBe(1);
+  // Under client B's session, an UNFILTERED select must see 0 rows — only RLS can be responsible
+  // for hiding A's row here (no WHERE clause in the query).
+  const seenByB = await withTenant(cb, (tx) => tx.query('SELECT count(*)::int AS n FROM invoice_profiles'));
+  expect(seenByB.rows[0].n).toBe(0);
+  // And the domain getter is null for B.
+  expect(await withTenant(cb, (tx) => getInvoiceProfile(tx, cb))).toBeNull();
 });
