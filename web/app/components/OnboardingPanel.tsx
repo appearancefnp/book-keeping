@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMessages } from '@/app/lib/i18n-context';
 import styles from './OnboardingPanel.module.css';
 
@@ -16,7 +16,6 @@ interface OnboardingPanelProps {
 }
 
 export function OnboardingPanel({ clients, templates, role, onChanged }: OnboardingPanelProps) {
-  const { t } = useMessages();
   if (role !== 'firm_admin') {
     // Accountant: read-only template list only.
     return <TemplatesList templates={templates} />;
@@ -111,6 +110,10 @@ function SaveTemplateForm({ clients, onChanged }: { clients: { id: string; name:
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!clientCompanyId && clients.length > 0) setClientCompanyId(clients[0]!.id);
+  }, [clients, clientCompanyId]);
 
   async function submit() {
     if (!clientCompanyId || !name.trim()) { setError(true); return; }
