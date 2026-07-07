@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useMessages } from '@/app/lib/i18n-context';
 import { AdminTables, type ClientCompany, type UserRow, type AuditRow } from '@/app/components/AdminTables';
 import { TariffTable, type FirmTariffRow } from '@/app/components/TariffTable';
+import { OnboardingPanel, type TemplateSummary } from '@/app/components/OnboardingPanel';
 import { SkeletonCard } from '@/app/components/SkeletonCard';
 import { ErrorState } from '@/app/components/ErrorState';
 import { EmptyState } from '@/app/components/EmptyState';
@@ -17,6 +18,7 @@ interface AdminData {
   users: UserRow[];
   audit: AuditRow[];
   tariffs: FirmTariffRow[];
+  templates: TemplateSummary[];
   role: string;
 }
 
@@ -42,15 +44,16 @@ function AdminInner() {
         ? fetch(`/api/audit?clientCompanyId=${encodeURIComponent(clientCompanyId)}`)
         : Promise.resolve(new Response('{"audit":[]}', { status: 200 }));
 
-      const [clientsRes, usersRes, auditRes, tariffsRes] = await Promise.all([
+      const [clientsRes, usersRes, auditRes, tariffsRes, templatesRes] = await Promise.all([
         fetch('/api/admin/clients'),
         fetch('/api/admin/users'),
         auditFetch,
         fetch('/api/admin/tariffs'),
+        fetch('/api/admin/templates'),
       ]);
 
       // Role gate: if either firm-level endpoint returns 403, show restricted notice
-      if (clientsRes.status === 403 || usersRes.status === 403 || tariffsRes.status === 403) {
+      if (clientsRes.status === 403 || usersRes.status === 403 || tariffsRes.status === 403 || templatesRes.status === 403) {
         setForbidden(true);
         return;
       }
@@ -67,6 +70,10 @@ function AdminInner() {
         const b = await tariffsRes.json().catch(() => ({}));
         throw new Error((b as { error?: string }).error ?? `HTTP ${tariffsRes.status}`);
       }
+      if (!templatesRes.ok) {
+        const b = await templatesRes.json().catch(() => ({}));
+        throw new Error((b as { error?: string }).error ?? `HTTP ${templatesRes.status}`);
+      }
 
       const [clientsJson, usersJson, auditJson] = await Promise.all([
         clientsRes.json(),
@@ -74,12 +81,14 @@ function AdminInner() {
         auditRes.json(),
       ]);
       const tariffsBody = tariffsRes.ok ? await tariffsRes.json() : { tariffs: [], role: '' };
+      const templatesBody = templatesRes.ok ? await templatesRes.json() : { templates: [], role: '' };
 
       setData({
         clients: (clientsJson as { clients: ClientCompany[] }).clients,
         users: (usersJson as { users: UserRow[] }).users,
         audit: (auditJson as { audit: AuditRow[] }).audit ?? [],
         tariffs: (tariffsBody as { tariffs: FirmTariffRow[] }).tariffs,
+        templates: (templatesBody as { templates: TemplateSummary[] }).templates,
         role: (tariffsBody as { role: string }).role,
       });
     } catch (err) {
@@ -132,6 +141,12 @@ function AdminInner() {
               audit={data.audit}
             />
             <TariffTable tariffs={data.tariffs} role={data.role} onSaved={load} />
+            <OnboardingPanel
+              clients={data.clients.map((c) => ({ id: c.id, name: c.name }))}
+              templates={data.templates}
+              role={data.role}
+              onChanged={load}
+            />
           </>
         )}
       </main>
