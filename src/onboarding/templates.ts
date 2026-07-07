@@ -20,7 +20,7 @@ export interface TemplateSummary {
   id: string; name: string; accountCount: number; policyCount: number; hasTariff: boolean;
 }
 
-const SNAPSHOT_ASOF = '9999-12-31'; // reading: capture the client's latest current tariff
+const SNAPSHOT_ASOF = '9999-12-31'; // reading: select the latest tariff row by effective_from
 // applying: date the seeded tariff far in the past so it is immediately "current" for the new client.
 const ONBOARDING_TARIFF_EFFECTIVE_FROM = '2000-01-01';
 
@@ -80,6 +80,10 @@ export async function getTemplateBody(firmId: string, id: string): Promise<Templ
  * Create a client, assign the creator, and (if a template is given) seed the new
  * client's accounts + autonomy + tariff from the template body. Audited.
  * Throws 'unknown template' if templateId is given but not found in the firm.
+ *
+ * Not atomic: createClientCompany, assignUserToClient, and withTenant seed run
+ * as three separate transactions. If seeding throws, a created + assigned but
+ * unseeded client remains—a valid state. Idempotent retry/cleanup is a follow-up.
  */
 export async function createClientFromTemplate(
   firmId: string,
