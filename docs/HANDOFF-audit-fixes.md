@@ -59,6 +59,29 @@ provider + accountant decisions (see `HANDOFF.md` §1/§2 and §"First decisions
 > **G4 remaining slices (each own spec→plan→build):** (3) invoice/document templates,
 > (4) notification/email templates. **Still open:** credit notes, G5 (2FA enrolment),
 > WCAG automated check.
+>
+> **Update 2026-07-07 (cont.):** ✅ **G4 slice 3a — per-client invoice profile + UBL
+> content** shipped via subagent-driven plan `docs/superpowers/plans/2026-07-07-invoice-profile.md`
+> (spec `docs/superpowers/specs/2026-07-07-invoice-profile-design.md`). A per-client
+> invoice-defaults record (payment terms, note, due-date offset, number prefix, default
+> lines) that (a) pre-fills the composer and (b) threads **Note / PaymentTerms / DueDate**
+> into the real UBL. New `invoice_profiles` table — **RLS-enabled** (this IS per-client
+> tenant data, unlike the firm-admin no-RLS slices 1–2; genuine RLS isolation now tested
+> via an unfiltered cross-tenant query). `src/einvoice/invoice-profile.ts` domain;
+> extended `EInvoice`/`buildUblInvoice`/`parseUblInvoice` (optional fields, emitted only
+> when present → absent output byte-identical, backward-compatible); new
+> `invoice_profile.write` authz op (firm_admin/accountant); `GET/POST /api/invoice-profile`
+> (per-client tenant routes); composer applies defaults + sends the fields; "Invoice
+> defaults" form on `/settings`. Full suite 207/207; root+web typecheck + web build clean;
+> per-role HTTP smoke verified (accountant GET/POST 200; employee/owner POST 403; employee
+> GET 200 read-open; no-cookie 401; profile round-trips) AND a real end-to-end issue →
+> the stored UBL contains `cbc:DueDate`, `cbc:Note`, `cac:PaymentTerms`. **Reviews caught
+> & fixed:** a weak RLS test that didn't exercise RLS (strengthened to an unfiltered
+> cross-tenant query), and a 0-day due-offset silently becoming "no due date" (`0 || null`
+> → now preserves explicit 0). **G4 remaining:** slice 3b (branded HTML/PDF invoice
+> renderer + logo/footer — render tech decided: server-rendered branded HTML, print-to-PDF,
+> logo via blob store), slice 4 (notification/email templates). **Still open:** credit
+> notes, G5 (2FA enrolment), WCAG check.
 
 ## Read first
 - `docs/SPEC-AUDIT.md` — the coverage snapshot these fixes come from (gaps **G1–G6** + minors).
