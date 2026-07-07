@@ -37,9 +37,28 @@ provider + accountant decisions (see `HANDOFF.md` §1/§2 and §"First decisions
 > Store-rate-only (no invoice/posting/billing). Full suite 193/193; root+web typecheck +
 > web build clean; per-role HTTP smoke verified (firm_admin GET 200 / POST 201 / GET
 > reflects rate / cross-firm 403 / negative 400; accountant GET 200 / POST 403; no-cookie
-> 401). **G4 remaining slices (each own spec→plan→build):** (2) client-onboarding
-> templates, (3) invoice/document templates, (4) notification/email templates. **Still
-> open:** credit notes, G5 (2FA enrolment), WCAG automated check.
+> 401).
+>
+> **Update 2026-07-07:** ✅ **G4 slice 2 — onboarding templates + Add-client flow**
+> shipped via subagent-driven plan `docs/superpowers/plans/2026-07-06-onboarding-templates.md`
+> (spec `docs/superpowers/specs/2026-07-06-onboarding-templates-design.md`). New
+> `onboarding_templates` table (jsonb body, **no RLS**, firm-scoped, cross-firm isolation
+> unit-tested), `src/onboarding/templates.ts` (`snapshotClientAsTemplate`,
+> `listTemplatesForFirm`, `getTemplateBody`, `createClientFromTemplate` — creates a client,
+> auto-assigns the creator, seeds accounts+autonomy+tariff from the template), `GET/POST
+> /api/admin/templates` + `POST /api/admin/clients` (the previously-missing Add-client
+> flow), and an OnboardingPanel on `/admin` (Add-client form + Save-as-template + list;
+> firm_admin writes, accountant reads). Snapshot-only authoring; apply-on-create only.
+> Full suite 197/197; root+web typecheck + web build clean; per-role HTTP smoke verified
+> (firm_admin snapshot 201 → template captured 2 accounts → create-from-template 201 →
+> new client seeded with the same accounts; unknown-template 400; cross-firm 403;
+> accountant POST 403; no-cookie 401). **Review caught & fixed:** an implementer had
+> polluted production `createClientFromTemplate` with dummy-user creation to satisfy a
+> flawed test (reverted; test now uses a real user); and a stale client-select default
+> that blocked the create-first-client→snapshot flow.
+> **G4 remaining slices (each own spec→plan→build):** (3) invoice/document templates,
+> (4) notification/email templates. **Still open:** credit notes, G5 (2FA enrolment),
+> WCAG automated check.
 
 ## Read first
 - `docs/SPEC-AUDIT.md` — the coverage snapshot these fixes come from (gaps **G1–G6** + minors).
