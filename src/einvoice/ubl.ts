@@ -7,6 +7,7 @@ export interface EInvoice {
   invoiceNumber: string; issueDate: string; currency: string;
   supplier: InvoiceParty; customer: InvoiceParty; lines: InvoiceLineIn[];
   netTotal: string; vatTotal: string; grandTotal: string;
+  dueDate?: string; note?: string; paymentTerms?: string;
 }
 
 const CUSTOMIZATION = 'urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0';
@@ -39,9 +40,12 @@ export function buildUblInvoice(inv: EInvoice): string {
     `  <cbc:ProfileID>${PROFILE}</cbc:ProfileID>`,
     `  <cbc:ID>${escapeXml(inv.invoiceNumber)}</cbc:ID>`,
     `  <cbc:IssueDate>${inv.issueDate}</cbc:IssueDate>`,
+    inv.dueDate ? `  <cbc:DueDate>${inv.dueDate}</cbc:DueDate>` : null,
+    inv.note ? `  <cbc:Note>${escapeXml(inv.note)}</cbc:Note>` : null,
     `  <cbc:DocumentCurrencyCode>${cur}</cbc:DocumentCurrencyCode>`,
     party('AccountingSupplierParty', inv.supplier, cur),
     party('AccountingCustomerParty', inv.customer, cur),
+    inv.paymentTerms ? `  <cac:PaymentTerms><cbc:Note>${escapeXml(inv.paymentTerms)}</cbc:Note></cac:PaymentTerms>` : null,
     `  <cac:TaxTotal><cbc:TaxAmount currencyID="${cur}">${inv.vatTotal}</cbc:TaxAmount></cac:TaxTotal>`,
     `  <cac:LegalMonetaryTotal>`,
     `    <cbc:LineExtensionAmount currencyID="${cur}">${inv.netTotal}</cbc:LineExtensionAmount>`,
@@ -51,7 +55,7 @@ export function buildUblInvoice(inv: EInvoice): string {
     `  </cac:LegalMonetaryTotal>`,
     lines,
     '</Invoice>',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', removeNSPrefix: true, parseTagValue: false, parseAttributeValue: false });
@@ -74,6 +78,11 @@ export function parseUblInvoice(xml: string): EInvoice {
     invoiceNumber: String(inv.ID ?? ''),
     issueDate: String(inv.IssueDate ?? ''),
     currency: String(inv.DocumentCurrencyCode ?? ''),
+    ...(inv.DueDate !== undefined && { dueDate: String(inv.DueDate) }),
+    ...(inv.Note !== undefined && { note: String(inv.Note) }),
+    ...((inv.PaymentTerms as { Note?: unknown })?.Note !== undefined && {
+      paymentTerms: String((inv.PaymentTerms as { Note?: unknown }).Note),
+    }),
     supplier: readParty(sup),
     customer: readParty(cus),
     lines: asArray(inv.InvoiceLine).map((l: Record<string, unknown>) => ({
