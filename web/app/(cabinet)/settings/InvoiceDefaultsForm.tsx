@@ -49,10 +49,18 @@ export function InvoiceDefaultsForm({ clientCompanyId }: { clientCompanyId: stri
     setBusy(true);
     setStatus(null);
     try {
+      // Preserve explicit 0 (due-on-issue); only blank/invalid → null.
+      const offsetDays = (() => {
+        const s = String(dueOffset).trim();
+        if (s === '') return null;
+        const n = Number(s);
+        return Number.isInteger(n) && n >= 0 ? n : null;
+      })();
+
       const profile = {
         paymentTerms: paymentTerms.trim() || null,
         note: note.trim() || null,
-        dueDateOffsetDays: Number(dueOffset) || null,
+        dueDateOffsetDays: offsetDays,
         numberPrefix: prefix.trim() || null,
         defaultLines: lines
           .filter((l) => l.description.trim())
