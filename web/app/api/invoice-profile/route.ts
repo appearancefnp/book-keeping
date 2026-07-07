@@ -43,6 +43,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'invalid default line' }, { status: 400 });
     }
   }
+  for (const [k, v] of Object.entries({ paymentTerms: p.paymentTerms, note: p.note, numberPrefix: p.numberPrefix })) {
+    if (v !== null && v !== undefined && typeof v !== 'string') {
+      return NextResponse.json({ error: `invalid ${k}` }, { status: 400 });
+    }
+  }
   try {
     const ctx = await resolveTenantContext(token, body.clientCompanyId, nowUnix());
     assertRoleAllowed(ctx.actorRole, 'invoice_profile.write');
