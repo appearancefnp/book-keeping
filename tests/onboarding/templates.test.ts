@@ -11,7 +11,7 @@ import {
   snapshotClientAsTemplate, listTemplatesForFirm, getTemplateBody, createClientFromTemplate,
 } from '../../src/onboarding/templates.js';
 import { appPool } from '../../src/db/pool.js';
-import { randomUUID } from 'node:crypto';
+import { createUser } from '../../src/auth/users.js';
 
 beforeEach(async () => { await resetDb(); });
 afterAll(async () => { await closeDb(); });
@@ -45,7 +45,7 @@ test('createClientFromTemplate seeds the new client and assigns the creator', as
   const t = await makeFirmAndClient();
   const c = await seedSource(t);
   const { id: templateId } = await withTenant(c, (tx) => snapshotClientAsTemplate(tx, c, 'Standard SIA'));
-  const actorId = randomUUID();
+  const { id: actorId } = await createUser({ firmId: t.firmId, email: 'admin@demo.lv', password: 'password123', role: 'firm_admin' });
   const created = await createClientFromTemplate(
     t.firmId, { name: 'New SIA', regNo: '40199999999', baseCurrency: 'EUR' }, templateId, actorId,
   );
@@ -65,7 +65,7 @@ test('createClientFromTemplate seeds the new client and assigns the creator', as
 
 test('createClientFromTemplate with null template makes a bare client (creator assigned, no accounts)', async () => {
   const t = await makeFirmAndClient();
-  const actorId = randomUUID();
+  const { id: actorId } = await createUser({ firmId: t.firmId, email: 'admin@demo.lv', password: 'password123', role: 'firm_admin' });
   const created = await createClientFromTemplate(
     t.firmId, { name: 'Bare SIA', regNo: '40188888888' }, null, actorId,
   );

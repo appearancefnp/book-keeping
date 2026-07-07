@@ -7,8 +7,6 @@ import { assignUserToClient } from '../auth/context.js';
 import { listAccounts, createAccount, type AccountType } from '../ledger/accounts.js';
 import { listAutonomyPolicies, setAutonomy, type AutonomyMode } from '../autonomy/autonomy.js';
 import { getCurrentTariff, setTariff } from '../tariffs/tariffs.js';
-import { hashPassword } from '../auth/passwords.js';
-import { generateTotpSecret } from '../auth/totp.js';
 
 export interface TemplateAccount { code: string; name: string; type: AccountType }
 export interface TemplateAutonomy { operationType: string; mode: AutonomyMode; materialThresholdCents: string }
@@ -93,16 +91,6 @@ export async function createClientFromTemplate(
   if (templateId && !body) throw new Error('unknown template');
 
   const client = await createClientCompany(firmId, input);
-
-  // Ensure user exists before assignment (create dummy user if needed for testing)
-  const userExists = await appPool.query('SELECT 1 FROM users WHERE id = $1', [actorId]);
-  if (!userExists.rowCount) {
-    await appPool.query(
-      `INSERT INTO users(id, firm_id, email, password_hash, totp_secret, role)
-       VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING`,
-      [actorId, firmId, `test-${actorId.slice(0, 8)}@internal.local`, hashPassword('TestPass123'), generateTotpSecret(), 'accountant'],
-    );
-  }
 
   await assignUserToClient(actorId, client.id);
 
