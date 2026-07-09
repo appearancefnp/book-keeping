@@ -183,10 +183,16 @@ LR-specific rules in every one.
   monthly tax-status data, orders (rīkojumi), deterministic bruto→neto engine
   (IIN/VSAOI 2026, versioned in `tax_rules`), shared average earnings, A-lapa
   sick pay, vacation accrual + postings, termination settlement, API routes.
-  Still open: VID EDS payroll reports (instr. 3.5 — deliberately last), order
-  PDF + eParaksts, payroll UI pages, employee self-service portal, MUN-regime
-  calc (flag stored), advances, LR public-holiday calendar (shared gap with
-  `vid.ts`), EDS tax-book/sick-leave auto-import (manual monthly entry today).
+  ✅ phase-2 operator UI shipped (see
+  `docs/superpowers/plans/2026-07-09-payroll-phase2-operator-ui.md`): employees,
+  orders, and the monthly run with an exceptions-first review, payslip
+  explanation, and approve→post — plus manual adjustments with a mandatory
+  reason (instr. 5). Still open: VID EDS payroll reports (instr. 3.5 —
+  deliberately last), order PDF + eParaksts, employee self-service portal
+  (instr. 2.3), AI helpers (7.x), scheduled auto-run (7.1), business-trip
+  orders, company-level setup (2.1), MUN-regime calc (flag stored), advances,
+  LR public-holiday calendar (shared gap with `vid.ts`), EDS tax-book/sick-leave
+  auto-import (manual monthly entry today).
 - **Fixed assets (§6.5)** — asset register, accounting + tax depreciation with
   automatic postings, disposal.
 - **Warehouse / inventory (§6.4)** — receipts/issues/transfers, FIFO, batches,
