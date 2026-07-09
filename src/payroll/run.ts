@@ -11,6 +11,9 @@ import { computePayroll } from './calc.js';
 import { computeAverageEarnings } from './average-earnings.js';
 import { computeSickPayA, computeVacationPay } from './absence-pay.js';
 import { firstDayOfMonth, lastDayOfMonth, workDaysInMonth, workDaysOverlap } from './workdays.js';
+import { postEntry, type NewJournalLine } from '../ledger/posting.js';
+import { ensurePayrollAccounts, type PayrollSettings } from './settings.js';
+import { recomputeAccrual } from './accrual.js';
 
 export interface RunRow { id: string; year: number; month: number; status: 'draft' | 'computed' | 'approved'; }
 export interface RunItemRow {
@@ -225,5 +228,85 @@ export async function computeRun(tx: PoolClient, ctx: TenantContext, runId: stri
   await appendAudit(tx, ctx, {
     action: 'compute', entityType: 'payroll_run', entityId: runId,
     before: { status: run.status }, after: { status: 'computed', employees: employees.length },
+  });
+}
+
+/** A balanced debit/credit pair; skipped when the amount is zero. */
+function pair(debitAcc: string, creditAcc: string, cents: bigint, description: string): NewJournalLine[] {
+  if (cents === 0n) return [];
+  return [
+    { accountCode: debitAcc, debit: fromCents(cents), credit: '0', description },
+    { accountCode: creditAcc, debit: '0', credit: fromCents(cents), description },
+  ];
+}
+
+/**
+ * Approve a computed run: post the doc-3.4 accrual rows (1-8) per employee, then
+ * the doc-3.7 vacation-accrual delta. Payment rows (9-12) happen in the bank module
+ * when money actually moves — the doc requires the two steps stay separate.
+ */
+export async function approveRun(tx: PoolClient, ctx: TenantContext, runId: string): Promise<void> {
+  const run = await getRun(tx, ctx, runId);
+  if (run.status !== 'computed') throw new Error(`Run ${runId} is not computed (status: ${run.status})`);
+
+  const s: PayrollSettings = await getPayrollSettings(tx, ctx);
+  await ensurePayrollAccounts(tx, ctx);
+  const params = await loadPayrollParams(tx, lastDayOfMonth(run.year, run.month));
+  const entryDate = lastDayOfMonth(run.year, run.month);
+  const label = `${run.year}-${String(run.month).padStart(2, '0')}`;
+
+  const items = await tx.query(
+    `SELECT i.employee_id, e.first_name, e.last_name,
+            (ROUND(i.gross*100))::bigint AS gross, (ROUND(i.severance_exempt*100))::bigint AS severance,
+            (ROUND(i.vsaoi_employee*100))::bigint AS vsaoi_emp, (ROUND(i.iin*100))::bigint AS iin,
+            (ROUND(i.other_deductions*100))::bigint AS deductions,
+            (ROUND(i.vsaoi_employer*100))::bigint AS vsaoi_er, (ROUND(i.risk_duty*100))::bigint AS risk,
+            (ROUND(i.avg_daily*100))::bigint AS avg_daily
+     FROM payroll_items i JOIN employees e ON e.id = i.employee_id
+     WHERE i.run_id = $1 AND i.client_company_id = $2 ORDER BY e.last_name, e.first_name`,
+    [runId, ctx.clientCompanyId],
+  );
+
+  for (const r of items.rows) {
+    const name = `${r.last_name} ${r.first_name}`;
+    // Doc 3.4 rows 1-8 as one balanced entry (each pair is one row of the scheme).
+    const lines: NewJournalLine[] = [
+      ...pair(s.accWageExpense, s.accWagesPayable, BigInt(r.gross), 'Bruto alga (3.4 r.1-2)'),
+      ...pair(s.accSeveranceExpense, s.accWagesPayable, BigInt(r.severance), 'Atlaišanas pabalsts (3.4 r.3)'),
+      ...pair(s.accEmployerVsaoiExpense, s.accVsaoiPayable, BigInt(r.vsaoi_er), 'Darba devēja VSAOI (3.4 r.4)'),
+      ...pair(s.accRiskDutyExpense, s.accRiskDutyPayable, BigInt(r.risk), 'Riska nodeva (3.4 r.5)'),
+      ...pair(s.accWagesPayable, s.accIinPayable, BigInt(r.iin), 'IIN ieturējums (3.4 r.6)'),
+      ...pair(s.accWagesPayable, s.accVsaoiPayable, BigInt(r.vsaoi_emp), 'VSAOI darbinieka daļa (3.4 r.7)'),
+      ...pair(s.accWagesPayable, s.accOtherDeductionsPayable, BigInt(r.deductions), 'Citi ieturējumi (3.4 r.8)'),
+    ];
+    if (lines.length > 0) {
+      await postEntry(tx, ctx, { date: entryDate, memo: `Alga ${label} — ${name}`, currency: 'EUR', lines });
+    }
+
+    // Doc 3.7: vacation-accrual delta (positive = build up, negative = release).
+    const acc = await recomputeAccrual(tx, ctx, {
+      employeeId: r.employee_id, year: run.year, month: run.month,
+      avgDailyCents: BigInt(r.avg_daily), employerBp: params.vsaoiEmployerBp,
+    });
+    const accLines: NewJournalLine[] = [
+      ...(acc.deltaCents >= 0n
+        ? pair(s.accWageExpense, s.accVacationAccrualLiability, acc.deltaCents, 'Atvaļinājuma uzkrājums (3.7)')
+        : pair(s.accVacationAccrualLiability, s.accWageExpense, -acc.deltaCents, 'Atvaļinājuma uzkrājuma samazinājums (3.7)')),
+      ...(acc.deltaVsaoiCents >= 0n
+        ? pair(s.accEmployerVsaoiExpense, s.accVacationAccrualVsaoiLiability, acc.deltaVsaoiCents, 'VSAOI par uzkrājumu (3.7)')
+        : pair(s.accVacationAccrualVsaoiLiability, s.accEmployerVsaoiExpense, -acc.deltaVsaoiCents, 'VSAOI uzkrājuma samazinājums (3.7)')),
+    ];
+    if (accLines.length > 0) {
+      await postEntry(tx, ctx, { date: entryDate, memo: `Atvaļinājuma uzkrājums ${label} — ${name}`, currency: 'EUR', lines: accLines });
+    }
+  }
+
+  await tx.query(
+    `UPDATE payroll_runs SET status = 'approved', approved_at = now() WHERE id = $1 AND client_company_id = $2`,
+    [runId, ctx.clientCompanyId],
+  );
+  await appendAudit(tx, ctx, {
+    action: 'approve', entityType: 'payroll_run', entityId: runId,
+    before: { status: 'computed' }, after: { status: 'approved', employees: items.rowCount },
   });
 }
