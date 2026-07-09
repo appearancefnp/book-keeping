@@ -15,6 +15,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const body = (await req.json().catch(() => ({}))) as {
     clientCompanyId?: string; year?: number; month?: number;
     taxBookActive?: boolean; dependents?: number; disabilityGroup?: number;
+    isPensioner?: boolean; isRepressed?: boolean;
   };
   if (!body.clientCompanyId) return NextResponse.json({ error: 'missing clientCompanyId' }, { status: 400 });
   if (body.year === undefined || body.month === undefined || body.taxBookActive === undefined) {
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     await withTenant(tctx, (tx) => setMonthlyTaxStatus(tx, tctx, id, {
       year: body.year!, month: body.month!, taxBookActive: body.taxBookActive!,
       dependents: body.dependents ?? 0, disabilityGroup: body.disabilityGroup ?? 0,
+      isPensioner: body.isPensioner ?? false, isRepressed: body.isRepressed ?? false,
     }));
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err) {

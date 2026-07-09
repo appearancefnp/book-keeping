@@ -53,10 +53,10 @@ test('monthly tax status: upsert, exact hit, stale fallback, missing', async () 
   }));
 
   const exact = await withTenant(t, (tx) => taxStatusFor(tx, t, id, 2026, 5));
-  expect(exact).toEqual({ taxBookActive: true, dependents: 2, disabilityGroup: 0, stale: false });
+  expect(exact).toEqual({ taxBookActive: true, dependents: 2, disabilityGroup: 0, isPensioner: false, isRepressed: false, stale: false });
 
   const stale = await withTenant(t, (tx) => taxStatusFor(tx, t, id, 2026, 7));
-  expect(stale).toEqual({ taxBookActive: true, dependents: 2, disabilityGroup: 0, stale: true });
+  expect(stale).toEqual({ taxBookActive: true, dependents: 2, disabilityGroup: 0, isPensioner: false, isRepressed: false, stale: true });
 
   const missing = await withTenant(t, (tx) => taxStatusFor(tx, t, id, 2026, 4));
   expect(missing).toBeNull();

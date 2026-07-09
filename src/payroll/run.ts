@@ -80,7 +80,7 @@ const toHourHundredths = toCents;
 
 async function computeEmployee(
   tx: PoolClient, ctx: TenantContext, emp: EmployeeRow,
-  year: number, month: number, params: PayrollParams,
+  year: number, month: number, params: PayrollParams, progressiveMonthly: boolean,
 ): Promise<Record<string, unknown>> {
   const warnings: string[] = [];
   const totalWorkDays = workDaysInMonth(year, month);
@@ -174,9 +174,12 @@ async function computeEmployee(
     taxBookActive: tax?.taxBookActive ?? false,
     dependents: tax?.dependents ?? 0,
     disabilityGroup: (tax?.disabilityGroup ?? 0) as 0 | 1 | 2 | 3,
+    isPensioner: tax?.isPensioner ?? false,
+    isRepressed: tax?.isRepressed ?? false,
     workedDays, totalWorkDays,
     requestedDeductionsCents: sum('deduction'),
     ytdVsaoiBaseCents: BigInt(ytd.rows[0].cents),
+    progressiveMonthly,
   }, params);
 
   return {
@@ -202,11 +205,12 @@ export async function computeRun(tx: PoolClient, ctx: TenantContext, runId: stri
   if (run.status === 'approved') throw new Error(`Run ${runId} is approved and cannot be recomputed`);
 
   const params = await loadPayrollParams(tx, lastDayOfMonth(run.year, run.month));
+  const settings = await getPayrollSettings(tx, ctx);
   await tx.query('DELETE FROM payroll_items WHERE run_id = $1 AND client_company_id = $2', [runId, ctx.clientCompanyId]);
 
   const employees = await activeEmployeesFor(tx, ctx, run.year, run.month);
   for (const emp of employees) {
-    const item = await computeEmployee(tx, ctx, emp, run.year, run.month, params);
+    const item = await computeEmployee(tx, ctx, emp, run.year, run.month, params, settings.iinProgressiveMonthly);
     await tx.query(
       `INSERT INTO payroll_items(client_company_id, run_id, employee_id, worked_days, total_work_days,
          base, premiums, bonus, vacation_pay, sick_pay, other_taxable, severance_exempt,

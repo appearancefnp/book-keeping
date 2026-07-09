@@ -19,10 +19,13 @@ export interface PayrollCalcInput {
   taxBookActive: boolean;
   dependents: number;
   disabilityGroup: 0 | 1 | 2 | 3;
+  isPensioner?: boolean;            // pensioner minimum replaces the standard minimum
+  isRepressed?: boolean;            // politically-repressed / national-resistance relief (additive)
   workedDays: number;               // prorates the non-taxable minimum
   totalWorkDays: number;
   requestedDeductionsCents: bigint; // maintenance / loans / union (doc 3.1 step 6)
   ytdVsaoiBaseCents: bigint;        // prior approved months' gross this calendar year
+  progressiveMonthly?: boolean;     // true = 25.5/33/36 monthly bands; false (default) = flat 25.5% (LV 2025+ employer rule)
 }
 
 export interface ExplanationLine { step: string; amount: string; }
@@ -33,6 +36,7 @@ export interface PayrollCalcResult {
   nontaxableAppliedCents: bigint;
   dependentReliefCents: bigint;
   disabilityReliefCents: bigint;
+  repressionReliefCents: bigint;
   iinBaseCents: bigint;
   iinCents: bigint;
   deductionsAppliedCents: bigint;
@@ -61,32 +65,49 @@ export function computePayroll(input: PayrollCalcInput, p: PayrollParams): Payro
   if (input.ytdVsaoiBaseCents + gross > p.vsaoiCapAnnualCents) warnings.push('vsaoi_cap_reached');
 
   // 3. Reliefs — only with an active tax book THIS month (doc 3.1 step 3).
-  let nontaxable = 0n; let dependentRelief = 0n; let disabilityRelief = 0n;
+  let nontaxable = 0n; let dependentRelief = 0n; let disabilityRelief = 0n; let repressionRelief = 0n;
   if (input.taxBookActive) {
+    // A pensioner's non-taxable minimum (EUR 1000/mo) replaces the standard one.
+    const baseMinimum = input.isPensioner ? p.pensionerMinimumCents : p.nontaxableMinimumCents;
     nontaxable = input.totalWorkDays > 0
-      ? divRound(p.nontaxableMinimumCents * BigInt(input.workedDays), BigInt(input.totalWorkDays))
+      ? divRound(baseMinimum * BigInt(input.workedDays), BigInt(input.totalWorkDays))
       : 0n;
     dependentRelief = p.dependentReliefCents * BigInt(input.dependents);
     disabilityRelief = input.disabilityGroup === 1 || input.disabilityGroup === 2
       ? p.disabilityReliefGroup12Cents
       : input.disabilityGroup === 3 ? p.disabilityReliefGroup3Cents : 0n;
-    note('Neapliekamais minimums (proporcionāli nostrādātajam)', nontaxable);
+    repressionRelief = input.isRepressed ? p.repressionReliefCents : 0n;
+    note(input.isPensioner
+      ? 'Pensionāra neapliekamais minimums (proporcionāli nostrādātajam)'
+      : 'Neapliekamais minimums (proporcionāli nostrādātajam)', nontaxable);
     if (dependentRelief > 0n) note('Atvieglojums par apgādājamiem', dependentRelief);
     if (disabilityRelief > 0n) note('Invaliditātes atvieglojums', disabilityRelief);
+    if (repressionRelief > 0n) note('Politiski represētās personas atvieglojums', repressionRelief);
   } else {
     note('Algas nodokļa grāmatiņa nav aktīva — atvieglojumi netiek piemēroti', 0n);
   }
 
   // 4. IIN base (doc 3.1 step 4), never negative.
-  let iinBase = gross - vsaoiEmployee - nontaxable - dependentRelief - disabilityRelief;
+  let iinBase = gross - vsaoiEmployee - nontaxable - dependentRelief - disabilityRelief - repressionRelief;
   if (iinBase < 0n) iinBase = 0n;
   note('IIN bāze', iinBase);
 
-  // 5. Progressive IIN (doc 3.1 step 5) — single half-up rounding across both bands.
-  const below = iinBase < p.iinThresholdMonthlyCents ? iinBase : p.iinThresholdMonthlyCents;
-  const above = iinBase - below;
-  const iin = divRound(below * p.iinRateBasicBp + above * p.iinRateTopBp, 10000n);
-  note('IIN (progresīvā skala)', iin);
+  // 5. IIN (doc 3.1 step 5). Default = flat 25.5% (LV 2025+: employer withholds one rate;
+  //    33%/36% settled in the annual declaration). progressiveMonthly = the calculator's
+  //    monthly estimate across the 25.5/33/36 bands (single half-up rounding across bands).
+  let iin: bigint;
+  if (input.progressiveMonthly) {
+    const t1 = p.iinThresholdMonthlyCents;
+    const t2 = p.iinThreshold2MonthlyCents;
+    const band1 = iinBase < t1 ? iinBase : t1;
+    const band2 = iinBase <= t1 ? 0n : (iinBase < t2 ? iinBase - t1 : t2 - t1);
+    const band3 = iinBase <= t2 ? 0n : iinBase - t2;
+    iin = divRound(band1 * p.iinRateBasicBp + band2 * p.iinRateTopBp + band3 * p.iinRateBand3Bp, 10000n);
+    note('IIN (progresīvā skala)', iin);
+  } else {
+    iin = divRound(iinBase * p.iinRateBasicBp, 10000n);
+    note('IIN (25,5%)', iin);
+  }
 
   // 6. Other deductions capped at deduction_cap_pct of the payable amount (doc 3.1 step 6).
   const payableBeforeDeductions = gross - vsaoiEmployee - iin;
@@ -115,6 +136,7 @@ export function computePayroll(input: PayrollCalcInput, p: PayrollParams): Payro
   return {
     grossCents: gross, vsaoiEmployeeCents: vsaoiEmployee,
     nontaxableAppliedCents: nontaxable, dependentReliefCents: dependentRelief, disabilityReliefCents: disabilityRelief,
+    repressionReliefCents: repressionRelief,
     iinBaseCents: iinBase, iinCents: iin,
     deductionsAppliedCents: deductionsApplied, netCents: net, payoutCents: payout,
     vsaoiEmployerCents: vsaoiEmployer, riskDutyCents: riskDuty,

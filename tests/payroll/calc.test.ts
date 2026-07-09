@@ -4,9 +4,10 @@ import type { PayrollParams } from '../../src/payroll/params.js';
 
 // Frozen 2026 parameter set (same values migration 023 seeds).
 const P: PayrollParams = {
-  iinRateBasicBp: 2550n, iinRateTopBp: 3300n, iinThresholdMonthlyCents: 877500n,
-  nontaxableMinimumCents: 55000n, dependentReliefCents: 25000n,
-  disabilityReliefGroup12Cents: 15400n, disabilityReliefGroup3Cents: 12000n,
+  iinRateBasicBp: 2550n, iinRateTopBp: 3300n, iinRateBand3Bp: 3600n,
+  iinThresholdMonthlyCents: 877500n, iinThreshold2MonthlyCents: 1666666n,
+  nontaxableMinimumCents: 55000n, pensionerMinimumCents: 100000n, dependentReliefCents: 25000n,
+  disabilityReliefGroup12Cents: 15400n, disabilityReliefGroup3Cents: 12000n, repressionReliefCents: 15400n,
   vsaoiEmployeeBp: 1050n, vsaoiEmployerBp: 2359n, vsaoiCapAnnualCents: 10530000n,
   minWageMonthlyCents: 78000n, riskDutyMonthlyCents: 36n,
   premiumNightBp: 5000n, premiumOvertimeBp: 10000n, premiumHolidayBp: 10000n,
@@ -37,12 +38,44 @@ test('standard month: 1000 EUR gross, tax book, 1 dependent -> net 870.77', () =
   expect(r.warnings).toEqual([]);
 });
 
-test('progressive IIN above the monthly threshold', () => {
-  const r = computePayroll({ ...BASE, baseCents: 1100000n, dependents: 0 }, P);
+test('progressive IIN above the monthly threshold (progressiveMonthly on)', () => {
+  const r = computePayroll({ ...BASE, baseCents: 1100000n, dependents: 0, progressiveMonthly: true }, P);
   // VSAOI 1155.00; base 11000-1155-550 = 9295.00; 8775 @25.5% + 520 @33% = 2409.225 -> 2409.23
   expect(r.vsaoiEmployeeCents).toBe(115500n);
   expect(r.iinBaseCents).toBe(929500n);
   expect(r.iinCents).toBe(240923n);
+});
+
+test('default (flat 25.5%): the same high earner is withheld a single rate monthly', () => {
+  const r = computePayroll({ ...BASE, baseCents: 1100000n, dependents: 0 }, P);
+  // base 9295.00 @ 25.5% flat = 2370.225 -> 2370.23 (33% band settled annually, not monthly)
+  expect(r.iinBaseCents).toBe(929500n);
+  expect(r.iinCents).toBe(237023n);
+});
+
+test('third band 36% above the 2nd threshold (progressiveMonthly on)', () => {
+  // gross 20000.00: VSAOI 2100.00; base 20000-2100-550 = 17350.00 = 1735000c
+  // 877500 @25.5% + 789166 @33% + 68334 @36% = 2237625000 + 2604247800 + 246002400 = 5087875200 /10000 -> 508788c
+  const r = computePayroll({ ...BASE, baseCents: 2000000n, dependents: 0, progressiveMonthly: true }, P);
+  expect(r.iinBaseCents).toBe(1735000n);
+  expect(r.iinCents).toBe(508788n);
+});
+
+test('pensioner: the EUR 1000 minimum replaces the standard EUR 550', () => {
+  const r = computePayroll({ ...BASE, isPensioner: true }, P);
+  expect(r.nontaxableAppliedCents).toBe(100000n); // 1000.00
+  // base 1000 - 105 - 1000 < 0 -> IIN base 0, IIN 0; net = 1000 - 105 = 895.00
+  expect(r.iinBaseCents).toBe(0n);
+  expect(r.iinCents).toBe(0n);
+  expect(r.netCents).toBe(89500n);
+});
+
+test('politically-repressed relief is additive (EUR 154/mo)', () => {
+  const r = computePayroll({ ...BASE, isRepressed: true }, P);
+  expect(r.repressionReliefCents).toBe(15400n);
+  // base 1000 - 105 - 550 - 154 = 191.00 @ 25.5% flat = 48.705 -> 48.71
+  expect(r.iinBaseCents).toBe(19100n);
+  expect(r.iinCents).toBe(4871n);
 });
 
 test('no active tax book: no reliefs at all', () => {

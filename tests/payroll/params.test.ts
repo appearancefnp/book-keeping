@@ -12,11 +12,15 @@ test('loads the 2026 parameter set as cents/basis points', async () => {
     const p = await loadPayrollParams(client, '2026-07-01');
     expect(p.iinRateBasicBp).toBe(2550n);
     expect(p.iinRateTopBp).toBe(3300n);
+    expect(p.iinRateBand3Bp).toBe(3600n);
     expect(p.iinThresholdMonthlyCents).toBe(877500n); // 105300/12 = 8775.00
+    expect(p.iinThreshold2MonthlyCents).toBe(1666666n); // 200000/12 = 16666.66 (floor)
     expect(p.nontaxableMinimumCents).toBe(55000n);    // 2026 row, not 2025
+    expect(p.pensionerMinimumCents).toBe(100000n);
     expect(p.dependentReliefCents).toBe(25000n);
     expect(p.disabilityReliefGroup12Cents).toBe(15400n);
     expect(p.disabilityReliefGroup3Cents).toBe(12000n);
+    expect(p.repressionReliefCents).toBe(15400n);
     expect(p.vsaoiEmployeeBp).toBe(1050n);
     expect(p.vsaoiEmployerBp).toBe(2359n);
     expect(p.vsaoiCapAnnualCents).toBe(10530000n);

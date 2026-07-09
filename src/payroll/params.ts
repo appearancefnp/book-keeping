@@ -7,11 +7,15 @@ import { toCents } from '../db/money.js';
 export interface PayrollParams {
   iinRateBasicBp: bigint;
   iinRateTopBp: bigint;
+  iinRateBand3Bp: bigint;
   iinThresholdMonthlyCents: bigint;
+  iinThreshold2MonthlyCents: bigint;
   nontaxableMinimumCents: bigint;
+  pensionerMinimumCents: bigint;
   dependentReliefCents: bigint;
   disabilityReliefGroup12Cents: bigint;
   disabilityReliefGroup3Cents: bigint;
+  repressionReliefCents: bigint;
   vsaoiEmployeeBp: bigint;
   vsaoiEmployerBp: bigint;
   vsaoiCapAnnualCents: bigint;
@@ -31,11 +35,15 @@ export async function loadPayrollParams(tx: PoolClient, onDate: string): Promise
   return {
     iinRateBasicBp: await v('payroll_iin_rate_basic'),
     iinRateTopBp: await v('payroll_iin_rate_top'),
+    iinRateBand3Bp: await v('payroll_iin_rate_band3'),
     iinThresholdMonthlyCents: (await v('payroll_iin_threshold_annual')) / 12n, // 10530000/12 = 877500 exact
+    iinThreshold2MonthlyCents: (await v('payroll_iin_threshold2_annual')) / 12n, // 20000000/12 = 1666666 (floor)
     nontaxableMinimumCents: await v('payroll_nontaxable_minimum_monthly'),
+    pensionerMinimumCents: await v('payroll_pensioner_minimum_monthly'),
     dependentReliefCents: await v('payroll_dependent_relief_monthly'),
     disabilityReliefGroup12Cents: await v('payroll_disability_relief_group12_monthly'),
     disabilityReliefGroup3Cents: await v('payroll_disability_relief_group3_monthly'),
+    repressionReliefCents: await v('payroll_repression_relief_monthly'),
     vsaoiEmployeeBp: await v('payroll_vsaoi_rate_employee'),
     vsaoiEmployerBp: await v('payroll_vsaoi_rate_employer'),
     vsaoiCapAnnualCents: await v('payroll_vsaoi_cap_annual'),

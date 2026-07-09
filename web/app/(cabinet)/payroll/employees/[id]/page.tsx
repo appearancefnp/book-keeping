@@ -38,6 +38,7 @@ function DetailInner() {
   const [period, setPeriod] = useState(`${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`);
   const [bookActive, setBookActive] = useState(true);
   const [dependents, setDependents] = useState('0'); const [disability, setDisability] = useState('0');
+  const [pensioner, setPensioner] = useState(false); const [repressed, setRepressed] = useState(false);
   const [kind, setKind] = useState<MoneyKind>('bonus'); const [amount, setAmount] = useState(''); const [compReason, setCompReason] = useState('');
   const [absType, setAbsType] = useState<AbsenceType>('unpaid'); const [from, setFrom] = useState(''); const [to, setTo] = useState(''); const [absReason, setAbsReason] = useState('');
 
@@ -101,7 +102,7 @@ function DetailInner() {
               <h2 className={styles.sectionTitle}>{t('pay.tax.title')}</h2>
               <p className={styles.hint}>{t('pay.tax.hint')}</p>
               <form className={styles.form} onSubmit={(e) => { e.preventDefault(); run(
-                () => post(`/api/payroll/employees/${id}/tax-status`, { clientCompanyId: client, year: y, month: m, taxBookActive: bookActive, dependents: Number(dependents), disabilityGroup: Number(disability) }),
+                () => post(`/api/payroll/employees/${id}/tax-status`, { clientCompanyId: client, year: y, month: m, taxBookActive: bookActive, dependents: Number(dependents), disabilityGroup: Number(disability), isPensioner: pensioner, isRepressed: repressed }),
                 t('pay.tax.save'));
               }}>
                 <label className={styles.field}><span>{t('pay.tax.period')}</span>
@@ -115,6 +116,12 @@ function DetailInner() {
                   <select value={disability} onChange={(e) => setDisability(e.target.value)}>
                     <option value="0">{t('pay.tax.none')}</option><option value="1">I</option><option value="2">II</option><option value="3">III</option>
                   </select></label>
+                <label className={`${styles.field} ${styles.checkField}`}>
+                  <input type="checkbox" checked={pensioner} onChange={(e) => setPensioner(e.target.checked)} />
+                  <span>{t('pay.tax.pensioner')}</span></label>
+                <label className={`${styles.field} ${styles.checkField}`}>
+                  <input type="checkbox" checked={repressed} onChange={(e) => setRepressed(e.target.checked)} />
+                  <span>{t('pay.tax.repressed')}</span></label>
                 <div className={styles.formActions}><button className={styles.primaryBtn} type="submit">{t('pay.tax.save')}</button></div>
               </form>
             </section>

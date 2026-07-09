@@ -3,6 +3,7 @@ import type { TenantContext } from '../tenancy/context.js';
 
 export interface PayrollSettings {
   munRegime: boolean;
+  iinProgressiveMonthly: boolean;
   accWageExpense: string;
   accSeveranceExpense: string;
   accEmployerVsaoiExpense: string;
@@ -16,7 +17,7 @@ export interface PayrollSettings {
   accVacationAccrualVsaoiLiability: string;
 }
 
-const SELECT_COLS = `mun_regime AS "munRegime",
+const SELECT_COLS = `mun_regime AS "munRegime", iin_progressive_monthly AS "iinProgressiveMonthly",
   acc_wage_expense AS "accWageExpense", acc_severance_expense AS "accSeveranceExpense",
   acc_employer_vsaoi_expense AS "accEmployerVsaoiExpense", acc_risk_duty_expense AS "accRiskDutyExpense",
   acc_wages_payable AS "accWagesPayable", acc_iin_payable AS "accIinPayable",

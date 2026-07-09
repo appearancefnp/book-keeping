@@ -104,21 +104,30 @@ export async function updateEmployee(
   await appendAudit(tx, ctx, { action: 'update', entityType: 'employee', entityId: id, before, after: merged });
 }
 
-export interface MonthlyTaxStatus { taxBookActive: boolean; dependents: number; disabilityGroup: number; }
+export interface MonthlyTaxStatus {
+  taxBookActive: boolean; dependents: number; disabilityGroup: number;
+  isPensioner: boolean; isRepressed: boolean;
+}
 
 /** Upsert the month's tax-book data (doc 2.2 — refreshed every month; manual in phase 1). */
 export async function setMonthlyTaxStatus(
   tx: PoolClient, ctx: TenantContext, employeeId: string,
-  s: { year: number; month: number } & MonthlyTaxStatus,
+  s: {
+    year: number; month: number; taxBookActive: boolean; dependents: number; disabilityGroup: number;
+    isPensioner?: boolean; isRepressed?: boolean;
+  },
 ): Promise<void> {
   await tx.query(
-    `INSERT INTO employee_tax_status(client_company_id, employee_id, year, month, tax_book_active, dependents, disability_group)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)
+    `INSERT INTO employee_tax_status(client_company_id, employee_id, year, month, tax_book_active, dependents, disability_group, is_pensioner, is_repressed)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      ON CONFLICT (employee_id, year, month)
      DO UPDATE SET tax_book_active = EXCLUDED.tax_book_active,
                    dependents = EXCLUDED.dependents,
-                   disability_group = EXCLUDED.disability_group`,
-    [ctx.clientCompanyId, employeeId, s.year, s.month, s.taxBookActive, s.dependents, s.disabilityGroup],
+                   disability_group = EXCLUDED.disability_group,
+                   is_pensioner = EXCLUDED.is_pensioner,
+                   is_repressed = EXCLUDED.is_repressed`,
+    [ctx.clientCompanyId, employeeId, s.year, s.month, s.taxBookActive, s.dependents, s.disabilityGroup,
+     s.isPensioner ?? false, s.isRepressed ?? false],
   );
   await appendAudit(tx, ctx, {
     action: 'update', entityType: 'employee_tax_status', entityId: employeeId,
@@ -135,7 +144,8 @@ export async function taxStatusFor(
   tx: PoolClient, ctx: TenantContext, employeeId: string, year: number, month: number,
 ): Promise<(MonthlyTaxStatus & { stale: boolean }) | null> {
   const res = await tx.query(
-    `SELECT year, month, tax_book_active AS "taxBookActive", dependents, disability_group AS "disabilityGroup"
+    `SELECT year, month, tax_book_active AS "taxBookActive", dependents, disability_group AS "disabilityGroup",
+            is_pensioner AS "isPensioner", is_repressed AS "isRepressed"
      FROM employee_tax_status
      WHERE employee_id = $1 AND client_company_id = $2 AND (year*12 + month) <= $3
      ORDER BY year DESC, month DESC LIMIT 1`,
@@ -145,6 +155,7 @@ export async function taxStatusFor(
   const r = res.rows[0];
   return {
     taxBookActive: r.taxBookActive, dependents: r.dependents, disabilityGroup: r.disabilityGroup,
+    isPensioner: r.isPensioner, isRepressed: r.isRepressed,
     stale: !(r.year === year && r.month === month),
   };
 }
