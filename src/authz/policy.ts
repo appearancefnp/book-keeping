@@ -12,7 +12,8 @@ export type Operation =
   | 'autonomy.write' // set agent autonomy policy
   | 'einvoice.issue' // issue an outbound invoice
   | 'bank.write' // import statements / build payment orders
-  | 'parties.write'; // create/update customers & vendors
+  | 'parties.write' // create/update customers & vendors
+  | 'payroll.write'; // employees, orders, runs — firm-side only
 
 /**
  * Which roles may perform each mutating operation.
@@ -28,6 +29,7 @@ const OPERATION_ROLES: Record<Operation, readonly UserRole[]> = {
   'einvoice.issue': ['firm_admin', 'accountant', 'owner', 'employee'],
   'bank.write': ['firm_admin', 'accountant'],
   'parties.write': ['firm_admin', 'accountant', 'employee'],
+  'payroll.write': ['firm_admin', 'accountant'],
 };
 
 /** True if `role` is permitted to perform `op`. Unrecognised roles are denied. */
