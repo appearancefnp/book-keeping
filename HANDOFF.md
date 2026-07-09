@@ -178,8 +178,15 @@ Net-new backend + UI. Each needs migrations, a `src/<module>/`, tests, API
 routes, and pages. **Engage the accountant/tax consultant (spec §10.1)** for
 LR-specific rules in every one.
 
-- **Payroll & HR (§6.3)** — salary, VSAOI + IIN (the 15th-of-month filing),
-  sick leave, vacation, advances; employee self-service portal.
+- **Payroll & HR (§6.3)** — ✅ phase-1 calculation core shipped (see
+  `docs/superpowers/plans/2026-07-09-payroll-phase1-core.md`): employee card,
+  monthly tax-status data, orders (rīkojumi), deterministic bruto→neto engine
+  (IIN/VSAOI 2026, versioned in `tax_rules`), shared average earnings, A-lapa
+  sick pay, vacation accrual + postings, termination settlement, API routes.
+  Still open: VID EDS payroll reports (instr. 3.5 — deliberately last), order
+  PDF + eParaksts, payroll UI pages, employee self-service portal, MUN-regime
+  calc (flag stored), advances, LR public-holiday calendar (shared gap with
+  `vid.ts`), EDS tax-book/sick-leave auto-import (manual monthly entry today).
 - **Fixed assets (§6.5)** — asset register, accounting + tax depreciation with
   automatic postings, disposal.
 - **Warehouse / inventory (§6.4)** — receipts/issues/transfers, FIFO, batches,
