@@ -4,6 +4,7 @@ import type { TenantContext } from '../tenancy/context.js';
 import { appendAudit } from '../audit/audit.js';
 import { updateEmployee } from './employees.js';
 import { addAbsence, addPayComponent } from './inputs.js';
+import { applyTermination } from './termination.js';
 
 export type OrderType = 'hire' | 'termination' | 'bonus' | 'vacation' | 'wage_change';
 
@@ -116,8 +117,11 @@ export async function approveOrder(tx: PoolClient, ctx: TenantContext, id: strin
       await updateEmployee(tx, ctx, before.employeeIds[0]!, { wage: before.amount! });
       break;
     case 'termination':
-      // Replaced with the full final-settlement effect in Task 14.
-      throw new Error('termination orders are not supported yet (Task 14)');
+      await applyTermination(tx, ctx, {
+        orderId: id, employeeId: before.employeeIds[0]!, lastDay: before.dateTo!,
+        severance: before.payload['severance'] === true,
+      });
+      break;
   }
 
   await tx.query(
