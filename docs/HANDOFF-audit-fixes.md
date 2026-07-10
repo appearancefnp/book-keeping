@@ -82,6 +82,26 @@ provider + accountant decisions (see `HANDOFF.md` §1/§2 and §"First decisions
 > renderer + logo/footer — render tech decided: server-rendered branded HTML, print-to-PDF,
 > logo via blob store), slice 4 (notification/email templates). **Still open:** credit
 > notes, G5 (2FA enrolment), WCAG check.
+>
+> **Update 2026-07-10:** ✅ **G4 slice 3b — branded invoice document renderer** shipped via
+> subagent-driven plan `docs/superpowers/plans/2026-07-07-invoice-document.md` (spec
+> `docs/superpowers/specs/2026-07-07-invoice-document-design.md`). Renders an issued invoice
+> as a branded, print-to-PDF HTML document — logo + footer from the client's invoice profile,
+> content parsed from the stored UBL. `invoice_profiles` gains `logo_blob_key` + `footer`
+> (migration 026); `setInvoiceProfile` writes footer but **never clobbers** an uploaded logo
+> (logo lives on its own `setInvoiceLogo` upsert + `set_logo` audit). New `getEinvoiceUbl`
+> (RLS-scoped fetch of stored UBL by id); **pure** `renderInvoiceHtml` helper (`src/einvoice/invoice-html.ts`)
+> — no React/I/O, own EN/LV/RU label map, every value through `escapeXml`, cent-safe per-line
+> VAT (added `fromCents` to `src/db/money.ts`); `POST /api/invoice-profile/logo` (image →
+> blob store, `invoice_profile.write`); standalone `/invoice-document/[id]` print page
+> **outside** `(cabinet)` (no AppShell; auth via `requireSession`; logo inlined as a data URI);
+> outbox **View / Print** link + logo/footer controls on the `/settings` invoice-defaults form.
+> Full suite 214/214; root+web typecheck + web build clean; end-to-end HTTP verified — issue →
+> upload logo + set footer → GET the document page returns HTML with the invoice number,
+> supplier name, footer, an `<img src="data:image…">`, an escaped `<`-containing customer
+> name, and the grand total; bogus id → "not found"; no-cookie → 307 (auth enforced).
+> **G4 remaining:** only slice 4 (notification/email templates). **Still open:** credit
+> notes, G5 (2FA enrolment), WCAG check.
 
 ## Read first
 - `docs/SPEC-AUDIT.md` — the coverage snapshot these fixes come from (gaps **G1–G6** + minors).
