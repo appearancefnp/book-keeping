@@ -13,6 +13,7 @@ export type Operation =
   | 'einvoice.issue' // issue an outbound invoice
   | 'bank.write' // import statements / build payment orders
   | 'parties.write' // create/update customers & vendors
+  | 'payroll.write' // employees, orders, runs — firm-side only
   | 'invoice_profile.write'; // set invoice profile (payment terms, numbering, defaults)
 
 /**
@@ -29,6 +30,7 @@ const OPERATION_ROLES: Record<Operation, readonly UserRole[]> = {
   'einvoice.issue': ['firm_admin', 'accountant', 'owner', 'employee'],
   'bank.write': ['firm_admin', 'accountant'],
   'parties.write': ['firm_admin', 'accountant', 'employee'],
+  'payroll.write': ['firm_admin', 'accountant'],
   'invoice_profile.write': ['firm_admin', 'accountant'],
 };
 

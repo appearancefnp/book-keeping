@@ -13,6 +13,7 @@ export type NavIconName =
   | 'invoices'
   | 'bank'
   | 'journal'
+  | 'payroll'
   | 'settings';
 
 const PATHS: Record<NavIconName, React.ReactNode> = {
@@ -101,6 +102,15 @@ const PATHS: Record<NavIconName, React.ReactNode> = {
       <circle cx="8" cy="6" r="1.75" fill="var(--surface, #fff)" />
       <circle cx="12.5" cy="10" r="1.75" fill="var(--surface, #fff)" />
       <circle cx="6.5" cy="14" r="1.75" fill="var(--surface, #fff)" />
+    </>
+  ),
+  // Payroll — stylised payslip with a coin
+  payroll: (
+    <>
+      <path d="M4 4.75h9.5A1.25 1.25 0 0114.75 6v9.25A1.25 1.25 0 0113.5 16.5H4A1.25 1.25 0 012.75 15.25V6A1.25 1.25 0 014 4.75z" strokeLinejoin="round" />
+      <path d="M5.5 8h6M5.5 11h3.5" strokeLinecap="round" />
+      <circle cx="14" cy="13" r="3.25" />
+      <path d="M14 11.75v2.5M12.9 13h2.2" strokeLinecap="round" />
     </>
   ),
 };

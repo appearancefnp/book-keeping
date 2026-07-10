@@ -1,0 +1,48 @@
+.page { display: flex; justify-content: center; }
+.main { width: 100%; max-width: 1040px; padding: var(--space-6) var(--space-5); display: flex; flex-direction: column; gap: var(--space-5); }
+.headRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+.pageHeading { font-size: 1.375rem; font-weight: 600; color: var(--ink); margin: 0; }
+.skeletons { display: flex; flex-direction: column; gap: var(--space-4); }
+
+.tabs { display: flex; gap: var(--space-2); border-bottom: 1px solid var(--border); }
+.tab { padding: var(--space-2) var(--space-4); font: inherit; color: var(--ink-soft); text-decoration: none; border-bottom: 2px solid transparent; }
+.tabActive { color: var(--ink); border-bottom-color: var(--primary); font-weight: 500; }
+
+.primaryBtn { background: var(--primary); color: var(--primary-ink); border: none; border-radius: var(--radius-sm); padding: var(--space-2) var(--space-4); font: inherit; font-weight: 500; cursor: pointer; }
+.primaryBtn:disabled { opacity: 0.55; cursor: default; }
+.ghostBtn { background: transparent; color: var(--primary-deep); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-1) var(--space-3); font: inherit; cursor: pointer; }
+.dangerBtn { background: transparent; color: var(--danger); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-1) var(--space-3); font: inherit; cursor: pointer; }
+
+.form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-5); }
+.field { display: flex; flex-direction: column; gap: var(--space-1); font-size: 0.875rem; color: var(--ink-soft); }
+.field input, .field select { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
+.checkField { flex-direction: row; align-items: center; gap: var(--space-2); }
+.formActions { grid-column: 1 / -1; display: flex; gap: var(--space-3); }
+.formError { grid-column: 1 / -1; color: var(--danger); font-size: 0.875rem; margin: 0; }
+
+.tableWrapper { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+.table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+.table th { text-align: left; font-weight: 500; color: var(--ink-soft); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); }
+.table td { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); color: var(--ink); }
+.table tbody tr:last-child td { border-bottom: none; }
+.num { font-variant-numeric: tabular-nums; text-align: right; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.875rem; }
+.actionsCell { text-align: right; white-space: nowrap; }
+
+.section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); }
+.sectionTitle { font-size: 1.0625rem; font-weight: 600; color: var(--ink); margin: 0; }
+.hint { font-size: 0.8125rem; color: var(--ink-soft); margin: 0; }
+.rowActions { display: flex; gap: var(--space-3); align-items: center; }
+.statusChip { font-size: 0.75rem; padding: 2px var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--border); color: var(--ink-soft); }
+
+.exceptionCard { border: 1px solid var(--warning, #c98a00); border-radius: var(--radius-md); background: color-mix(in srgb, var(--warning, #c98a00) 8%, var(--surface)); padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); }
+.warnRow td { background: color-mix(in srgb, var(--warning, #c98a00) 6%, transparent); }
+.warnList { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.warnBadge { font-size: 0.75rem; padding: 2px var(--space-2); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--warning, #c98a00) 18%, transparent); color: var(--ink); }
+.okNote { color: var(--ink-soft); font-size: 0.875rem; }
+
+.drawer { position: fixed; inset: 0; background: color-mix(in srgb, black 40%, transparent); display: flex; justify-content: flex-end; z-index: 50; }
+.drawerPanel { width: min(520px, 100%); height: 100%; background: var(--surface); padding: var(--space-6) var(--space-5); overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4); }
+.explain { display: flex; flex-direction: column; gap: var(--space-2); }
+.explainRow { display: flex; justify-content: space-between; gap: var(--space-4); font-size: 0.9375rem; padding: var(--space-1) 0; border-bottom: 1px dashed var(--border); }
+.explainRow span:last-child { font-variant-numeric: tabular-nums; }
