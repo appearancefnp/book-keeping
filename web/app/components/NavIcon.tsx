@@ -14,7 +14,8 @@ export type NavIconName =
   | 'bank'
   | 'journal'
   | 'payroll'
-  | 'settings';
+  | 'settings'
+  | 'reports';
 
 const PATHS: Record<NavIconName, React.ReactNode> = {
   // Checklist / approval queue
@@ -111,6 +112,13 @@ const PATHS: Record<NavIconName, React.ReactNode> = {
       <path d="M5.5 8h6M5.5 11h3.5" strokeLinecap="round" />
       <circle cx="14" cy="13" r="3.25" />
       <path d="M14 11.75v2.5M12.9 13h2.2" strokeLinecap="round" />
+    </>
+  ),
+  // Reports / financial statements (trend line on axes)
+  reports: (
+    <>
+      <path d="M4 4v12h12" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7 12l3-3 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
     </>
   ),
 };

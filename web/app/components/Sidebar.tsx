@@ -7,9 +7,9 @@ import { NavIcon, type NavIconName } from './NavIcon';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
-  key: 'nav.home' | 'nav.queue' | 'nav.documents' | 'nav.overview' | 'nav.tasks' | 'nav.notifications' | 'nav.admin' | 'nav.parties' | 'nav.invoices' | 'nav.bank' | 'nav.journal' | 'nav.payroll' | 'nav.settings';
+  key: 'nav.home' | 'nav.queue' | 'nav.documents' | 'nav.overview' | 'nav.tasks' | 'nav.notifications' | 'nav.admin' | 'nav.parties' | 'nav.invoices' | 'nav.bank' | 'nav.journal' | 'nav.payroll' | 'nav.settings' | 'nav.reports';
   /** Compact label for the mobile bottom tab bar, where six full-length LV/RU labels can't fit. */
-  shortKey: 'nav.short.home' | 'nav.short.queue' | 'nav.short.documents' | 'nav.short.overview' | 'nav.short.tasks' | 'nav.short.notifications' | 'nav.short.admin' | 'nav.short.parties' | 'nav.short.invoices' | 'nav.short.bank' | 'nav.short.journal' | 'nav.short.payroll' | 'nav.short.settings';
+  shortKey: 'nav.short.home' | 'nav.short.queue' | 'nav.short.documents' | 'nav.short.overview' | 'nav.short.tasks' | 'nav.short.notifications' | 'nav.short.admin' | 'nav.short.parties' | 'nav.short.invoices' | 'nav.short.bank' | 'nav.short.journal' | 'nav.short.payroll' | 'nav.short.settings' | 'nav.short.reports';
   href: string;
   icon: NavIconName;
 }
@@ -20,6 +20,7 @@ const BASE_ITEMS: NavItem[] = [
   { key: 'nav.invoices',       shortKey: 'nav.short.invoices',       href: '/invoices',      icon: 'invoices' },
   { key: 'nav.bank',           shortKey: 'nav.short.bank',           href: '/bank',          icon: 'bank' },
   { key: 'nav.journal',        shortKey: 'nav.short.journal',        href: '/journal',       icon: 'journal' },
+  { key: 'nav.reports',        shortKey: 'nav.short.reports',        href: '/reports',       icon: 'reports' },
   { key: 'nav.overview',       shortKey: 'nav.short.overview',       href: '/overview',      icon: 'overview' },
   { key: 'nav.tasks',          shortKey: 'nav.short.tasks',          href: '/tasks',         icon: 'tasks' },
   { key: 'nav.notifications',  shortKey: 'nav.short.notifications',  href: '/notifications', icon: 'notifications' },
@@ -37,6 +38,7 @@ const ADMIN_ITEMS: NavItem[] = [
 const OWNER_ITEMS: NavItem[] = [
   { key: 'nav.home',          shortKey: 'nav.short.home',          href: '/',              icon: 'overview' },
   { key: 'nav.documents',     shortKey: 'nav.short.documents',     href: '/documents',     icon: 'documents' },
+  { key: 'nav.reports',       shortKey: 'nav.short.reports',       href: '/reports',       icon: 'reports' },
   { key: 'nav.notifications', shortKey: 'nav.short.notifications', href: '/notifications', icon: 'notifications' },
 ];
 
