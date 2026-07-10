@@ -5,7 +5,7 @@ import { createAccount } from '../../src/ledger/accounts.js';
 import { openPeriod } from '../../src/ledger/periods.js';
 import { StubAccessPoint } from '../../src/einvoice/access-point.js';
 import { sendInvoice } from '../../src/einvoice/outbound.js';
-import { listEinvoices } from '../../src/einvoice/query.js';
+import { listEinvoices, getEinvoiceUbl } from '../../src/einvoice/query.js';
 import type { EInvoice } from '../../src/einvoice/ubl.js';
 
 const inv: EInvoice = {
@@ -45,6 +45,26 @@ test('lists outbound einvoices with statuses', async () => {
   expect(row.peppolStatus).toBe('sent');
   expect(row.vidStatus).toBe('pending');
   expect(row.direction).toBe('outbound');
+});
+
+test('getEinvoiceUbl returns the stored UBL for its id, null otherwise', async () => {
+  const t = await makeFirmAndClient();
+  const { einvoiceId } = await issueOne(t);
+  const found = await withTenant(ctx(t), (tx) => getEinvoiceUbl(tx, ctx(t), einvoiceId));
+  expect(found).not.toBeNull();
+  expect(found!.invoiceNumber).toBe('INV-2026-042');
+  expect(found!.ublXml).toContain('<Invoice');
+  const missing = await withTenant(ctx(t), (tx) =>
+    getEinvoiceUbl(tx, ctx(t), '00000000-0000-0000-0000-000000000000'));
+  expect(missing).toBeNull();
+});
+
+test('getEinvoiceUbl does not leak another tenant\'s invoice (RLS)', async () => {
+  const t1 = await makeFirmAndClient('SIA Viens');
+  const t2 = await makeFirmAndClient('SIA Divi');
+  const { einvoiceId } = await issueOne(t1);
+  const leaked = await withTenant(ctx(t2), (tx) => getEinvoiceUbl(tx, ctx(t2), einvoiceId));
+  expect(leaked).toBeNull();
 });
 
 test('does not leak other tenants and respects limit', async () => {

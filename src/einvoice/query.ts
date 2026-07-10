@@ -56,3 +56,16 @@ export async function listEinvoices(
     createdAt: r.created_at,
   }));
 }
+
+export async function getEinvoiceUbl(
+  tx: PoolClient,
+  ctx: TenantContext,
+  id: string,
+): Promise<{ invoiceNumber: string; ublXml: string } | null> {
+  const res = await tx.query(
+    `SELECT invoice_number AS "invoiceNumber", ubl_xml AS "ublXml"
+       FROM einvoices WHERE id = $1 AND client_company_id = $2`,
+    [id, ctx.clientCompanyId],
+  );
+  return res.rows[0] ?? null;
+}
