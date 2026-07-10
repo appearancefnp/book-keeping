@@ -12,19 +12,19 @@ export function toCents(s: string): bigint {
   return neg ? -cents : cents;
 }
 
-export function sumCents(values: string[]): bigint {
-  return values.reduce<bigint>((acc, v) => acc + toCents(v), 0n);
-}
-
-export function centsEqual(a: bigint, b: bigint): boolean {
-  return a === b;
-}
-
-/** Format integer cents back to a 2dp decimal string ("87077n" -> "870.77"). Inverse of toCents. */
+/** Format integer cents back into a 2-decimal money string ("2100" → "21.00"). Handles negatives. */
 export function fromCents(cents: bigint): string {
   const neg = cents < 0n;
   const abs = neg ? -cents : cents;
   const whole = abs / 100n;
   const frac = (abs % 100n).toString().padStart(2, '0');
   return `${neg ? '-' : ''}${whole}.${frac}`;
+}
+
+export function sumCents(values: string[]): bigint {
+  return values.reduce<bigint>((acc, v) => acc + toCents(v), 0n);
+}
+
+export function centsEqual(a: bigint, b: bigint): boolean {
+  return a === b;
 }

@@ -13,7 +13,8 @@ export type Operation =
   | 'einvoice.issue' // issue an outbound invoice
   | 'bank.write' // import statements / build payment orders
   | 'parties.write' // create/update customers & vendors
-  | 'payroll.write'; // employees, orders, runs — firm-side only
+  | 'payroll.write' // employees, orders, runs — firm-side only
+  | 'invoice_profile.write'; // set invoice profile (payment terms, numbering, defaults)
 
 /**
  * Which roles may perform each mutating operation.
@@ -30,6 +31,7 @@ const OPERATION_ROLES: Record<Operation, readonly UserRole[]> = {
   'bank.write': ['firm_admin', 'accountant'],
   'parties.write': ['firm_admin', 'accountant', 'employee'],
   'payroll.write': ['firm_admin', 'accountant'],
+  'invoice_profile.write': ['firm_admin', 'accountant'],
 };
 
 /** True if `role` is permitted to perform `op`. Unrecognised roles are denied. */

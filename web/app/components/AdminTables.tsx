@@ -92,6 +92,7 @@ const ENTITY_KEYS: Record<string, MsgKey> = {
   chat: 'audit.entity.chat',
   account: 'audit.entity.account',
   period: 'audit.entity.period',
+  tariff: 'audit.entity.tariff',
 };
 
 function translated(map: Record<string, MsgKey>, raw: string, t: (k: MsgKey) => string): string {

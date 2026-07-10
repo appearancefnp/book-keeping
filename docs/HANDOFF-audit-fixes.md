@@ -25,8 +25,83 @@ provider + accountant decisions (see `HANDOFF.md` §1/§2 and §"First decisions
 > server-side page-read gating for the owner (an owner can still type `/journal`; nav
 > hiding is calm-by-default, not access control — mutations are already G1-gated).
 > **G4** (tariffs & templates) is specced next (decisions captured: per-client monthly
-> retainer; onboarding + invoice/document + notification templates). **Still open:**
-> credit notes, G5 (2FA enrolment), G4 build, WCAG automated check.
+> retainer; onboarding + invoice/document + notification templates).
+>
+> **Update 2026-07-06 (cont.):** ✅ **G4 slice 1 — per-client tariffs** shipped via
+> subagent-driven plan `docs/superpowers/plans/2026-07-06-tariffs.md` (spec
+> `docs/superpowers/specs/2026-07-06-tariffs-design.md`). New `client_tariffs` table
+> (effective-dated, VAT + currency, **no RLS** — firm-scoped like the rest of `/admin`,
+> cross-firm isolation unit-tested), `src/tariffs/tariffs.ts` domain, `GET/POST
+> /api/admin/tariffs` (read = accountant/firm_admin; **write = firm_admin only**;
+> firm-scoping check before write), and a tariff table + inline edit form on `/admin`.
+> Store-rate-only (no invoice/posting/billing). Full suite 193/193; root+web typecheck +
+> web build clean; per-role HTTP smoke verified (firm_admin GET 200 / POST 201 / GET
+> reflects rate / cross-firm 403 / negative 400; accountant GET 200 / POST 403; no-cookie
+> 401).
+>
+> **Update 2026-07-07:** ✅ **G4 slice 2 — onboarding templates + Add-client flow**
+> shipped via subagent-driven plan `docs/superpowers/plans/2026-07-06-onboarding-templates.md`
+> (spec `docs/superpowers/specs/2026-07-06-onboarding-templates-design.md`). New
+> `onboarding_templates` table (jsonb body, **no RLS**, firm-scoped, cross-firm isolation
+> unit-tested), `src/onboarding/templates.ts` (`snapshotClientAsTemplate`,
+> `listTemplatesForFirm`, `getTemplateBody`, `createClientFromTemplate` — creates a client,
+> auto-assigns the creator, seeds accounts+autonomy+tariff from the template), `GET/POST
+> /api/admin/templates` + `POST /api/admin/clients` (the previously-missing Add-client
+> flow), and an OnboardingPanel on `/admin` (Add-client form + Save-as-template + list;
+> firm_admin writes, accountant reads). Snapshot-only authoring; apply-on-create only.
+> Full suite 197/197; root+web typecheck + web build clean; per-role HTTP smoke verified
+> (firm_admin snapshot 201 → template captured 2 accounts → create-from-template 201 →
+> new client seeded with the same accounts; unknown-template 400; cross-firm 403;
+> accountant POST 403; no-cookie 401). **Review caught & fixed:** an implementer had
+> polluted production `createClientFromTemplate` with dummy-user creation to satisfy a
+> flawed test (reverted; test now uses a real user); and a stale client-select default
+> that blocked the create-first-client→snapshot flow.
+> **G4 remaining slices (each own spec→plan→build):** (3) invoice/document templates,
+> (4) notification/email templates. **Still open:** credit notes, G5 (2FA enrolment),
+> WCAG automated check.
+>
+> **Update 2026-07-07 (cont.):** ✅ **G4 slice 3a — per-client invoice profile + UBL
+> content** shipped via subagent-driven plan `docs/superpowers/plans/2026-07-07-invoice-profile.md`
+> (spec `docs/superpowers/specs/2026-07-07-invoice-profile-design.md`). A per-client
+> invoice-defaults record (payment terms, note, due-date offset, number prefix, default
+> lines) that (a) pre-fills the composer and (b) threads **Note / PaymentTerms / DueDate**
+> into the real UBL. New `invoice_profiles` table — **RLS-enabled** (this IS per-client
+> tenant data, unlike the firm-admin no-RLS slices 1–2; genuine RLS isolation now tested
+> via an unfiltered cross-tenant query). `src/einvoice/invoice-profile.ts` domain;
+> extended `EInvoice`/`buildUblInvoice`/`parseUblInvoice` (optional fields, emitted only
+> when present → absent output byte-identical, backward-compatible); new
+> `invoice_profile.write` authz op (firm_admin/accountant); `GET/POST /api/invoice-profile`
+> (per-client tenant routes); composer applies defaults + sends the fields; "Invoice
+> defaults" form on `/settings`. Full suite 207/207; root+web typecheck + web build clean;
+> per-role HTTP smoke verified (accountant GET/POST 200; employee/owner POST 403; employee
+> GET 200 read-open; no-cookie 401; profile round-trips) AND a real end-to-end issue →
+> the stored UBL contains `cbc:DueDate`, `cbc:Note`, `cac:PaymentTerms`. **Reviews caught
+> & fixed:** a weak RLS test that didn't exercise RLS (strengthened to an unfiltered
+> cross-tenant query), and a 0-day due-offset silently becoming "no due date" (`0 || null`
+> → now preserves explicit 0). **G4 remaining:** slice 3b (branded HTML/PDF invoice
+> renderer + logo/footer — render tech decided: server-rendered branded HTML, print-to-PDF,
+> logo via blob store), slice 4 (notification/email templates). **Still open:** credit
+> notes, G5 (2FA enrolment), WCAG check.
+>
+> **Update 2026-07-10:** ✅ **G4 slice 3b — branded invoice document renderer** shipped via
+> subagent-driven plan `docs/superpowers/plans/2026-07-07-invoice-document.md` (spec
+> `docs/superpowers/specs/2026-07-07-invoice-document-design.md`). Renders an issued invoice
+> as a branded, print-to-PDF HTML document — logo + footer from the client's invoice profile,
+> content parsed from the stored UBL. `invoice_profiles` gains `logo_blob_key` + `footer`
+> (migration 026); `setInvoiceProfile` writes footer but **never clobbers** an uploaded logo
+> (logo lives on its own `setInvoiceLogo` upsert + `set_logo` audit). New `getEinvoiceUbl`
+> (RLS-scoped fetch of stored UBL by id); **pure** `renderInvoiceHtml` helper (`src/einvoice/invoice-html.ts`)
+> — no React/I/O, own EN/LV/RU label map, every value through `escapeXml`, cent-safe per-line
+> VAT (added `fromCents` to `src/db/money.ts`); `POST /api/invoice-profile/logo` (image →
+> blob store, `invoice_profile.write`); standalone `/invoice-document/[id]` print page
+> **outside** `(cabinet)` (no AppShell; auth via `requireSession`; logo inlined as a data URI);
+> outbox **View / Print** link + logo/footer controls on the `/settings` invoice-defaults form.
+> Full suite 214/214; root+web typecheck + web build clean; end-to-end HTTP verified — issue →
+> upload logo + set footer → GET the document page returns HTML with the invoice number,
+> supplier name, footer, an `<img src="data:image…">`, an escaped `<`-containing customer
+> name, and the grand total; bogus id → "not found"; no-cookie → 307 (auth enforced).
+> **G4 remaining:** only slice 4 (notification/email templates). **Still open:** credit
+> notes, G5 (2FA enrolment), WCAG check.
 
 ## Read first
 - `docs/SPEC-AUDIT.md` — the coverage snapshot these fixes come from (gaps **G1–G6** + minors).

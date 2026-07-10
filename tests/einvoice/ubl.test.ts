@@ -29,3 +29,53 @@ test('round-trips through parse', () => {
   expect(parsed.lines).toHaveLength(1);
   expect(parsed.lines[0]!.net).toBe('100.00');
 });
+
+test('buildUblInvoice omits optional fields when absent (backward-compatible)', () => {
+  const inv = {
+    invoiceNumber: 'INV-1', issueDate: '2026-07-01', currency: 'EUR',
+    supplier: { name: 'S', regNo: '1', vatNo: 'LV1' },
+    customer: { name: 'C', regNo: '2', vatNo: 'LV2' },
+    lines: [{ description: 'x', net: '100.00', vatRate: 21, vat: '21.00' }],
+    netTotal: '100.00', vatTotal: '21.00', grandTotal: '121.00',
+  };
+  const xml = buildUblInvoice(inv);
+  expect(xml).not.toContain('<cbc:DueDate>');
+  expect(xml).not.toContain('<cbc:Note>');
+  expect(xml).not.toContain('<cac:PaymentTerms>');
+});
+
+test('buildUblInvoice emits DueDate, Note, PaymentTerms when present, in valid order', () => {
+  const inv = {
+    invoiceNumber: 'INV-2', issueDate: '2026-07-01', currency: 'EUR',
+    supplier: { name: 'S', regNo: '1', vatNo: 'LV1' },
+    customer: { name: 'C', regNo: '2', vatNo: 'LV2' },
+    lines: [{ description: 'x', net: '100.00', vatRate: 21, vat: '21.00' }],
+    netTotal: '100.00', vatTotal: '21.00', grandTotal: '121.00',
+    dueDate: '2026-07-15', note: 'Thank you', paymentTerms: 'Net 14 days',
+  };
+  const xml = buildUblInvoice(inv);
+  expect(xml).toContain('<cbc:DueDate>2026-07-15</cbc:DueDate>');
+  expect(xml).toContain('<cbc:Note>Thank you</cbc:Note>');
+  expect(xml).toContain('<cac:PaymentTerms><cbc:Note>Net 14 days</cbc:Note></cac:PaymentTerms>');
+  // DueDate after IssueDate, before DocumentCurrencyCode
+  expect(xml.indexOf('<cbc:DueDate>')).toBeGreaterThan(xml.indexOf('<cbc:IssueDate>'));
+  expect(xml.indexOf('<cbc:DueDate>')).toBeLessThan(xml.indexOf('<cbc:DocumentCurrencyCode>'));
+  // PaymentTerms after customer party, before TaxTotal
+  expect(xml.indexOf('<cac:PaymentTerms>')).toBeGreaterThan(xml.indexOf('AccountingCustomerParty'));
+  expect(xml.indexOf('<cac:PaymentTerms>')).toBeLessThan(xml.indexOf('<cac:TaxTotal>'));
+});
+
+test('parseUblInvoice round-trips the optional fields', () => {
+  const inv = {
+    invoiceNumber: 'INV-3', issueDate: '2026-07-01', currency: 'EUR',
+    supplier: { name: 'S', regNo: '1', vatNo: 'LV1' },
+    customer: { name: 'C', regNo: '2', vatNo: 'LV2' },
+    lines: [{ description: 'x', net: '100.00', vatRate: 21, vat: '21.00' }],
+    netTotal: '100.00', vatTotal: '21.00', grandTotal: '121.00',
+    dueDate: '2026-07-15', note: 'Thank you', paymentTerms: 'Net 14 days',
+  };
+  const parsed = parseUblInvoice(buildUblInvoice(inv));
+  expect(parsed.dueDate).toBe('2026-07-15');
+  expect(parsed.note).toBe('Thank you');
+  expect(parsed.paymentTerms).toBe('Net 14 days');
+});

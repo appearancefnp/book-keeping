@@ -7,6 +7,7 @@ import type { MsgKey } from '@/app/lib/i18n';
 import { SkeletonCard } from '@/app/components/SkeletonCard';
 import { ErrorState } from '@/app/components/ErrorState';
 import { formatCents } from '@/app/lib/format';
+import { InvoiceDefaultsForm } from './InvoiceDefaultsForm';
 import styles from './page.module.css';
 
 interface PeriodRow { year: number; month: number; status: 'open' | 'closed'; }
@@ -223,6 +224,8 @@ function SettingsInner() {
             <button type="submit" className={styles.primaryBtn} disabled={busy}>{t('settings.addPolicy')}</button>
           </form>
         </section>
+
+        {clientCompanyId && <InvoiceDefaultsForm clientCompanyId={clientCompanyId} />}
       </main>
     </div>
   );

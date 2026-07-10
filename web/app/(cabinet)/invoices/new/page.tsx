@@ -10,6 +10,14 @@ import styles from './page.module.css';
 
 interface PartyRow { id: string; kind: 'customer' | 'vendor' | 'both'; name: string; regNo: string | null; vatNo: string | null; }
 interface LineDraft { description: string; net: string; vatRate: number; }
+interface InvoiceProfileLine { description: string; net: string; vatRate: number; }
+interface InvoiceProfileDTO {
+  paymentTerms: string | null;
+  note: string | null;
+  dueDateOffsetDays: number | null;
+  numberPrefix: string | null;
+  defaultLines: InvoiceProfileLine[];
+}
 
 function toCents(s: string): number {
   const n = Number(s);
@@ -39,16 +47,21 @@ function ComposerInner() {
   const [peppolId, setPeppolId] = useState('');
   const [supplierVatNo, setSupplierVatNo] = useState('');
   const [lines, setLines] = useState<LineDraft[]>([{ description: '', net: '', vatRate: 21 }]);
+  const [note, setNote] = useState('');
+  const [paymentTerms, setPaymentTerms] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [offsetDays, setOffsetDays] = useState<number | null>(null);
   const [issuing, setIssuing] = useState(false);
   const [issueError, setIssueError] = useState<string | null>(null);
 
   const load = useCallback(async (id: string) => {
     setLoadError(null);
     try {
-      const [pRes, cBody, rRes] = await Promise.all([
+      const [pRes, cBody, rRes, pfRes] = await Promise.all([
         fetch(`/api/parties?clientCompanyId=${encodeURIComponent(id)}`, { cache: 'no-store' }),
         fetchClients(),
         fetch(`/api/vat-rate?clientCompanyId=${encodeURIComponent(id)}`, { cache: 'no-store' }),
+        fetch(`/api/invoice-profile?clientCompanyId=${encodeURIComponent(id)}`, { cache: 'no-store' }),
       ]);
       if (!pRes.ok) throw new Error(((await pRes.json().catch(() => ({}))) as { error?: string }).error ?? `HTTP ${pRes.status}`);
       const parties = ((await pRes.json()) as { parties: PartyRow[] }).parties;
@@ -61,6 +74,18 @@ function ComposerInner() {
         if (typeof body.rate === 'number' && Number.isFinite(body.rate)) {
           setDefaultRate(body.rate);
           setLines((ls) => ls.map((l) => ({ ...l, vatRate: body.rate! })));
+        }
+      }
+      if (pfRes.ok) {
+        const profile = ((await pfRes.json()) as { profile: InvoiceProfileDTO | null }).profile;
+        if (profile) {
+          if (profile.numberPrefix && !invoiceNumber.trim()) setInvoiceNumber(profile.numberPrefix);
+          if (profile.defaultLines?.length) {
+            setLines(profile.defaultLines.map((l) => ({ description: l.description, net: l.net, vatRate: l.vatRate })));
+          }
+          setNote(profile.note ?? '');
+          setPaymentTerms(profile.paymentTerms ?? '');
+          setOffsetDays(profile.dueDateOffsetDays ?? null);
         }
       }
     } catch (err) {
@@ -77,6 +102,14 @@ function ComposerInner() {
   useEffect(() => {
     if (customer?.regNo) setPeppolId(`0088:${customer.regNo}`);
   }, [customer]);
+
+  useEffect(() => {
+    if (offsetDays === null) return;
+    const base = new Date(issueDate);
+    if (Number.isNaN(base.getTime())) return;
+    base.setDate(base.getDate() + offsetDays);
+    setDueDate(base.toISOString().slice(0, 10));
+  }, [issueDate, offsetDays]);
 
   const netTotalCents = lines.reduce((acc, l) => acc + toCents(l.net), 0);
   const vatTotalCents = lines.reduce((acc, l) => acc + lineVatCents(l), 0);
@@ -105,6 +138,9 @@ function ComposerInner() {
       netTotal: fromCents(netTotalCents),
       vatTotal: fromCents(vatTotalCents),
       grandTotal: fromCents(grandTotalCents),
+      ...(dueDate.trim() && { dueDate: dueDate.trim() }),
+      ...(note.trim() && { note: note.trim() }),
+      ...(paymentTerms.trim() && { paymentTerms: paymentTerms.trim() }),
     };
     try {
       const res = await fetch('/api/einvoices', {
@@ -169,6 +205,18 @@ function ComposerInner() {
                 <label className={styles.field}>
                   <span>{t('einv.peppolId')}</span>
                   <input value={peppolId} onChange={(e) => setPeppolId(e.target.value)} required />
+                </label>
+                <label className={styles.field}>
+                  <span>{t('inv.dueDate')}</span>
+                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                </label>
+                <label className={styles.field}>
+                  <span>{t('inv.paymentTerms')}</span>
+                  <input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} />
+                </label>
+                <label className={styles.field}>
+                  <span>{t('inv.note')}</span>
+                  <input value={note} onChange={(e) => setNote(e.target.value)} />
                 </label>
               </div>
             </section>
