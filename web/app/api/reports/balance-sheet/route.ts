@@ -7,7 +7,11 @@ import { withTenant } from '@domain/db/pool.js';
 import { balanceSheet } from '@domain/reports/balance-sheet.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function isValidIsoDate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
@@ -17,7 +21,7 @@ export async function GET(req: NextRequest) {
   if (!clientCompanyId) return NextResponse.json({ error: 'missing clientCompanyId' }, { status: 400 });
 
   const asOf = req.nextUrl.searchParams.get('asOf') ?? new Date().toISOString().slice(0, 10);
-  if (!DATE_RE.test(asOf)) {
+  if (!isValidIsoDate(asOf)) {
     return NextResponse.json({ error: 'asOf must be YYYY-MM-DD' }, { status: 400 });
   }
 

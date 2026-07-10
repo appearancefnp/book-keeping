@@ -13,7 +13,7 @@ export interface ProfitAndLoss {
   netProfit: string;
 }
 
-/** Build a section from rows of one type. `sign` flips debit-normal balance to
+/** Build a section from rows of one type. `normal` flips debit-normal balance to
  *  the natural presentation sign (credit-normal for income, debit-normal for
  *  expense). Zero-amount lines are omitted. */
 function section(rows: DatedBalanceRow[], normal: 'credit' | 'debit'): StatementSection {

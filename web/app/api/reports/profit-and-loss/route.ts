@@ -7,7 +7,11 @@ import { withTenant } from '@domain/db/pool.js';
 import { profitAndLoss } from '@domain/reports/profit-and-loss.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function isValidIsoDate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
 
 function todayIso(): string { return new Date().toISOString().slice(0, 10); }
 function firstOfMonthIso(): string { return todayIso().slice(0, 8) + '01'; }
@@ -21,7 +25,7 @@ export async function GET(req: NextRequest) {
 
   const from = req.nextUrl.searchParams.get('from') ?? firstOfMonthIso();
   const to = req.nextUrl.searchParams.get('to') ?? todayIso();
-  if (!DATE_RE.test(from) || !DATE_RE.test(to)) {
+  if (!isValidIsoDate(from) || !isValidIsoDate(to)) {
     return NextResponse.json({ error: 'from/to must be YYYY-MM-DD' }, { status: 400 });
   }
 

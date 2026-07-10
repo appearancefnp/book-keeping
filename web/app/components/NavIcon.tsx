@@ -114,11 +114,11 @@ const PATHS: Record<NavIconName, React.ReactNode> = {
       <path d="M14 11.75v2.5M12.9 13h2.2" strokeLinecap="round" />
     </>
   ),
-  // Reports / financial statements (bar chart)
+  // Reports / financial statements (trend line on axes)
   reports: (
     <>
-      <path d="M3.5 16.5h13" strokeLinecap="round" />
-      <path d="M6 16.5V11M10 16.5V6M14 16.5v-3.5" strokeLinecap="round" />
+      <path d="M4 4v12h12" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7 12l3-3 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
     </>
   ),
 };

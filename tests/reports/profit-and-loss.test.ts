@@ -70,6 +70,26 @@ test('profitAndLoss excludes entries outside the date range', async () => {
   expect(pl.income.subtotal).toBe('100.00');
 });
 
+test('profitAndLoss reports a net loss when expenses exceed income', async () => {
+  const t = await base();
+  await withTenant(ctx(t), async (tx) => {
+    // Sale 50: DR bank / CR sales
+    await postEntry(tx, ctx(t), { date: '2026-03-10', memo: 'Sale', currency: 'EUR', lines: [
+      { accountCode: '2620', debit: '50.00', credit: '0' },
+      { accountCode: '6110', debit: '0', credit: '50.00' },
+    ]});
+    // Expense 120: DR expenses / CR bank
+    await postEntry(tx, ctx(t), { date: '2026-03-12', memo: 'Cost', currency: 'EUR', lines: [
+      { accountCode: '7710', debit: '120.00', credit: '0' },
+      { accountCode: '2620', debit: '0', credit: '120.00' },
+    ]});
+  });
+  const pl = await withTenant(ctx(t), (tx) => profitAndLoss(tx, ctx(t), { from: '2026-03-01', to: '2026-03-31' }));
+  expect(pl.income.subtotal).toBe('50.00');
+  expect(pl.expense.subtotal).toBe('120.00');
+  expect(pl.netProfit).toBe('-70.00');
+});
+
 test('profitAndLoss nets out a reversal', async () => {
   const t = await base();
   const posted = await withTenant(ctx(t), (tx) => postEntry(tx, ctx(t), { date: '2026-03-10', memo: 'Sale', currency: 'EUR', lines: [
