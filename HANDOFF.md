@@ -18,6 +18,11 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > rather than our own spec. Surfaces table-stakes gaps we scoped around: financial statements
 > (P&L/BS/cash-flow), accounts payable/bills, live bank feeds, AR lifecycle (recurring
 > invoices/quotes/reminders), aged AR/AP, expense claims.
+>
+> **Progress:** M1 (financial statements) — **P&L + Balance Sheet shipped 2026-07-10**
+> (`src/reports/`, `/reports` page; Cash-Flow still deferred, needs activity classification).
+> Next unblocked in the market-gaps sequence: M2 (accounts payable / bills), M3 (live bank
+> feeds); M5 (aged AR/AP) and M14 (report depth/export) now ride cheaply on `src/reports/`.
 
 What remains is **not polish** — it's substantive feature work in two buckets:
 
