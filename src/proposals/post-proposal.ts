@@ -31,6 +31,13 @@ export async function postApprovedPosting(
     );
   }
 
+  // Link + open a payables bill, if this posting proposal originated from one.
+  await tx.query(
+    `UPDATE bills SET journal_entry_id = $1, status = 'open'
+     WHERE posting_proposal_id = $2 AND client_company_id = $3 AND status = 'awaiting_approval'`,
+    [entryId, proposalId, ctx.clientCompanyId],
+  );
+
   await appendAudit(tx, ctx, {
     action: 'posted', entityType: 'proposal', entityId: proposalId,
     before: { status: 'approved' }, after: { status: 'posted', entryId },
