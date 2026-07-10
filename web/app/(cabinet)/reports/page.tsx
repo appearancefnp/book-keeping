@@ -85,7 +85,7 @@ function ReportsInner() {
           {s.lines.map((l, i) => (
             <tr key={`${l.code}-${i}`}>
               <td className={styles.code}>{l.code}</td>
-              <td className={styles.name}>{l.name}</td>
+              <td className={styles.name}>{l.code === '' ? t('reports.currentResult') : l.name}</td>
               <td className={styles.amount}>{fmtMoney(l.amount)}</td>
             </tr>
           ))}
@@ -143,7 +143,7 @@ function ReportsInner() {
         )}
 
         {!error && !loading && tab === 'bs' && bs && (
-          bs.assets.lines.length === 0 && bs.liabilities.lines.length === 0 && bs.equity.lines.length === 0
+          sectionEmpty(bs.assets) && sectionEmpty(bs.liabilities) && sectionEmpty(bs.equity)
             ? <EmptyState message={t('reports.empty')} detail={t('reports.emptyDetail')} />
             : (
               <div className={styles.statement}>
