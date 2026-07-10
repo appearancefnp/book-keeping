@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'invalid default line' }, { status: 400 });
     }
   }
-  for (const [k, v] of Object.entries({ paymentTerms: p.paymentTerms, note: p.note, numberPrefix: p.numberPrefix })) {
+  for (const [k, v] of Object.entries({ paymentTerms: p.paymentTerms, note: p.note, numberPrefix: p.numberPrefix, footer: p.footer })) {
     if (v !== null && v !== undefined && typeof v !== 'string') {
       return NextResponse.json({ error: `invalid ${k}` }, { status: 400 });
     }
@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
       dueDateOffsetDays: p.dueDateOffsetDays ?? null,
       numberPrefix: p.numberPrefix?.trim() || null,
       defaultLines: p.defaultLines,
+      footer: p.footer?.trim() || null,
     }));
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err) {
