@@ -11,6 +11,8 @@ interface InvoiceProfileDTO {
   dueDateOffsetDays: number | null;
   numberPrefix: string | null;
   defaultLines: { description: string; net: string; vatRate: number }[];
+  footer: string | null;
+  logoBlobKey: string | null;
 }
 
 export function InvoiceDefaultsForm({ clientCompanyId }: { clientCompanyId: string }) {
@@ -20,6 +22,8 @@ export function InvoiceDefaultsForm({ clientCompanyId }: { clientCompanyId: stri
   const [note, setNote] = useState('');
   const [dueOffset, setDueOffset] = useState('');
   const [prefix, setPrefix] = useState('');
+  const [footer, setFooter] = useState('');
+  const [hasLogo, setHasLogo] = useState(false);
   const [lines, setLines] = useState<DefaultLineDraft[]>([]);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<{ kind: 'saved' | 'error'; message: string } | null>(null);
@@ -34,6 +38,8 @@ export function InvoiceDefaultsForm({ clientCompanyId }: { clientCompanyId: stri
       setNote(p?.note ?? '');
       setDueOffset(p?.dueDateOffsetDays != null ? String(p.dueDateOffsetDays) : '');
       setPrefix(p?.numberPrefix ?? '');
+      setFooter(p?.footer ?? '');
+      setHasLogo(Boolean(p?.logoBlobKey));
       setLines((p?.defaultLines ?? []).map((l) => ({ description: l.description, net: l.net, vatRate: String(l.vatRate) })));
     } finally {
       setLoaded(true);
@@ -62,6 +68,7 @@ export function InvoiceDefaultsForm({ clientCompanyId }: { clientCompanyId: stri
         note: note.trim() || null,
         dueDateOffsetDays: offsetDays,
         numberPrefix: prefix.trim() || null,
+        footer: footer.trim() || null,
         defaultLines: lines
           .filter((l) => l.description.trim())
           .map((l) => ({ description: l.description.trim(), net: l.net.trim() || '0', vatRate: Number(l.vatRate) || 0 })),
@@ -76,6 +83,38 @@ export function InvoiceDefaultsForm({ clientCompanyId }: { clientCompanyId: stri
         throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
       }
       setStatus({ kind: 'saved', message: t('settings.invoice.saved') });
+    } catch {
+      setStatus({ kind: 'error', message: t('settings.invoice.error') });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function uploadLogo(file: File) {
+    if (!clientCompanyId) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      const bytesBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('read failed'));
+        reader.onload = () => {
+          const result = String(reader.result);
+          resolve(result.slice(result.indexOf(',') + 1)); // strip the data: URI prefix
+        };
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch('/api/invoice-profile/logo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientCompanyId, bytesBase64, mime: file.type }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+      }
+      setHasLogo(true);
+      setStatus({ kind: 'saved', message: t('settings.invoice.logoUploaded') });
     } catch {
       setStatus({ kind: 'error', message: t('settings.invoice.error') });
     } finally {
@@ -107,6 +146,21 @@ export function InvoiceDefaultsForm({ clientCompanyId }: { clientCompanyId: stri
             <input value={prefix} onChange={(e) => setPrefix(e.target.value)} />
           </label>
         </div>
+
+        <label className={styles.field}>
+          <span>{t('settings.invoice.footer')}</span>
+          <textarea value={footer} onChange={(e) => setFooter(e.target.value)} rows={3} />
+        </label>
+
+        <label className={styles.field}>
+          <span>{t('settings.invoice.logo')}{hasLogo ? ' ✓' : ''}</span>
+          <input
+            type="file"
+            accept="image/*"
+            disabled={busy}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLogo(f); e.target.value = ''; }}
+          />
+        </label>
 
         <div>
           <h3 className={styles.sectionHeading}>{t('settings.invoice.lines')}</h3>

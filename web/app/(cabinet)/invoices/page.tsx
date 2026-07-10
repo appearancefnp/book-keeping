@@ -88,6 +88,7 @@ function InvoicesInner() {
                   <th scope="col">{t('einv.peppol')}</th>
                   <th scope="col">{t('einv.vid')}</th>
                   <th scope="col">{t('einv.vidDue')}</th>
+                  <th scope="col"><span className="sr-only">{t('einv.viewDoc')}</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -99,6 +100,17 @@ function InvoicesInner() {
                     <td>{statusLabel(r.peppolStatus)}</td>
                     <td>{statusLabel(r.vidStatus)}</td>
                     <td>{r.vidDueDate ? fmtDate(r.vidDueDate) : '—'}</td>
+                    <td>
+                      {r.direction === 'outbound' && clientCompanyId ? (
+                        <a
+                          href={`/invoice-document/${r.id}?client=${encodeURIComponent(clientCompanyId)}&lang=${lang}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {t('einv.viewDoc')}
+                        </a>
+                      ) : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
