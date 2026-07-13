@@ -15,7 +15,8 @@ export type Operation =
   | 'parties.write' // create/update customers & vendors
   | 'payroll.write' // employees, orders, runs — firm-side only
   | 'invoice_profile.write' // set invoice profile (payment terms, numbering, defaults)
-  | 'bills.write'; // create/void accounts-payable bills
+  | 'bills.write' // create/void accounts-payable bills
+  | 'payruns.write'; // create accounts-payable pay-runs (SEPA pain.001)
 
 /**
  * Which roles may perform each mutating operation.
@@ -34,6 +35,7 @@ const OPERATION_ROLES: Record<Operation, readonly UserRole[]> = {
   'payroll.write': ['firm_admin', 'accountant'],
   'invoice_profile.write': ['firm_admin', 'accountant'],
   'bills.write': ['firm_admin', 'accountant', 'employee'],
+  'payruns.write': ['firm_admin', 'accountant', 'employee'],
 };
 
 /** True if `role` is permitted to perform `op`. Unrecognised roles are denied. */

@@ -6,8 +6,13 @@ import { resolveTenantContext } from '@domain/auth/context.js';
 import { withTenant } from '@domain/db/pool.js';
 import { parseCamt053 } from '@domain/banking/camt-parser.js';
 import { importStatement } from '@domain/banking/import.js';
+import { proposeApMatches } from '@domain/banking/match.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
+
+// Accounts for AP-side auto-matching of unmatched bank debits: 5310 payables,
+// 2620 bank, 2699 bank-clearing transit (mirrors pay-run settlement accounts).
+const AP_MATCH = { payablesAccount: '5310', bankAccount: '2620', bankClearingAccount: '2699' };
 
 export async function POST(req: NextRequest) {
   const token = await getSessionToken();
@@ -31,7 +36,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `camt.053 parse failed: ${msg}` }, { status: 400 });
     }
 
-    const result = await withTenant(ctx, (tx) => importStatement(tx, ctx, stmt));
+    const result = await withTenant(ctx, async (tx) => {
+      const imported = await importStatement(tx, ctx, stmt);
+      const ap = await proposeApMatches(tx, ctx, AP_MATCH);
+      return { ...imported, apProposals: ap.proposalIds.length };
+    });
     return NextResponse.json(result, { status: 200 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
