@@ -9,7 +9,7 @@ import { appendAudit } from '../audit/audit.js';
 
 export async function sendInvoice(
   tx: PoolClient, ctx: TenantContext,
-  args: { invoice: EInvoice; recipientPeppolId: string; ap: AccessPoint; receivableAccount: string; salesAccount: string; vatAccount: string },
+  args: { invoice: EInvoice; recipientPeppolId: string; ap: AccessPoint; receivableAccount: string; salesAccount: string; vatAccount: string; customerPartyId?: string | null; dueDate?: string | null },
 ): Promise<{ einvoiceId: string; entryId: string; messageId: string }> {
   const inv = args.invoice;
 
@@ -38,9 +38,9 @@ export async function sendInvoice(
 
   // 5. Record the einvoice (vid_status pending — VID submission handled in Task 6).
   const res = await tx.query(
-    `INSERT INTO einvoices(client_company_id, direction, invoice_number, issue_date, grand_total_cents, currency, ubl_xml, vid_status, peppol_status, peppol_message_id, journal_entry_id)
-     VALUES ($1,'outbound',$2,$3,$4,$5,$6,'pending','sent',$7,$8) RETURNING id`,
-    [ctx.clientCompanyId, inv.invoiceNumber, inv.issueDate, toCents(inv.grandTotal).toString(), inv.currency, ubl, messageId, entryId],
+    `INSERT INTO einvoices(client_company_id, direction, invoice_number, issue_date, grand_total_cents, currency, ubl_xml, vid_status, peppol_status, peppol_message_id, journal_entry_id, customer_party_id, due_date, status)
+     VALUES ($1,'outbound',$2,$3,$4,$5,$6,'pending','sent',$7,$8,$9,$10,'open') RETURNING id`,
+    [ctx.clientCompanyId, inv.invoiceNumber, inv.issueDate, toCents(inv.grandTotal).toString(), inv.currency, ubl, messageId, entryId, args.customerPartyId ?? null, args.dueDate ?? inv.dueDate ?? null],
   );
   const einvoiceId = res.rows[0].id as string;
   await appendAudit(tx, ctx, { action: 'send', entityType: 'einvoice', entityId: einvoiceId, before: null, after: { invoiceNumber: inv.invoiceNumber, messageId, entryId } });
