@@ -15,7 +15,8 @@ export type NavIconName =
   | 'journal'
   | 'payroll'
   | 'settings'
-  | 'reports';
+  | 'reports'
+  | 'bills';
 
 const PATHS: Record<NavIconName, React.ReactNode> = {
   // Checklist / approval queue
@@ -119,6 +120,14 @@ const PATHS: Record<NavIconName, React.ReactNode> = {
     <>
       <path d="M4 4v12h12" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M7 12l3-3 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+    </>
+  ),
+  // Bills / accounts payable — inbox tray receiving an incoming bill
+  bills: (
+    <>
+      <path d="M3.5 12v3.25c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25V12" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3.5 12h3.75l1.25 2h2.5l1.25-2h3.75" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 3.25v7.5M7 8l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
     </>
   ),
 };
