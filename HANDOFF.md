@@ -26,6 +26,27 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > aged-payables tab on `/reports` — the full money-out loop. M5 now has its AP half.
 > Next unblocked in the market-gaps sequence: M3 (live bank feeds), M4 (AR lifecycle); M14
 > (report depth/export) now rides cheaply on `src/reports/`.
+>
+> **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`
+> (23 commits, not yet merged to `main`); full backend suite 328/328, root+web typecheck
+> clean, web build clean. Per-task reviews all passed; the **final whole-branch review was
+> not run** (interrupted) — run `/code-review` (or a whole-branch reviewer) over
+> `main..m2-accounts-payable` before merging.
+> Known follow-ups to fold in next:
+> - **Pre-existing VAT-account bug (not M2, but same family — fix soon):**
+>   `web/app/api/documents/capture/route.ts` sets `vatInputAccount: '5721'`, but `5721` is
+>   **Output** VAT (per `src/dev/seed.ts` / `src/tax/vat-compute.ts`; input VAT is `5722`).
+>   OCR-captured purchase VAT therefore posts to the output-VAT account and corrupts the VAT
+>   return. M2's `/api/bills` route was fixed to use `5722`; `documents/capture` still needs
+>   the same one-word fix.
+> - **Account-mapping is hard-coded** (`5310/5722/2620/2699` defaults in the bills + pay-run
+>   + ap-aging routes) — accountant to confirm LR chart codes; a per-client account-mapping
+>   settings screen is still deferred (same bucket as tariffs/templates).
+> - Minor cleanups logged in `.superpowers/sdd/progress.md` (M2 section): tighten `vatRate`
+>   bound, dedupe `billIds` in pay runs, type `BillRow.status` as a union, broaden the aging
+>   bucket-boundary test, centralize `isValidIsoDate`, unify report-tab money formatting.
+> - AP bank-matching is amount-only with no cross-proposal dedup (documented MVP limit,
+>   mirrors the existing receivable matcher) — revisit with reference/fuzzy matching.
 
 What remains is **not polish** — it's substantive feature work in two buckets:
 
