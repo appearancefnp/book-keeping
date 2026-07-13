@@ -36,6 +36,12 @@ const newBillSchema = z.object({
     net: z.string().regex(/^-?\d+(\.\d{1,2})?$/),
     vatRate: z.number(),
     vat: z.string().regex(/^-?\d+(\.\d{1,2})?$/),
+  }).refine((l) => toCents(l.net) >= 0n && toCents(l.vat) >= 0n, {
+    // Credit notes (negative net/VAT) are out of scope for M2 (see M7). Without this,
+    // buildBillEntry's `vat > 0n` guard drops the VAT line for negative-VAT bills while
+    // still crediting payables for the full (negative) grand total, producing an
+    // unbalanced entry that postEntry rejects with a confusing "does not balance" error.
+    message: 'Negative amounts are not supported (credit notes are out of scope — see M7)',
   })).min(1),
   source: z.enum(['manual', 'ocr', 'peppol']).optional(),
   documentId: z.string().uuid().nullable().optional(),

@@ -69,6 +69,18 @@ test('listBills returns rows with outstanding and filters by status', async () =
   expect(open).toHaveLength(0);
 });
 
+test('createBill rejects a line with negative net (credit notes are out of scope for M2)', async () => {
+  const { t, vendorId } = await seed();
+  const bill = {
+    ...sampleBill(vendorId),
+    lines: [{ description: 'Refund', expenseAccount: '7710', net: '-100.00', vatRate: 21, vat: '-21.00' }],
+  };
+  await expect(withTenant(ctx(t), (tx) => createBill(tx, ctx(t), bill, ACCTS)))
+    .rejects.toThrow(/negative|credit note/i);
+  const bills = await withTenant(ctx(t), (tx) => listBills(tx, ctx(t)));
+  expect(bills).toHaveLength(0);
+});
+
 test('voidBill voids an awaiting_approval bill and rejects its proposal', async () => {
   const { t, vendorId } = await seed();
   const { billId, proposalId } = await withTenant(ctx(t), (tx) => createBill(tx, ctx(t), sampleBill(vendorId), ACCTS));

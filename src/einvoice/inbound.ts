@@ -5,7 +5,7 @@ import { parseUblInvoice } from './ubl.js';
 import type { PostingTemplate } from '../intake/map-posting.js';
 import { createBill, type BillAccounts } from '../payables/bills.js';
 import { listParties, createParty } from '../parties/parties.js';
-import { toCents, fromCents } from '../db/money.js';
+import { toCents, fromCents, sumCents } from '../db/money.js';
 
 /** Add whole days to a YYYY-MM-DD date, returning YYYY-MM-DD (UTC-safe). */
 function addDays(iso: string, days: number): string {
@@ -40,6 +40,28 @@ export async function receiveInboundInvoices(
 
   for (const msg of batch) {
     const ubl = parseUblInvoice(msg.ublXml);
+
+    // The vendor's own declared totals must add up before we book anything: net + VAT
+    // must equal the PayableAmount (grandTotal), and the line nets must sum to the
+    // declared net total. If they don't, there's a document-level rounding/charge that
+    // reconciledLineVatCents cannot absorb (it only reconciles VAT, not the grand total),
+    // and silently fabricating a grand total would let bills.grand_total_cents disagree
+    // with einvoices.grand_total_cents (and underpay/overpay the vendor). Reject instead,
+    // as the old postEntry balance check used to.
+    const netTotalCents = toCents(ubl.netTotal);
+    const vatTotalCents = toCents(ubl.vatTotal);
+    const grandTotalCents = toCents(ubl.grandTotal);
+    if (netTotalCents + vatTotalCents !== grandTotalCents) {
+      throw new Error(
+        `Inbound invoice ${ubl.invoiceNumber}: declared totals do not reconcile (net ${ubl.netTotal} + VAT ${ubl.vatTotal} ≠ grand ${ubl.grandTotal}); manual review required`,
+      );
+    }
+    const lineNetCents = sumCents(ubl.lines.map((l) => l.net));
+    if (lineNetCents !== netTotalCents) {
+      throw new Error(
+        `Inbound invoice ${ubl.invoiceNumber}: line net total (${fromCents(lineNetCents)}) does not reconcile with the declared net total (${ubl.netTotal}); manual review required`,
+      );
+    }
 
     const rec = await tx.query(
       `INSERT INTO einvoices(client_company_id, direction, invoice_number, issue_date, grand_total_cents, currency, ubl_xml, peppol_status, vid_status)

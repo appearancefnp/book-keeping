@@ -114,6 +114,36 @@ test('multi-line VAT is reconciled to the vendor-declared totals', async () => {
   expect(bills[0]!.grandTotalCents).toBe('11');  // == toCents(ubl.grandTotal '0.11')
 });
 
+test('unreconciled declared totals (net + VAT != grand) are rejected, no bill created', async () => {
+  // PayableAmount 121.05 disagrees with net 100.00 + VAT 21.00 (= 121.00) — a legal
+  // document-level rounding/charge that this booking path cannot silently absorb without
+  // making bills.grand_total_cents disagree with einvoices.grand_total_cents (and the
+  // vendor's declared PayableAmount). Must reject, matching the old postEntry balance check.
+  const t = await makeFirmAndClient();
+  const ubl = buildUblInvoice({
+    invoiceNumber: 'S-BAD', issueDate: '2026-03-05', currency: 'EUR',
+    supplier: { name: 'Mismatch Oy', regNo: 'FI555', vatNo: 'FI555444333' },
+    customer: { name: 'Us', regNo: 'LV1', vatNo: 'LV12345678901' },
+    lines: [{ description: 'Parts', net: '100.00', vatRate: 21, vat: '21.00' }],
+    netTotal: '100.00', vatTotal: '21.00', grandTotal: '121.05',
+  });
+  const ap = new StubAccessPoint([{ ublXml: ubl }]);
+
+  await withTenant(ctx(t), async (tx) => {
+    await createAccount(tx, ctx(t), { code: '7710', name: 'Expenses', type: 'expense' });
+    await createAccount(tx, ctx(t), { code: '5721', name: 'VAT input', type: 'asset' });
+    await createAccount(tx, ctx(t), { code: '5310', name: 'Payables', type: 'liability' });
+    await openPeriod(tx, ctx(t), { year: 2026, month: 3 });
+  });
+
+  await expect(withTenant(ctx(t), (tx) =>
+    receiveInboundInvoices(tx, ctx(t), { ap, template: TEMPLATE, accounts: ACCTS, dueDays: 30 })),
+  ).rejects.toThrow(/reconcile|manual review/i);
+
+  const bills = await withTenant(ctx(t), (tx) => listBills(tx, ctx(t)));
+  expect(bills).toHaveLength(0);
+});
+
 test('no inbound invoices yields no bills', async () => {
   const t = await makeFirmAndClient();
   const ap = new StubAccessPoint([]);
