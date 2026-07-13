@@ -60,7 +60,10 @@ function BillsInner() {
       <main className={styles.main}>
         <div className={styles.header}>
           <h1 className={styles.pageHeading}>{t('bills.title')}</h1>
-          <Link className={styles.newButton} href={`/bills/new${q}`}>{t('bills.new')}</Link>
+          <div className={styles.actions}>
+            <Link className={styles.payButton} href={`/bills/pay${q}`}>{t('bills.pay')}</Link>
+            <Link className={styles.newButton} href={`/bills/new${q}`}>{t('bills.new')}</Link>
+          </div>
         </div>
         {error && <ErrorState message={error} onRetry={load} />}
         {!error && !bills && <div className={styles.skeletons}><SkeletonCard /><SkeletonCard /></div>}

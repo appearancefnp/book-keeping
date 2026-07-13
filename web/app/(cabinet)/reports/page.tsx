@@ -16,7 +16,9 @@ interface BalanceSheet {
   currentPeriodResult: string; totalAssets: string; totalLiabilitiesAndEquity: string; balanced: boolean;
 }
 
-type Tab = 'pl' | 'bs';
+interface ApAging { asOf: string; current: string; d1_30: string; d31_60: string; d61_90: string; d90plus: string; total: string; }
+
+type Tab = 'pl' | 'bs' | 'apaging';
 
 function todayIso(): string { return new Date().toISOString().slice(0, 10); }
 function firstOfMonthIso(): string { return todayIso().slice(0, 8) + '01'; }
@@ -37,6 +39,7 @@ function ReportsInner() {
 
   const [pl, setPl] = useState<ProfitAndLoss | null>(null);
   const [bs, setBs] = useState<BalanceSheet | null>(null);
+  const [aging, setAging] = useState<ApAging | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,17 +47,19 @@ function ReportsInner() {
     if (!clientCompanyId) return;
     setLoading(true); setError(null);
     try {
-      const url = tab === 'pl'
-        ? `/api/reports/profit-and-loss?clientCompanyId=${encodeURIComponent(clientCompanyId)}&from=${from}&to=${to}`
-        : `/api/reports/balance-sheet?clientCompanyId=${encodeURIComponent(clientCompanyId)}&asOf=${asOf}`;
+      let url: string;
+      if (tab === 'pl') url = `/api/reports/profit-and-loss?clientCompanyId=${encodeURIComponent(clientCompanyId)}&from=${from}&to=${to}`;
+      else if (tab === 'bs') url = `/api/reports/balance-sheet?clientCompanyId=${encodeURIComponent(clientCompanyId)}&asOf=${asOf}`;
+      else url = `/api/reports/ap-aging?clientCompanyId=${encodeURIComponent(clientCompanyId)}&asOf=${asOf}`;
       const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
       }
-      const data = (await res.json()) as { report: ProfitAndLoss | BalanceSheet };
-      if (tab === 'pl') { setPl(data.report as ProfitAndLoss); setBs(null); }
-      else { setBs(data.report as BalanceSheet); setPl(null); }
+      const data = (await res.json()) as { report: ProfitAndLoss | BalanceSheet | ApAging };
+      if (tab === 'pl') { setPl(data.report as ProfitAndLoss); setBs(null); setAging(null); }
+      else if (tab === 'bs') { setBs(data.report as BalanceSheet); setPl(null); setAging(null); }
+      else { setAging(data.report as ApAging); setPl(null); setBs(null); }
     } catch (err) {
       setError((err as Error).message ?? t('state.error'));
     } finally {
@@ -106,6 +111,7 @@ function ReportsInner() {
         <div className={styles.tabs} role="tablist">
           <button role="tab" aria-selected={tab === 'pl'} className={tab === 'pl' ? styles.tabActive : styles.tab} onClick={() => setTab('pl')}>{t('reports.tab.pl')}</button>
           <button role="tab" aria-selected={tab === 'bs'} className={tab === 'bs' ? styles.tabActive : styles.tab} onClick={() => setTab('bs')}>{t('reports.tab.bs')}</button>
+          <button role="tab" aria-selected={tab === 'apaging'} className={tab === 'apaging' ? styles.tabActive : styles.tab} onClick={() => setTab('apaging')}>{t('reports.tab.apaging')}</button>
         </div>
 
         <div className={styles.controls}>
@@ -161,6 +167,19 @@ function ReportsInner() {
                 </div>
               </div>
             )
+        )}
+
+        {!error && !loading && tab === 'apaging' && aging && (
+          <div className={styles.statement}>
+            <table className={styles.table}><tbody>
+              <tr><td className={styles.name}>{t('reports.aging.current')}</td><td className={styles.amount}>{fmtMoney(aging.current)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d1_30')}</td><td className={styles.amount}>{fmtMoney(aging.d1_30)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d31_60')}</td><td className={styles.amount}>{fmtMoney(aging.d31_60)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d61_90')}</td><td className={styles.amount}>{fmtMoney(aging.d61_90)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d90plus')}</td><td className={styles.amount}>{fmtMoney(aging.d90plus)}</td></tr>
+            </tbody></table>
+            <div className={styles.grandTotal}><span>{t('reports.aging.total')}</span><span className={styles.amount}>{fmtMoney(aging.total)}</span></div>
+          </div>
         )}
       </main>
     </div>
