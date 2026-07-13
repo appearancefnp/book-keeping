@@ -5,9 +5,12 @@ import { createAccount } from '../../src/ledger/accounts.js';
 import { openPeriod } from '../../src/ledger/periods.js';
 import { postEntry, getEntry } from '../../src/ledger/posting.js';
 import { importStatement } from '../../src/banking/import.js';
+import { proposeArMatches } from '../../src/banking/match.js';
 import { approveProposal } from '../../src/proposals/lifecycle.js';
 import { createProposal, getProposal } from '../../src/proposals/proposals.js';
 import { postApprovedBankMatch } from '../../src/banking/confirm-match.js';
+import { setup, issueOpenReceivable } from '../receivables/helpers.js';
+import { getReceivable } from '../../src/receivables/receivables.js';
 
 beforeAll(async () => { await resetDb(); });
 beforeEach(async () => { await resetDb(); });
@@ -79,4 +82,21 @@ test('refuses to confirm a match that is not approved', async () => {
     await tx.query(`UPDATE bank_transactions SET status='matched' WHERE id=$1 AND client_company_id=$2`, [txnId, ctx(t).clientCompanyId]);
     return postApprovedBankMatch(tx, ctx(t), pid); // not approved
   })).rejects.toThrow(/approved/i);
+});
+
+test('confirming a receivable_direct match settles the invoice and reconciles the txn', async () => {
+  const { cid, customerId } = await setup();
+  const { einvoiceId } = await issueOpenReceivable(cid, customerId);
+  const proposalId = await withTenant(cid, async (tx) => {
+    await importStatement(tx, cid, { account: 'LV80', transactions: [
+      { bookingDate: '2026-03-20', amountCents: '12100', currency: 'EUR', side: 'credit', reference: 'INV', counterparty: 'SIA Klients', endToEndId: 'e2e-ar-1' },
+    ]});
+    const { proposalIds } = await proposeArMatches(tx, cid, { receivableAccount: '2310', bankAccount: '2620' });
+    return proposalIds[0]!;
+  });
+  await withTenant(cid, (tx) => approveProposal(tx, cid, proposalId));
+  const { entryId } = await withTenant(cid, (tx) => postApprovedBankMatch(tx, cid, proposalId));
+  expect(entryId).toBeTruthy();
+  const r = await withTenant(cid, (tx) => getReceivable(tx, cid, einvoiceId));
+  expect(r.status).toBe('paid');
 });
