@@ -39,7 +39,6 @@ const ADMIN_ITEMS: NavItem[] = [
 const OWNER_ITEMS: NavItem[] = [
   { key: 'nav.home',          shortKey: 'nav.short.home',          href: '/',              icon: 'overview' },
   { key: 'nav.documents',     shortKey: 'nav.short.documents',     href: '/documents',     icon: 'documents' },
-  { key: 'nav.bills',         shortKey: 'nav.short.bills',         href: '/bills',         icon: 'bills' },
   { key: 'nav.reports',       shortKey: 'nav.short.reports',       href: '/reports',       icon: 'reports' },
   { key: 'nav.notifications', shortKey: 'nav.short.notifications', href: '/notifications', icon: 'notifications' },
 ];
