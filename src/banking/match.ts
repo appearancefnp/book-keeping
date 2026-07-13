@@ -2,55 +2,58 @@ import type { PoolClient } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
 import { createProposal, type Rationale } from '../proposals/proposals.js';
 
-export interface MatchConfig { receivablesAccount: string; bankAccount: string; }
+export interface ArMatchConfig { receivableAccount: string; bankAccount: string; }
 
-export async function proposeMatches(
-  tx: PoolClient, ctx: TenantContext, config: MatchConfig,
+/**
+ * Propose settlements for unmatched CREDIT transactions against open receivables.
+ * Match an open/partially-paid outbound invoice whose OUTSTANDING equals the credit amount
+ * → settle directly on approval (postApprovedBankMatch 'receivable_direct' branch).
+ *
+ * Dedup mirrors proposeApMatches: a bank credit may claim a given receivable at most once,
+ * guarded within one import (claimed Set) and across imports (NOT EXISTS against unresolved
+ * bank_match proposals referencing the same einvoiceId). Amount-only matching is an accepted
+ * MVP limitation (no reference/fuzzy matching yet).
+ */
+export async function proposeArMatches(
+  tx: PoolClient, ctx: TenantContext, config: ArMatchConfig,
 ): Promise<{ proposalIds: string[] }> {
-  // Unmatched credit transactions.
   const txns = await tx.query(
-    `SELECT id, amount_cents::text AS "amountCents", reference, end_to_end_id AS "endToEndId", counterparty
+    `SELECT id, amount_cents::text AS "amountCents", reference, counterparty
      FROM bank_transactions
-     WHERE client_company_id = $1 AND status = 'unmatched' AND side = 'credit'`,
+     WHERE client_company_id = $1 AND status = 'unmatched' AND side = 'credit'
+     ORDER BY booking_date, id`,
     [ctx.clientCompanyId],
   );
 
   const proposalIds: string[] = [];
+  const claimedIds = new Set<string>();
   for (const t of txns.rows) {
-    // Candidate open receivables: a debit on the receivables account of the same amount.
-    // MVP limitation: amount-only matching does not exclude receivables already referenced
-    // by a pending/approved bank_match proposal. Two equal-amount credit transactions can
-    // both propose against the same receivable. This is an accepted MVP trade-off; reference
-    // matching, fuzzy matching, and candidate deduplication are future refinements.
-    const cand = await tx.query(
-      `SELECT je.id AS "entryId"
-       FROM journal_lines jl
-       JOIN journal_entries je ON je.id = jl.entry_id
-       JOIN accounts a ON a.id = jl.account_id
-       WHERE jl.client_company_id = $1 AND a.code = $2
-         AND (ROUND(jl.debit * 100))::bigint = $3::bigint
-       ORDER BY je.entry_date
-       LIMIT 1`,
-      [ctx.clientCompanyId, config.receivablesAccount, t.amountCents],
-    );
-    if (!cand.rowCount) continue;
-    const entryId = cand.rows[0].entryId as string;
-    const confidence = t.reference || t.endToEndId ? 1.0 : 0.7;
-
     const amountEur = (Number(t.amountCents) / 100).toFixed(2);
-    const rationale = {
-      ruleRef: 'bank-match-amount',
-      computation: `Bank credit of ${amountEur} EUR matches an open receivable${t.counterparty ? ` from ${t.counterparty}` : ''}.`,
-      sourceRefs: { bankTransactionId: t.id, candidateEntryId: entryId, confidence, counterparty: t.counterparty },
-    } as Rationale;
-
+    const inv = await tx.query(
+      `SELECT e.id, e.invoice_number AS "invoiceNumber" FROM einvoices e
+       WHERE e.client_company_id = $1 AND e.direction = 'outbound'
+         AND e.status IN ('open','partially_paid')
+         AND (e.grand_total_cents - e.amount_paid_cents) = $2::bigint
+         AND ($3::uuid[] IS NULL OR e.id <> ALL($3::uuid[]))
+         AND NOT EXISTS (
+           SELECT 1 FROM proposals p
+           WHERE p.client_company_id = $1 AND p.type = 'bank_match'
+             AND p.status IN ('pending_approval','approved')
+             AND p.payload->>'einvoiceId' = e.id::text
+         )
+       ORDER BY e.due_date NULLS LAST LIMIT 1`,
+      [ctx.clientCompanyId, t.amountCents, claimedIds.size ? [...claimedIds] : null],
+    );
+    if (!inv.rowCount) continue;
+    const einvoiceId = inv.rows[0].id as string;
     const { id } = await createProposal(tx, ctx, {
       type: 'bank_match',
-      payload: { bankTransactionId: t.id, candidateEntryId: entryId, amountCents: t.amountCents, bankAccount: config.bankAccount, receivablesAccount: config.receivablesAccount },
-      rationale,
+      payload: { kind: 'receivable_direct', bankTransactionId: t.id, einvoiceId, amountCents: t.amountCents, bankAccount: config.bankAccount, receivableAccount: config.receivableAccount },
+      rationale: { ruleRef: 'ar-direct', computation: `Bank credit of ${amountEur} EUR settles invoice ${inv.rows[0].invoiceNumber}${t.counterparty ? ` from ${t.counterparty}` : ''}.`, sourceRefs: { bankTransactionId: t.id, einvoiceId } } as Rationale,
       status: 'pending_approval',
     });
     await tx.query(`UPDATE bank_transactions SET status = 'matched' WHERE id = $1 AND client_company_id = $2`, [t.id, ctx.clientCompanyId]);
+    claimedIds.add(einvoiceId);
     proposalIds.push(id);
   }
   return { proposalIds };

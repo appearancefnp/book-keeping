@@ -24,7 +24,7 @@ import { createDocument, setDocumentStatus } from '../documents/documents.js';
 import { recordExtraction } from '../documents/extraction.js';
 import { createProposal, type Rationale } from '../proposals/proposals.js';
 import { importStatement } from '../banking/import.js';
-import { proposeMatches } from '../banking/match.js';
+import { proposeArMatches } from '../banking/match.js';
 import { createVatDeclarationProposal } from '../tax/vat-proposal.js';
 import { createTask, resolveTask } from '../collab/tasks.js';
 import { addComment } from '../collab/comments.js';
@@ -111,7 +111,10 @@ async function seedClient(ctx: TenantContext, clientName: string): Promise<void>
         { bookingDate: '2026-03-13', amountCents: '9680', currency: 'EUR', side: 'debit', reference: 'GAMMA-3391', counterparty: 'SIA Piegādātājs Gamma', endToEndId: 'GAMMA-3391' },
       ],
     });
-    await proposeMatches(tx, ctx, { receivablesAccount: '2310', bankAccount: '2620' });
+    // Note: the 121.00 receivable above is a raw journal entry (postEntry), not an outbound
+    // einvoice, so proposeArMatches (which matches against open einvoices) will not link it
+    // to this bank credit — 0 proposals here is expected/accepted for the demo seed.
+    await proposeArMatches(tx, ctx, { receivableAccount: '2310', bankAccount: '2620' });
 
     // VAT declaration proposal for March (always human-approved).
     await createVatDeclarationProposal(tx, ctx, { fromDate: '2026-03-01', toDate: '2026-03-31', config: VAT_CONFIG });

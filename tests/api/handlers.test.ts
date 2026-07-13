@@ -12,7 +12,6 @@ import { createProposal } from '../../src/proposals/proposals.js';
 import { submitForApproval } from '../../src/proposals/lifecycle.js';
 import { getProposal } from '../../src/proposals/proposals.js';
 import { importStatement } from '../../src/banking/import.js';
-import { proposeMatches } from '../../src/banking/match.js';
 import { approvalQueueHandler, approveHandler, rejectHandler, financialsHandler } from '../../src/api/handlers.js';
 
 const NOW = 1_700_000_000;
@@ -110,8 +109,15 @@ test('approve handler approves AND posts a bank_match proposal', async () => {
         endToEndId: 'e2e-001',
       }],
     });
-    const { proposalIds } = await proposeMatches(tx, cid, { receivablesAccount: '2310', bankAccount: '2620' });
-    return proposalIds[0] as string;
+    const txnId = (await tx.query('SELECT id FROM bank_transactions LIMIT 1')).rows[0].id as string;
+    const { id: pid } = await createProposal(tx, cid, {
+      type: 'bank_match',
+      payload: { bankTransactionId: txnId, amountCents: '12100', bankAccount: '2620', receivablesAccount: '2310' },
+      rationale: { ruleRef: 'bank-match-amount' },
+      status: 'pending_approval',
+    });
+    await tx.query(`UPDATE bank_transactions SET status='matched' WHERE id=$1 AND client_company_id=$2`, [txnId, cid.clientCompanyId]);
+    return pid;
   });
 
   expect(proposalId).toBeTruthy();
