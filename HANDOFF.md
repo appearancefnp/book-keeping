@@ -21,8 +21,11 @@ trilingual (LV/RU/EN), responsive, and accessible.
 >
 > **Progress:** M1 (financial statements) — **P&L + Balance Sheet shipped 2026-07-10**
 > (`src/reports/`, `/reports` page; Cash-Flow still deferred, needs activity classification).
-> Next unblocked in the market-gaps sequence: M2 (accounts payable / bills), M3 (live bank
-> feeds); M5 (aged AR/AP) and M14 (report depth/export) now ride cheaply on `src/reports/`.
+> M2 (accounts payable) — **bills core shipped 2026-07-10** — `src/payables/` (bills + lines),
+> approval-gated posting, `/bills` list/composer/detail, Peppol inbound → bills; the pay-out loop
+> (settlement, pay run, camt.053 AP match, aging) is tracked in Plan 2.
+> Next unblocked in the market-gaps sequence: M3 (live bank feeds); M5 (aged AR/AP) and
+> M14 (report depth/export) now ride cheaply on `src/reports/`.
 
 What remains is **not polish** — it's substantive feature work in two buckets:
 
