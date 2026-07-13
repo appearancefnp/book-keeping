@@ -15,11 +15,19 @@ function addDays(iso: string, days: number): string {
 }
 
 // UBL invoice lines carry a VAT *rate* (Percent) but not a per-line VAT amount, so
-// parseUblInvoice cannot fill it in (it always reports '0'). Derive it from net × rate
-// rather than trusting that field, or every Peppol bill would post with zero VAT.
-function computeLineVat(net: string, vatRate: number): string {
-  const vatCents = BigInt(Math.round(Number(toCents(net)) * vatRate / 100));
-  return fromCents(vatCents);
+// parseUblInvoice cannot fill it in (it always reports '0'). Derive per-line VAT from
+// net × rate (or every Peppol bill would post with zero VAT), THEN reconcile the sum
+// to the vendor's declared vatTotal: per-line rounding can drift a cent or two from
+// the vendor's total-level rounding, and the bill's totals (Σ net + Σ vat) must match
+// the einvoice row we write from toCents(ubl.grandTotal). We absorb the whole rounding
+// remainder into the last line's VAT so Σ(line vat) == toCents(ubl.vatTotal) exactly.
+function reconciledLineVatCents(lines: { net: string; vatRate: number }[], vatTotal: string): bigint[] {
+  const per = lines.map((l) => (toCents(l.net) * BigInt(Math.round(l.vatRate * 100)) + 5000n) / 10000n);
+  if (per.length === 0) return per;
+  const declared = toCents(vatTotal);
+  const remainder = declared - per.reduce((a, c) => a + c, 0n);
+  per[per.length - 1] = per[per.length - 1]! + remainder;
+  return per;
 }
 
 export async function receiveInboundInvoices(
@@ -43,13 +51,14 @@ export async function receiveInboundInvoices(
     // The customer has no per-line expense mapping from the vendor's UBL, so all
     // lines post to the template's single expense account (accountant can re-map later).
     const vendorPartyId = await resolveOrCreateVendor(tx, ctx, ubl.supplier);
+    const lineVat = reconciledLineVatCents(ubl.lines, ubl.vatTotal);
     const { billId, proposalId } = await createBill(tx, ctx, {
       vendorPartyId,
       billNumber: ubl.invoiceNumber, issueDate: ubl.issueDate, dueDate: addDays(ubl.issueDate, args.dueDays ?? 30),
       currency: ubl.currency,
-      lines: ubl.lines.map((l) => ({
+      lines: ubl.lines.map((l, i) => ({
         description: l.description, expenseAccount: args.template.expenseAccount,
-        net: l.net, vatRate: l.vatRate, vat: computeLineVat(l.net, l.vatRate),
+        net: l.net, vatRate: l.vatRate, vat: fromCents(lineVat[i]!),
       })),
       source: 'peppol', einvoiceId,
     }, args.accounts);

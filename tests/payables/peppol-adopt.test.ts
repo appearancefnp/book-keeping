@@ -81,6 +81,39 @@ test('second invoice from the same vendor reuses the existing party', async () =
   expect(new Set(bills.map((b) => b.vendorPartyId)).size).toBe(1); // same vendor party reused
 });
 
+test('multi-line VAT is reconciled to the vendor-declared totals', async () => {
+  // Three lines of 0.03 @ 21%: naive per-line rounding gives 0.01 each (Σ 0.03),
+  // but the vendor declares vatTotal 0.02 / grandTotal 0.11 (0.09 net @ 21% = 1.89 → 2c).
+  // The bill's totals MUST match the vendor's declared totals (and the einvoice row),
+  // not the drifted per-line sum.
+  const t = await makeFirmAndClient();
+  const ubl = buildUblInvoice({
+    invoiceNumber: 'S-DR', issueDate: '2026-03-05', currency: 'EUR',
+    supplier: { name: 'Rounding Oy', regNo: 'FI777', vatNo: 'FI777666555' },
+    customer: { name: 'Us', regNo: 'LV1', vatNo: 'LV12345678901' },
+    lines: [
+      { description: 'A', net: '0.03', vatRate: 21, vat: '0.01' },
+      { description: 'B', net: '0.03', vatRate: 21, vat: '0.01' },
+      { description: 'C', net: '0.03', vatRate: 21, vat: '0.01' },
+    ],
+    netTotal: '0.09', vatTotal: '0.02', grandTotal: '0.11',
+  });
+  const ap = new StubAccessPoint([{ ublXml: ubl }]);
+
+  await withTenant(ctx(t), async (tx) => {
+    await createAccount(tx, ctx(t), { code: '7710', name: 'Expenses', type: 'expense' });
+    await createAccount(tx, ctx(t), { code: '5721', name: 'VAT input', type: 'asset' });
+    await createAccount(tx, ctx(t), { code: '5310', name: 'Payables', type: 'liability' });
+    await openPeriod(tx, ctx(t), { year: 2026, month: 3 });
+  });
+
+  await withTenant(ctx(t), (tx) => receiveInboundInvoices(tx, ctx(t), { ap, template: TEMPLATE, accounts: ACCTS }));
+  const bills = await withTenant(ctx(t), (tx) => listBills(tx, ctx(t)));
+  expect(bills).toHaveLength(1);
+  expect(bills[0]!.vatCents).toBe('2');          // reconciled to declared vatTotal 0.02, not drifted 0.03
+  expect(bills[0]!.grandTotalCents).toBe('11');  // == toCents(ubl.grandTotal '0.11')
+});
+
 test('no inbound invoices yields no bills', async () => {
   const t = await makeFirmAndClient();
   const ap = new StubAccessPoint([]);
