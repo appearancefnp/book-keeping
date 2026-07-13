@@ -28,25 +28,40 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > (report depth/export) now rides cheaply on `src/reports/`.
 >
 > **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`
-> (23 commits, not yet merged to `main`); full backend suite 328/328, root+web typecheck
-> clean, web build clean. Per-task reviews all passed; the **final whole-branch review was
-> not run** (interrupted) — run `/code-review` (or a whole-branch reviewer) over
-> `main..m2-accounts-payable` before merging.
-> Known follow-ups to fold in next:
-> - **Pre-existing VAT-account bug (not M2, but same family — fix soon):**
+> (not yet merged to `main`); full backend suite **333/333**, root+web typecheck clean, web
+> build clean. Per-task reviews all passed; a **final whole-branch review (workflow, high
+> effort) was run** and surfaced 10 findings — the **5 correctness bugs were fixed** on-branch
+> and re-reviewed:
+> - Inbound Peppol booking now **rejects** invoices whose declared totals don't reconcile
+>   (net + VAT ≠ grand, or Σ line-nets ≠ declared net) instead of silently under-recording
+>   the bill vs the vendor's PayableAmount.
+> - Transit clearing now keys on the **pay-run total** (a SEPA batch is one lump bank debit),
+>   with a post-time `cleared_at` guard + propose-time dedup, so account `2699` always nets to
+>   zero and a payment/run can't be cleared twice.
+> - AP direct-match now **dedupes** so two equal-amount debits can't both settle (and strand)
+>   the same bill.
+> - Bills with **negative net/VAT** (credit notes, out of scope → M7) are rejected with a
+>   clear message instead of failing later as an unbalanced entry.
+> Deferred follow-ups (documented, not blocking):
+> - **Pre-existing VAT-account bug (not M2, same family — fix soon):**
 >   `web/app/api/documents/capture/route.ts` sets `vatInputAccount: '5721'`, but `5721` is
 >   **Output** VAT (per `src/dev/seed.ts` / `src/tax/vat-compute.ts`; input VAT is `5722`).
->   OCR-captured purchase VAT therefore posts to the output-VAT account and corrupts the VAT
->   return. M2's `/api/bills` route was fixed to use `5722`; `documents/capture` still needs
->   the same one-word fix.
+>   OCR-captured purchase VAT posts to the output-VAT account and corrupts the VAT return.
+>   M2's `/api/bills` route already uses `5722`; `documents/capture` needs the same one-word fix.
+> - **Bank-match reject doesn't free the transaction** (finding #5, pre-existing pattern shared
+>   with the receivable matcher `proposeMatches`): a rejected `bank_match` leaves the bank
+>   transaction stuck `matched`, never re-proposed. Fix generically in the reject flow (revert
+>   the linked tx to `unmatched`).
 > - **Account-mapping is hard-coded** (`5310/5722/2620/2699` defaults in the bills + pay-run
 >   + ap-aging routes) — accountant to confirm LR chart codes; a per-client account-mapping
 >   settings screen is still deferred (same bucket as tariffs/templates).
+> - AP bank-matching is amount-only with a narrow propose-time TOCTOU window (guarded at post
+>   time) — revisit with reference/fuzzy matching + a hard reservation.
 > - Minor cleanups logged in `.superpowers/sdd/progress.md` (M2 section): tighten `vatRate`
 >   bound, dedupe `billIds` in pay runs, type `BillRow.status` as a union, broaden the aging
->   bucket-boundary test, centralize `isValidIsoDate`, unify report-tab money formatting.
-> - AP bank-matching is amount-only with no cross-proposal dedup (documented MVP limit,
->   mirrors the existing receivable matcher) — revisit with reference/fuzzy matching.
+>   bucket-boundary test, add the Σ-line-nets reconciliation-branch test, centralize
+>   `isValidIsoDate`, unify report-tab money formatting, share `fmtDate`/`statusLabel`,
+>   header-only `getBill` in settle/pay-run, load parties once in `resolveOrCreateVendor`.
 
 What remains is **not polish** — it's substantive feature work in two buckets:
 
