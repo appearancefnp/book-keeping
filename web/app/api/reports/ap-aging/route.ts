@@ -7,8 +7,7 @@ import { withTenant } from '@domain/db/pool.js';
 import { apAging } from '@domain/payables/aging.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { errorToStatus } from '@/app/lib/authz';
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+import { isValidIsoDate } from '@/app/lib/date';
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
@@ -16,7 +15,7 @@ export async function GET(req: NextRequest) {
   const clientCompanyId = req.nextUrl.searchParams.get('clientCompanyId');
   if (!clientCompanyId) return NextResponse.json({ error: 'missing clientCompanyId' }, { status: 400 });
   const asOf = req.nextUrl.searchParams.get('asOf') ?? new Date().toISOString().slice(0, 10);
-  if (!DATE_RE.test(asOf)) return NextResponse.json({ error: 'asOf must be YYYY-MM-DD' }, { status: 400 });
+  if (!isValidIsoDate(asOf)) return NextResponse.json({ error: 'asOf must be a valid YYYY-MM-DD date' }, { status: 400 });
   try {
     const ctx = await resolveTenantContext(token, clientCompanyId, nowUnix());
     const report = await withTenant(ctx, (tx) => apAging(tx, ctx, { asOf }));

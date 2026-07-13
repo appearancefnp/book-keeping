@@ -7,12 +7,12 @@ import { withTenant } from '@domain/db/pool.js';
 import { createPayRun, listPayRuns } from '@domain/payables/pay-run.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
+import { isValidIsoDate } from '@/app/lib/date';
 
 // Same accounts as bills (5310 payables); pay-run settlement clears through the
 // bank-clearing transit account (2699), later matched to the real bank debit by
 // proposeApMatches (bank/import wiring).
 const PR_ACCOUNTS = { payablesAccount: '5310', bankClearingAccount: '2699' };
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   if (!body.clientCompanyId) return NextResponse.json({ error: 'missing clientCompanyId' }, { status: 400 });
   if (!body.billIds?.length) return NextResponse.json({ error: 'no bills selected' }, { status: 400 });
   const paidDate = body.paidDate ?? new Date().toISOString().slice(0, 10);
-  if (!DATE_RE.test(paidDate)) return NextResponse.json({ error: 'paidDate must be YYYY-MM-DD' }, { status: 400 });
+  if (!isValidIsoDate(paidDate)) return NextResponse.json({ error: 'paidDate must be a valid YYYY-MM-DD date' }, { status: 400 });
   try {
     const ctx = await resolveTenantContext(token, body.clientCompanyId, nowUnix());
     assertRoleAllowed(ctx.actorRole, 'payruns.write');
