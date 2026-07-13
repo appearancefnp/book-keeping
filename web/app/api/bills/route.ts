@@ -8,8 +8,10 @@ import { listBills, createBill, type NewBill } from '@domain/payables/bills.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
 
-// Representative LR chart defaults — accountant to confirm; matches documents/capture.
-const AP_ACCOUNTS = { vatInputAccount: '5721', payablesAccount: '5310' };
+// Representative LR chart defaults — accountant to confirm. Input VAT is 5722
+// (5721 is Output VAT per seed.ts / vat-compute.ts; posting input VAT to 5721
+// would corrupt the VAT declaration). Payables 5310.
+const AP_ACCOUNTS = { vatInputAccount: '5722', payablesAccount: '5310' };
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
