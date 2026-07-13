@@ -18,7 +18,7 @@ interface BalanceSheet {
 
 interface ApAging { asOf: string; current: string; d1_30: string; d31_60: string; d61_90: string; d90plus: string; total: string; }
 
-type Tab = 'pl' | 'bs' | 'apaging';
+type Tab = 'pl' | 'bs' | 'apaging' | 'araging';
 
 function todayIso(): string { return new Date().toISOString().slice(0, 10); }
 function firstOfMonthIso(): string { return todayIso().slice(0, 8) + '01'; }
@@ -50,7 +50,8 @@ function ReportsInner() {
       let url: string;
       if (tab === 'pl') url = `/api/reports/profit-and-loss?clientCompanyId=${encodeURIComponent(clientCompanyId)}&from=${from}&to=${to}`;
       else if (tab === 'bs') url = `/api/reports/balance-sheet?clientCompanyId=${encodeURIComponent(clientCompanyId)}&asOf=${asOf}`;
-      else url = `/api/reports/ap-aging?clientCompanyId=${encodeURIComponent(clientCompanyId)}&asOf=${asOf}`;
+      else if (tab === 'apaging') url = `/api/reports/ap-aging?clientCompanyId=${encodeURIComponent(clientCompanyId)}&asOf=${asOf}`;
+      else url = `/api/reports/ar-aging?clientCompanyId=${encodeURIComponent(clientCompanyId)}&asOf=${asOf}`;
       const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -112,6 +113,7 @@ function ReportsInner() {
           <button role="tab" aria-selected={tab === 'pl'} className={tab === 'pl' ? styles.tabActive : styles.tab} onClick={() => setTab('pl')}>{t('reports.tab.pl')}</button>
           <button role="tab" aria-selected={tab === 'bs'} className={tab === 'bs' ? styles.tabActive : styles.tab} onClick={() => setTab('bs')}>{t('reports.tab.bs')}</button>
           <button role="tab" aria-selected={tab === 'apaging'} className={tab === 'apaging' ? styles.tabActive : styles.tab} onClick={() => setTab('apaging')}>{t('reports.tab.apaging')}</button>
+          <button role="tab" aria-selected={tab === 'araging'} className={tab === 'araging' ? styles.tabActive : styles.tab} onClick={() => setTab('araging')}>{t('reports.tab.araging')}</button>
         </div>
 
         <div className={styles.controls}>
@@ -179,6 +181,19 @@ function ReportsInner() {
               <tr><td className={styles.name}>{t('reports.aging.d90plus')}</td><td className={styles.amount}>{fmtMoney(aging.d90plus)}</td></tr>
             </tbody></table>
             <div className={styles.grandTotal}><span>{t('reports.aging.total')}</span><span className={styles.amount}>{fmtMoney(aging.total)}</span></div>
+          </div>
+        )}
+
+        {!error && !loading && tab === 'araging' && aging && (
+          <div className={styles.statement}>
+            <table className={styles.table}><tbody>
+              <tr><td className={styles.name}>{t('reports.aging.current')}</td><td className={styles.amount}>{fmtMoney(aging.current)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d1_30')}</td><td className={styles.amount}>{fmtMoney(aging.d1_30)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d31_60')}</td><td className={styles.amount}>{fmtMoney(aging.d31_60)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d61_90')}</td><td className={styles.amount}>{fmtMoney(aging.d61_90)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d90plus')}</td><td className={styles.amount}>{fmtMoney(aging.d90plus)}</td></tr>
+            </tbody></table>
+            <div className={styles.grandTotal}><span>{t('reports.aging.totalReceivable')}</span><span className={styles.amount}>{fmtMoney(aging.total)}</span></div>
           </div>
         )}
       </main>

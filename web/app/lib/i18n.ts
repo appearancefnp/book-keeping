@@ -393,6 +393,8 @@ export const EN = {
   'reports.aging.d61_90': '61–90 days',
   'reports.aging.d90plus': '90+ days',
   'reports.aging.total': 'Total payable',
+  'reports.tab.araging': 'Aged receivables',
+  'reports.aging.totalReceivable': 'Total receivable',
 } as const;
 
 export const LV: Record<keyof typeof EN, string> = {
@@ -790,6 +792,8 @@ export const LV: Record<keyof typeof EN, string> = {
   'reports.aging.d61_90': '61–90 dienas',
   'reports.aging.d90plus': '90+ dienas',
   'reports.aging.total': 'Kopā saistības',
+  'reports.tab.araging': 'Debitoru parādi pēc termiņa',
+  'reports.aging.totalReceivable': 'Kopā debitori',
 };
 
 export const RU: Record<keyof typeof EN, string> = {
@@ -1187,6 +1191,8 @@ export const RU: Record<keyof typeof EN, string> = {
   'reports.aging.d61_90': '61–90 дней',
   'reports.aging.d90plus': '90+ дней',
   'reports.aging.total': 'Итого к оплате',
+  'reports.tab.araging': 'Дебиторка по срокам',
+  'reports.aging.totalReceivable': 'Итого к получению',
 };
 
 export type Lang = 'lv' | 'en' | 'ru';
