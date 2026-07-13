@@ -24,7 +24,18 @@ export async function postApprovedBankMatch(
   const amountDec = centsToDecimal(raw.amountCents);
 
   if (raw.kind === 'payable_clearing') {
-    const p = prop.payload as { billPaymentId: string; bankAccount: string; bankClearingAccount: string };
+    const p = prop.payload as { payRunId: string; bankAccount: string; bankClearingAccount: string };
+    // Re-verify the run's uncleared payments still SUM to the proposed amount (guards
+    // against the run changing between proposal and post).
+    const sumRes = await tx.query(
+      `SELECT COALESCE(SUM(amount_cents), 0)::text AS "sumCents"
+       FROM bill_payments
+       WHERE pay_run_id = $1 AND client_company_id = $2 AND method = 'pay_run' AND cleared_at IS NULL`,
+      [p.payRunId, ctx.clientCompanyId],
+    );
+    if (BigInt(sumRes.rows[0].sumCents) !== BigInt(raw.amountCents)) {
+      throw new Error(`Pay run ${p.payRunId} uncleared total ${sumRes.rows[0].sumCents} != proposed ${raw.amountCents} (already cleared or changed)`);
+    }
     const { entryId } = await postEntry(tx, ctx, {
       date: bookingDate, memo: `Clear pay-run transit (match ${proposalId})`, currency,
       lines: [
@@ -32,10 +43,17 @@ export async function postApprovedBankMatch(
         { accountCode: p.bankAccount, debit: '0', credit: amountDec, description: 'Bank payment' },
       ],
     });
-    await tx.query(`UPDATE bill_payments SET cleared_at = now() WHERE id = $1 AND client_company_id = $2`, [p.billPaymentId, ctx.clientCompanyId]);
+    // Clear ALL uncleared payments of the run at once; guard guarantees a run clears at
+    // most once (a concurrent/duplicate post finds nothing to clear and throws).
+    const cleared = await tx.query(
+      `UPDATE bill_payments SET cleared_at = now()
+       WHERE pay_run_id = $1 AND client_company_id = $2 AND method = 'pay_run' AND cleared_at IS NULL`,
+      [p.payRunId, ctx.clientCompanyId],
+    );
+    if (!cleared.rowCount) throw new Error(`Pay run ${p.payRunId} has no uncleared payments (already cleared)`);
     await tx.query(`UPDATE proposals SET status='posted', resolved_entry_id=$1, resolved_by=$2, resolved_at=now() WHERE id=$3 AND client_company_id=$4`, [entryId, ctx.actorId, proposalId, ctx.clientCompanyId]);
     await tx.query(`UPDATE bank_transactions SET status='reconciled', matched_entry_id=$1 WHERE id=$2 AND client_company_id=$3`, [entryId, raw.bankTransactionId, ctx.clientCompanyId]);
-    await appendAudit(tx, ctx, { action: 'posted', entityType: 'bank_match', entityId: proposalId, before: { status: 'approved' }, after: { status: 'posted', entryId, kind: 'payable_clearing' } });
+    await appendAudit(tx, ctx, { action: 'posted', entityType: 'bank_match', entityId: proposalId, before: { status: 'approved' }, after: { status: 'posted', entryId, kind: 'payable_clearing', payRunId: p.payRunId, cleared: cleared.rowCount } });
     return { entryId };
   }
 
