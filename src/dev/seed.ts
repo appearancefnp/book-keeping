@@ -39,6 +39,7 @@ const ACCOUNTS: { code: string; name: string; type: 'asset' | 'liability' | 'equ
   { code: '5310', name: 'Kreditori (Payables)', type: 'liability' },
   { code: '5721', name: 'PVN par pārdošanu (Output VAT)', type: 'liability' },
   { code: '5722', name: 'PVN par pirkumiem (Input VAT)', type: 'asset' },
+  { code: '2699', name: 'Naudas līdzekļi ceļā (Payments in transit)', type: 'asset' },
   { code: '6110', name: 'Ieņēmumi no pārdošanas (Sales)', type: 'income' },
   { code: '7710', name: 'Saimnieciskās darbības izdevumi (Expense)', type: 'expense' },
 ];
