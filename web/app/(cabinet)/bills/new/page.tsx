@@ -3,10 +3,11 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMessages } from '@/app/lib/i18n-context';
+import { formatDecimal } from '@/app/lib/format';
 import { SkeletonCard } from '@/app/components/SkeletonCard';
 import styles from './page.module.css';
 
-interface Vendor { id: string; name: string; }
+interface Vendor { id: string; kind: 'customer' | 'vendor' | 'both'; name: string; }
 interface Line { description: string; expenseAccount: string; net: string; vatRate: number; vat: string; }
 
 const emptyLine = (): Line => ({ description: '', expenseAccount: '7710', net: '0.00', vatRate: 21, vat: '0.00' });
@@ -29,15 +30,17 @@ function NewBillInner() {
 
   useEffect(() => {
     if (!client) return;
-    fetch(`/api/parties?clientCompanyId=${encodeURIComponent(client)}&kind=vendor`, { cache: 'no-store' })
+    // Fetch all parties and filter client-side, so 'both'-kind companies (customer & vendor) are
+    // included — the server's ?kind=vendor filter exact-matches and would drop them. Matches invoices/new.
+    fetch(`/api/parties?clientCompanyId=${encodeURIComponent(client)}`, { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d: { parties?: Vendor[] }) => setVendors(d.parties ?? []))
+      .then((d: { parties?: Vendor[] }) => setVendors((d.parties ?? []).filter((p) => p.kind === 'vendor' || p.kind === 'both')))
       .catch(() => {});
   }, [client]);
 
   const totals = useMemo(() => {
-    const net = lines.reduce((a, l) => a + Number(l.net || 0), 0);
-    const vat = lines.reduce((a, l) => a + Number(l.vat || 0), 0);
+    const net = lines.reduce((a, l) => a + (Number(l.net) || 0), 0);
+    const vat = lines.reduce((a, l) => a + (Number(l.vat) || 0), 0);
     return { net, vat, grand: net + vat };
   }, [lines]);
 
@@ -148,7 +151,7 @@ function NewBillInner() {
                     className={styles.num}
                   />
                 </td>
-                <td className={styles.right}>{l.vat}</td>
+                <td className={styles.right}>{formatDecimal(l.vat) ?? l.vat}</td>
                 <td>
                   {lines.length > 1 && (
                     <button type="button" className={styles.ghostBtn} onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>
@@ -165,9 +168,9 @@ function NewBillInner() {
         </button>
 
         <div className={styles.totals}>
-          <div><span>{t('bills.net')}</span><span className={styles.right}>{round2(totals.net)}</span></div>
-          <div><span>{t('bills.vat')}</span><span className={styles.right}>{round2(totals.vat)}</span></div>
-          <div className={styles.grand}><span>{t('bills.total')}</span><span className={styles.right}>{round2(totals.grand)}</span></div>
+          <div><span>{t('bills.net')}</span><span className={styles.right}>{formatDecimal(totals.net)}</span></div>
+          <div><span>{t('bills.vat')}</span><span className={styles.right}>{formatDecimal(totals.vat)}</span></div>
+          <div className={styles.grand}><span>{t('bills.total')}</span><span className={styles.right}>{formatDecimal(totals.grand)}</span></div>
         </div>
 
         {error && <p className={styles.formError} role="alert">{error}</p>}

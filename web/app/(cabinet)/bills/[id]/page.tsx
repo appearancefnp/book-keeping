@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useMessages } from '@/app/lib/i18n-context';
 import type { MsgKey } from '@/app/lib/i18n';
+import { LOCALE_FOR } from '@/app/lib/i18n';
 import { formatCents } from '@/app/lib/format';
 import { SkeletonCard } from '@/app/components/SkeletonCard';
 import { ErrorState } from '@/app/components/ErrorState';
@@ -16,7 +17,7 @@ interface BillDetail {
 }
 
 function DetailInner() {
-  const { t } = useMessages();
+  const { t, lang } = useMessages();
   const router = useRouter();
   const id = useParams<{ id: string }>().id;
   const client = useSearchParams().get('client');
@@ -69,6 +70,9 @@ function DetailInner() {
     return label === key ? s : label;
   };
 
+  const fmtDate = (iso: string) =>
+    new Intl.DateTimeFormat(LOCALE_FOR[lang], { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
+
   if (error) return <div className={styles.page}><main className={styles.main}><ErrorState message={error} onRetry={load} /></main></div>;
   if (!bill) return <div className={styles.page}><main className={styles.main}><SkeletonCard /></main></div>;
 
@@ -77,8 +81,8 @@ function DetailInner() {
       <main className={styles.main}>
         <h1 className={styles.pageHeading}>{bill.vendorName} · {bill.billNumber}</h1>
         <dl className={styles.meta}>
-          <div><dt>{t('bills.issueDate')}</dt><dd>{bill.issueDate}</dd></div>
-          <div><dt>{t('bills.dueDate')}</dt><dd>{bill.dueDate}</dd></div>
+          <div><dt>{t('bills.issueDate')}</dt><dd>{fmtDate(bill.issueDate)}</dd></div>
+          <div><dt>{t('bills.dueDate')}</dt><dd>{fmtDate(bill.dueDate)}</dd></div>
           <div><dt>{t('bills.status')}</dt><dd>{statusLabel(bill.status)}</dd></div>
           <div><dt>{t('bills.outstanding')}</dt><dd>{formatCents(bill.outstandingCents, bill.currency) ?? '—'}</dd></div>
         </dl>
