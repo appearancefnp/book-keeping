@@ -146,7 +146,13 @@ function ComposerInner() {
       const res = await fetch('/api/einvoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientCompanyId, invoice, recipientPeppolId: peppolId.trim() }),
+        body: JSON.stringify({
+          clientCompanyId,
+          invoice,
+          recipientPeppolId: peppolId.trim(),
+          customerPartyId: customer.id,
+          ...(dueDate.trim() && { dueDate: dueDate.trim() }),
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -207,7 +213,7 @@ function ComposerInner() {
                   <input value={peppolId} onChange={(e) => setPeppolId(e.target.value)} required />
                 </label>
                 <label className={styles.field}>
-                  <span>{t('inv.dueDate')}</span>
+                  <span>{t('invoices.dueDate')}</span>
                   <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
                 </label>
                 <label className={styles.field}>

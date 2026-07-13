@@ -46,6 +46,8 @@ export async function POST(req: NextRequest) {
     clientCompanyId?: string;
     invoice?: EInvoice;
     recipientPeppolId?: string;
+    customerPartyId?: string;
+    dueDate?: string;
   };
   if (!body.clientCompanyId) return NextResponse.json({ error: 'missing clientCompanyId' }, { status: 400 });
   if (!body.invoice) return NextResponse.json({ error: 'missing invoice' }, { status: 400 });
@@ -54,16 +56,29 @@ export async function POST(req: NextRequest) {
   try {
     const ctx = await resolveTenantContext(token, body.clientCompanyId, nowUnix());
     assertRoleAllowed(ctx.actorRole, 'einvoice.issue');
-    const result = await withTenant(ctx, (tx) =>
-      sendInvoice(tx, ctx, {
+    const result = await withTenant(ctx, async (tx) => {
+      // Resolve the receivable due date: explicit body.dueDate > invoice.dueDate > customer's
+      // payment-terms-days computed from the issue date. sendInvoice itself only falls back to
+      // invoice.dueDate, so the terms-based computation must happen here.
+      let dueDate = body.dueDate ?? body.invoice!.dueDate ?? null;
+      if (!dueDate && body.customerPartyId) {
+        const { getParty, dueDateFromTerms } = await import('@domain/parties/parties.js');
+        const party = await getParty(tx, ctx, body.customerPartyId);
+        if (party.paymentTermsDays != null) {
+          dueDate = dueDateFromTerms(body.invoice!.issueDate, party.paymentTermsDays);
+        }
+      }
+      return sendInvoice(tx, ctx, {
         invoice: body.invoice!,
         recipientPeppolId: body.recipientPeppolId!,
         ap: accessPoint,
         receivableAccount: RECEIVABLE_ACCOUNT,
         salesAccount: SALES_ACCOUNT,
         vatAccount: VAT_ACCOUNT,
-      }),
-    );
+        customerPartyId: body.customerPartyId ?? null,
+        dueDate,
+      });
+    });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

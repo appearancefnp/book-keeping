@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest';
 import { resetDb, closeDb, makeFirmAndClient, ctx } from '../helpers/db.js';
 import { withTenant } from '../../src/db/pool.js';
-import { createParty, getParty, listParties, updateParty } from '../../src/parties/parties.js';
+import { createParty, getParty, listParties, updateParty, dueDateFromTerms } from '../../src/parties/parties.js';
 
 beforeAll(async () => { await resetDb(); });
 beforeEach(async () => { await resetDb(); });
@@ -49,4 +49,13 @@ test('stores and updates a customer default payment terms', async () => {
   await withTenant(cid, (tx) => updateParty(tx, cid, created.id, { paymentTermsDays: 30 }));
   const afterUpdate = await withTenant(cid, (tx) => getParty(tx, cid, created.id));
   expect(afterUpdate.paymentTermsDays).toBe(30);
+});
+
+// Task 7 — the einvoices compose route falls back to this pure helper when the caller supplies
+// neither an explicit dueDate nor an invoice.dueDate, deriving it from the customer's terms.
+test('dueDateFromTerms adds payment-terms days to the issue date, crossing month/year boundaries', () => {
+  expect(dueDateFromTerms('2026-03-10', 14)).toBe('2026-03-24');
+  expect(dueDateFromTerms('2026-01-20', 14)).toBe('2026-02-03');
+  expect(dueDateFromTerms('2026-12-25', 10)).toBe('2027-01-04');
+  expect(dueDateFromTerms('2026-03-10', 0)).toBe('2026-03-10');
 });

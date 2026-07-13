@@ -17,6 +17,17 @@ const newPartySchema = z.object({
 
 const SELECT_COLS = 'id, kind, name, reg_no AS "regNo", vat_no AS "vatNo", iban, payment_terms_days AS "paymentTermsDays"';
 
+/**
+ * Compute an invoice due date from its issue date plus a customer's payment-terms days.
+ * Pure date math (UTC, no DB access) so the compose-path route can derive a fallback due date
+ * when the caller supplied neither an explicit dueDate nor an invoice.dueDate.
+ */
+export function dueDateFromTerms(issueDate: string, paymentTermsDays: number): string {
+  const d = new Date(`${issueDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + paymentTermsDays);
+  return d.toISOString().slice(0, 10);
+}
+
 export async function createParty(
   tx: PoolClient, ctx: TenantContext,
   input: { kind: PartyKind; name: string; regNo?: string | null; vatNo?: string | null; iban?: string | null; paymentTermsDays?: number | null },
