@@ -20,7 +20,10 @@ const CANNED = {
   },
   confidence: { supplierName: 0.98, grandTotal: 0.95 },
 };
-const TEMPLATE: PostingTemplate = { expenseAccount: '7710', vatInputAccount: '5721', payablesAccount: '5310' };
+// Representative LR chart defaults — accountant to confirm. Input VAT is 5722
+// (5721 is Output VAT per seed.ts / vat-compute.ts; posting captured purchase
+// VAT to 5721 would corrupt the VAT declaration). Matches /api/bills.
+const TEMPLATE: PostingTemplate = { expenseAccount: '7710', vatInputAccount: '5722', payablesAccount: '5310' };
 
 function selectExtractor(): DocumentExtractor {
   if (process.env.ANTHROPIC_API_KEY) return new AnthropicExtractor();

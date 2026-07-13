@@ -43,11 +43,11 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > - Bills with **negative net/VAT** (credit notes, out of scope → M7) are rejected with a
 >   clear message instead of failing later as an unbalanced entry.
 > Deferred follow-ups (documented, not blocking):
-> - **Pre-existing VAT-account bug (not M2, same family — fix soon):**
->   `web/app/api/documents/capture/route.ts` sets `vatInputAccount: '5721'`, but `5721` is
->   **Output** VAT (per `src/dev/seed.ts` / `src/tax/vat-compute.ts`; input VAT is `5722`).
->   OCR-captured purchase VAT posts to the output-VAT account and corrupts the VAT return.
->   M2's `/api/bills` route already uses `5722`; `documents/capture` needs the same one-word fix.
+> - ~~**Pre-existing VAT-account bug (not M2, same family — fix soon):**~~ **FIXED 2026-07-13.**
+>   `web/app/api/documents/capture/route.ts` now sets `vatInputAccount: '5722'` (Input VAT)
+>   instead of `5721` (Output VAT), matching `/api/bills`; captured purchase VAT no longer
+>   corrupts the VAT return. Misleading `5721` stand-in in `tests/intake/map-posting.test.ts`
+>   was also corrected to `5722`.
 > - **Bank-match reject doesn't free the transaction** (finding #5, pre-existing pattern shared
 >   with the receivable matcher `proposeMatches`): a rejected `bank_match` leaves the bank
 >   transaction stuck `matched`, never re-proposed. Fix generically in the reject flow (revert
