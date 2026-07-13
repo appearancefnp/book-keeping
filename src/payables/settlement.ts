@@ -21,6 +21,9 @@ export async function settleBill(
   tx: PoolClient, ctx: TenantContext, args: SettleArgs,
 ): Promise<{ entryId: string; billPaymentId: string }> {
   const bill = await getBill(tx, ctx, args.billId);
+  if (bill.status !== 'open' && bill.status !== 'partially_paid') {
+    throw new Error(`Bill ${bill.billNumber} is not settleable (status=${bill.status})`);
+  }
   const amount = BigInt(args.amountCents);
   const outstanding = BigInt(bill.outstandingCents);
   if (amount <= 0n) throw new Error(`Settlement amount must be positive (got ${args.amountCents})`);

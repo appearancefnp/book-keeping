@@ -6,7 +6,7 @@ import { openPeriod } from '../../src/ledger/periods.js';
 import { createParty } from '../../src/parties/parties.js';
 import { approveProposal } from '../../src/proposals/lifecycle.js';
 import { postApprovedPosting } from '../../src/proposals/post-proposal.js';
-import { createBill, getBill } from '../../src/payables/bills.js';
+import { createBill, getBill, voidBill } from '../../src/payables/bills.js';
 import { settleBill } from '../../src/payables/settlement.js';
 
 const ACCTS = { vatInputAccount: '5721', payablesAccount: '5310' };
@@ -67,4 +67,36 @@ test('over-payment is rejected', async () => {
   await expect(withTenant(ctx(t), (tx) => settleBill(tx, ctx(t), {
     billId, amountCents: '99999', paidDate: '2026-03-15', method: 'manual', payablesAccount: '5310', creditAccount: '2620',
   }))).rejects.toThrow(/outstanding/i);
+});
+
+test('settling a void bill is rejected', async () => {
+  const t = await makeFirmAndClient();
+  const billId = await withTenant(ctx(t), async (tx) => {
+    await createAccount(tx, ctx(t), { code: '7710', name: 'Expenses', type: 'expense' });
+    await createAccount(tx, ctx(t), { code: '5721', name: 'VAT input', type: 'asset' });
+    await createAccount(tx, ctx(t), { code: '5310', name: 'Payables', type: 'liability' });
+    await createAccount(tx, ctx(t), { code: '2620', name: 'Bank', type: 'asset' });
+    await openPeriod(tx, ctx(t), { year: 2026, month: 3 });
+    const v = await createParty(tx, ctx(t), { kind: 'vendor', name: 'Acme', iban: 'LV80B0000435195001' });
+    const b = await createBill(tx, ctx(t), {
+      vendorPartyId: v.id, billNumber: 'B-VOID', issueDate: '2026-03-01', dueDate: '2026-03-31', currency: 'EUR',
+      lines: [{ description: 'x', expenseAccount: '7710', net: '100.00', vatRate: 21, vat: '21.00' }],
+    }, ACCTS);
+    await voidBill(tx, ctx(t), b.billId);
+    return b.billId;
+  });
+  const b = await withTenant(ctx(t), (tx) => getBill(tx, ctx(t), billId));
+  expect(b.status).toBe('void');
+  await expect(withTenant(ctx(t), (tx) => settleBill(tx, ctx(t), {
+    billId, amountCents: '100', paidDate: '2026-03-15', method: 'manual', payablesAccount: '5310', creditAccount: '2620',
+  }))).rejects.toThrow(/settleable|status/i);
+});
+
+test('non-positive amounts are rejected', async () => {
+  const { t, billId } = await openBill();
+  for (const amountCents of ['0', '-100']) {
+    await expect(withTenant(ctx(t), (tx) => settleBill(tx, ctx(t), {
+      billId, amountCents, paidDate: '2026-03-15', method: 'manual', payablesAccount: '5310', creditAccount: '2620',
+    }))).rejects.toThrow(/positive/i);
+  }
 });
