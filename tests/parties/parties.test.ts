@@ -39,3 +39,14 @@ test('rejects an invalid kind', async () => {
   const t = await makeFirmAndClient();
   await expect(withTenant(ctx(t), (tx) => createParty(tx, ctx(t), { kind: 'bogus' as never, name: 'X' }))).rejects.toThrow();
 });
+
+test('stores and updates a customer default payment terms', async () => {
+  const t = await makeFirmAndClient();
+  const cid = ctx(t);
+  const created = await withTenant(cid, (tx) => createParty(tx, cid, { kind: 'customer', name: 'SIA Klients', paymentTermsDays: 14 }));
+  const afterCreate = await withTenant(cid, (tx) => getParty(tx, cid, created.id));
+  expect(afterCreate.paymentTermsDays).toBe(14);
+  await withTenant(cid, (tx) => updateParty(tx, cid, created.id, { paymentTermsDays: 30 }));
+  const afterUpdate = await withTenant(cid, (tx) => getParty(tx, cid, created.id));
+  expect(afterUpdate.paymentTermsDays).toBe(30);
+});
