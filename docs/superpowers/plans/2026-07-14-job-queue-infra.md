@@ -980,7 +980,9 @@ SELECT c.id, c.firm_id, 'dunning_run', now(),
   FROM client_companies c
   JOIN dunning_policy p ON p.client_company_id = c.id
  WHERE p.enabled = true
-ON CONFLICT (client_company_id, type, dedup_key) DO NOTHING;
+ON CONFLICT (client_company_id, type, dedup_key) WHERE dedup_key IS NOT NULL DO NOTHING;
+-- NOTE: the WHERE predicate is REQUIRED — jobs_dedup_idx is a partial unique index
+-- (WHERE dedup_key IS NOT NULL), so ON CONFLICT inference must repeat that predicate.
 ```
 
 - [ ] **Step 7: Run tests to verify they pass**
