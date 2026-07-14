@@ -402,6 +402,14 @@ export const EN = {
   'reports.aging.total': 'Total payable',
   'reports.tab.araging': 'Aged receivables',
   'reports.aging.totalReceivable': 'Total receivable',
+  'settle.action': 'Settle',
+  'settle.title': 'Record payment',
+  'settle.amount': 'Amount',
+  'settle.paidDate': 'Paid date',
+  'settle.submit': 'Settle',
+  'settle.void': 'Void invoice',
+  'settle.cancel': 'Cancel',
+  'settle.success': 'Payment recorded',
 } as const;
 
 export const LV: Record<keyof typeof EN, string> = {
@@ -808,6 +816,14 @@ export const LV: Record<keyof typeof EN, string> = {
   'reports.aging.total': 'Kopā saistības',
   'reports.tab.araging': 'Debitoru parādi pēc termiņa',
   'reports.aging.totalReceivable': 'Kopā debitori',
+  'settle.action': 'Apmaksāt',
+  'settle.title': 'Reģistrēt maksājumu',
+  'settle.amount': 'Summa',
+  'settle.paidDate': 'Maksājuma datums',
+  'settle.submit': 'Apmaksāt',
+  'settle.void': 'Anulēt rēķinu',
+  'settle.cancel': 'Atcelt',
+  'settle.success': 'Maksājums reģistrēts',
 };
 
 export const RU: Record<keyof typeof EN, string> = {
@@ -1214,6 +1230,14 @@ export const RU: Record<keyof typeof EN, string> = {
   'reports.aging.total': 'Итого к оплате',
   'reports.tab.araging': 'Дебиторка по срокам',
   'reports.aging.totalReceivable': 'Итого к получению',
+  'settle.action': 'Оплатить',
+  'settle.title': 'Записать платёж',
+  'settle.amount': 'Сумма',
+  'settle.paidDate': 'Дата оплаты',
+  'settle.submit': 'Оплатить',
+  'settle.void': 'Аннулировать счёт',
+  'settle.cancel': 'Отмена',
+  'settle.success': 'Платёж записан',
 };
 
 export type Lang = 'lv' | 'en' | 'ru';

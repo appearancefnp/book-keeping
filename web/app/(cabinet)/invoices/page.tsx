@@ -31,6 +31,12 @@ function InvoicesInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [settleRow, setSettleRow] = useState<EinvoiceRow | null>(null);
+  const [amount, setAmount] = useState('');
+  const [paidDate, setPaidDate] = useState('');
+  const [settleError, setSettleError] = useState<string | null>(null);
+  const [settleBusy, setSettleBusy] = useState(false);
+
   const load = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
@@ -52,6 +58,40 @@ function InvoicesInner() {
   useEffect(() => {
     if (clientCompanyId) load(clientCompanyId);
   }, [clientCompanyId, load]);
+
+  const openSettle = (r: EinvoiceRow) => {
+    setSettleRow(r);
+    // Prefill amount to outstanding in major units (cents/100), date to today.
+    setAmount(r.outstandingCents ? (Number(r.outstandingCents) / 100).toFixed(2) : '');
+    setPaidDate(new Date().toISOString().slice(0, 10));
+    setSettleError(null);
+  };
+
+  const submitSettle = async (action: 'settle' | 'void') => {
+    if (!settleRow || !clientCompanyId) return;
+    setSettleBusy(true);
+    setSettleError(null);
+    try {
+      const body: Record<string, string> = { clientCompanyId, action };
+      if (action === 'settle') {
+        body.amountCents = String(Math.round(Number(amount) * 100));
+        body.paidDate = paidDate;
+      }
+      const res = await fetch(`/api/receivables/${encodeURIComponent(settleRow.id)}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error((b as { error?: string }).error ?? `HTTP ${res.status}`);
+      }
+      setSettleRow(null);
+      await load(clientCompanyId);
+    } catch (err) {
+      setSettleError((err as Error).message);
+    } finally {
+      setSettleBusy(false);
+    }
+  };
 
   const fmtDate = (iso: string) =>
     new Intl.DateTimeFormat(LOCALE_FOR[lang], { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
@@ -96,6 +136,7 @@ function InvoicesInner() {
                   <th scope="col">{t('einv.due')}</th>
                   <th scope="col" className={styles.colAmount}>{t('einv.outstanding')}</th>
                   <th scope="col"><span className="sr-only">{t('einv.viewDoc')}</span></th>
+                  <th scope="col"><span className="sr-only">{t('settle.action')}</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -123,10 +164,44 @@ function InvoicesInner() {
                         </a>
                       ) : '—'}
                     </td>
+                    <td>
+                      {r.direction === 'outbound' && (r.status === 'open' || r.status === 'partially_paid') ? (
+                        <button type="button" className={styles.linkBtn} onClick={() => openSettle(r)}>
+                          {t('settle.action')}
+                        </button>
+                      ) : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {settleRow && (
+          <div className={styles.overlay} role="dialog" aria-modal="true" onClick={() => setSettleRow(null)}>
+            <div className={styles.drawer} onClick={(e) => e.stopPropagation()}>
+              <h2>{t('settle.title')}</h2>
+              <p className={styles.mono}>{settleRow.invoiceNumber}</p>
+              <label>
+                {t('settle.amount')}
+                <input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              </label>
+              <label>
+                {t('settle.paidDate')}
+                <input type="date" value={paidDate} onChange={(e) => setPaidDate(e.target.value)} />
+              </label>
+              {settleError && <p className={styles.settleError}>{settleError}</p>}
+              <div className={styles.drawerActions}>
+                <button type="button" onClick={() => setSettleRow(null)} disabled={settleBusy}>{t('settle.cancel')}</button>
+                {settleRow.status === 'open' && (
+                  <button type="button" onClick={() => submitSettle('void')} disabled={settleBusy}>{t('settle.void')}</button>
+                )}
+                <button type="button" className={styles.primaryBtn} onClick={() => submitSettle('settle')} disabled={settleBusy}>
+                  {t('settle.submit')}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </main>
