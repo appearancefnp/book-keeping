@@ -26,6 +26,8 @@ export async function setDunningPolicy(
   tx: PoolClient, ctx: TenantContext,
   input: { enabled: boolean; lateFeeAnnualBps: number; lateFeeFlatCents: string },
 ): Promise<void> {
+  if (input.lateFeeAnnualBps < 0) throw new Error('lateFeeAnnualBps must be non-negative');
+  if (BigInt(input.lateFeeFlatCents) < 0n) throw new Error('lateFeeFlatCents must be non-negative');
   await tx.query(
     `INSERT INTO dunning_policy(client_company_id, enabled, late_fee_annual_bps, late_fee_flat_cents)
      VALUES ($1,$2,$3,$4)
@@ -55,6 +57,9 @@ export async function setStages(tx: PoolClient, ctx: TenantContext, stages: Stag
     if (byLevel[i]!.daysOverdue <= byLevel[i - 1]!.daysOverdue) {
       throw new Error('Stage days_overdue must be strictly ascending by level');
     }
+  }
+  for (const s of stages) {
+    if (s.daysOverdue < 0) throw new Error('Stage days_overdue must be non-negative');
   }
   await tx.query(`DELETE FROM dunning_stages WHERE client_company_id = $1`, [ctx.clientCompanyId]);
   for (const s of byLevel) {

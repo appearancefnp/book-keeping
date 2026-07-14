@@ -30,3 +30,20 @@ test('PUT-shape: policy + stages are written atomically in one tenant tx', async
   expect(result.policy.lateFeeAnnualBps).toBe(500);
   expect(result.stages).toEqual([{ level: 1, daysOverdue: 10 }]);
 });
+
+test('validation: negative late-fee bps/flat are rejected', async () => {
+  const { cid } = await setup();
+  await expect(withTenant(cid, (tx) =>
+    setDunningPolicy(tx, cid, { enabled: true, lateFeeAnnualBps: -1, lateFeeFlatCents: '0' })),
+  ).rejects.toThrow(/non-negative/i);
+  await expect(withTenant(cid, (tx) =>
+    setDunningPolicy(tx, cid, { enabled: true, lateFeeAnnualBps: 0, lateFeeFlatCents: '-5' })),
+  ).rejects.toThrow(/non-negative/i);
+});
+
+test('validation: negative stage days_overdue is rejected', async () => {
+  const { cid } = await setup();
+  await expect(withTenant(cid, (tx) =>
+    setStages(tx, cid, [{ level: 1, daysOverdue: -3 }])),
+  ).rejects.toThrow(/non-negative/i);
+});
