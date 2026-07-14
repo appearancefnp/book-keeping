@@ -5,6 +5,8 @@ import { setup, issueOpenReceivable } from '../receivables/helpers.js';
 import { runDunning } from '../../src/dunning/dunning.js';
 import { setDunningPolicy, setStages } from '../../src/dunning/policy.js';
 import { listTasks } from '../../src/collab/tasks.js';
+import { settleReceivable } from '../../src/receivables/settlement.js';
+import { voidReceivable, getReceivable } from '../../src/receivables/receivables.js';
 
 // SAMPLE_INVOICE issueDate is 2026-03-10; issueOpenReceivable defaults dueDate 2026-03-24.
 async function overdueClient(dueDate = '2026-03-10') {
@@ -47,8 +49,28 @@ test('escalation: a later run at a higher day-count fires the next level once', 
 test('not-yet-due and paid/void invoices are skipped', async () => {
   const { cid, customerId } = await setup();
   await issueOpenReceivable(cid, customerId, { dueDate: '2026-12-31' }); // future due
-  const summary = await withTenant(cid, (tx) => runDunning(tx, cid, { asOf: '2026-03-30' }));
+
+  const { einvoiceId: paidId } = await issueOpenReceivable(cid, customerId, { dueDate: '2026-03-10' }); // overdue but paid
+  await withTenant(cid, (tx) => settleReceivable(tx, cid, {
+    einvoiceId: paidId, amountCents: '12100', paidDate: '2026-03-15',
+    method: 'manual', bankAccount: '2620', receivableAccount: '2310',
+  }));
+
+  const { einvoiceId: voidId } = await issueOpenReceivable(cid, customerId, { dueDate: '2026-03-10' }); // overdue but voided
+  await withTenant(cid, (tx) => voidReceivable(tx, cid, voidId));
+
+  // Sanity-check the fixtures actually landed in the states this test relies on.
+  const [paidRow, voidRow] = await withTenant(cid, async (tx) => [
+    await getReceivable(tx, cid, paidId),
+    await getReceivable(tx, cid, voidId),
+  ]);
+  expect(paidRow.status).toBe('paid');
+  expect(voidRow.status).toBe('void');
+
+  const summary = await withTenant(cid, (tx) => runDunning(tx, cid, { asOf: '2026-06-30' }));
   expect(summary.prompted).toBe(0);
+  const tasks = await withTenant(cid, (tx) => listTasks(tx, cid, {}));
+  expect(tasks).toHaveLength(0);
 });
 
 test('enabled=false is a no-op', async () => {
