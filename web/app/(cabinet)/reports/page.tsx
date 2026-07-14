@@ -43,6 +43,37 @@ function ReportsInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [dunPolicy, setDunPolicy] = useState<{ enabled: boolean; lateFeeAnnualBps: number; lateFeeFlatCents: string } | null>(null);
+  const [dunStages, setDunStages] = useState<{ level: number; daysOverdue: number }[]>([]);
+  const [dunMsg, setDunMsg] = useState<string | null>(null);
+
+  const loadDunning = useCallback(async (id: string) => {
+    const res = await fetch(`/api/receivables/dunning/policy?clientCompanyId=${encodeURIComponent(id)}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = (await res.json()) as { policy: typeof dunPolicy; stages: typeof dunStages };
+    setDunPolicy(data.policy);
+    setDunStages(data.stages);
+  }, []);
+
+  const saveDunning = useCallback(async () => {
+    if (!clientCompanyId || !dunPolicy) return;
+    const res = await fetch(`/api/receivables/dunning/policy`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientCompanyId, policy: dunPolicy, stages: dunStages }),
+    });
+    setDunMsg(res.ok ? t('dunning.saved') : ((await res.json().catch(() => ({}))) as { error?: string }).error ?? t('state.error'));
+  }, [clientCompanyId, dunPolicy, dunStages, t]);
+
+  const runDunningNow = useCallback(async () => {
+    if (!clientCompanyId) return;
+    const res = await fetch(`/api/receivables/dunning/run`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientCompanyId, asOf }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { prompted?: number; error?: string };
+    setDunMsg(res.ok ? `${t('dunning.ranSummary')} ${data.prompted ?? 0}` : data.error ?? t('state.error'));
+  }, [clientCompanyId, asOf, t]);
+
   const load = useCallback(async () => {
     if (!clientCompanyId) return;
     setLoading(true); setError(null);
@@ -69,6 +100,10 @@ function ReportsInner() {
   }, [clientCompanyId, tab, from, to, asOf, t]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (tab === 'araging' && clientCompanyId) loadDunning(clientCompanyId);
+  }, [tab, clientCompanyId, loadDunning]);
 
   const setPreset = (preset: 'month' | 'quarter' | 'year') => {
     const now = new Date();
@@ -194,6 +229,44 @@ function ReportsInner() {
               <tr><td className={styles.name}>{t('reports.aging.d90plus')}</td><td className={styles.amount}>{fmtMoney(aging.d90plus)}</td></tr>
             </tbody></table>
             <div className={styles.grandTotal}><span>{t('reports.aging.totalReceivable')}</span><span className={styles.amount}>{fmtMoney(aging.total)}</span></div>
+
+            {dunPolicy && (
+              <section className={styles.dunning}>
+                <h3>{t('dunning.heading')}</h3>
+                <label>
+                  <input type="checkbox" checked={dunPolicy.enabled}
+                    onChange={(e) => setDunPolicy({ ...dunPolicy, enabled: e.target.checked })} />
+                  {t('dunning.enabled')}
+                </label>
+                <label>{t('dunning.annualBps')}
+                  <input type="number" min={0} value={dunPolicy.lateFeeAnnualBps}
+                    onChange={(e) => setDunPolicy({ ...dunPolicy, lateFeeAnnualBps: Number(e.target.value) })} />
+                </label>
+                <label>{t('dunning.flat')}
+                  <input type="text" inputMode="decimal"
+                    value={(Number(dunPolicy.lateFeeFlatCents) / 100).toFixed(2)}
+                    onChange={(e) => setDunPolicy({ ...dunPolicy, lateFeeFlatCents: String(Math.round(Number(e.target.value.replace(',', '.')) * 100) || 0) })} />
+                </label>
+                <fieldset>
+                  <legend>{t('dunning.stages')}</legend>
+                  {dunStages.map((s, i) => (
+                    <div key={s.level} className={styles.stageRow}>
+                      <span>L{s.level}</span>
+                      <input type="number" min={0} value={s.daysOverdue}
+                        onChange={(e) => setDunStages(dunStages.map((x, j) => j === i ? { ...x, daysOverdue: Number(e.target.value) } : x))} />
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setDunStages([...dunStages, { level: (dunStages.at(-1)?.level ?? 0) + 1, daysOverdue: (dunStages.at(-1)?.daysOverdue ?? 0) + 15 }])}>
+                    {t('dunning.addStage')}
+                  </button>
+                </fieldset>
+                <div className={styles.dunningActions}>
+                  <button type="button" onClick={saveDunning}>{t('dunning.save')}</button>
+                  <button type="button" className={styles.primaryBtn} onClick={runDunningNow}>{t('dunning.run')}</button>
+                </div>
+                {dunMsg && <p className={styles.dunMsg}>{dunMsg}</p>}
+              </section>
+            )}
           </div>
         )}
       </main>

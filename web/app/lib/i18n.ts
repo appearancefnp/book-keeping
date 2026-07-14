@@ -395,6 +395,16 @@ export const EN = {
   'reports.aging.total': 'Total payable',
   'reports.tab.araging': 'Aged receivables',
   'reports.aging.totalReceivable': 'Total receivable',
+  'dunning.heading': 'Payment reminders',
+  'dunning.enabled': 'Reminders enabled',
+  'dunning.annualBps': 'Late fee (basis points / year)',
+  'dunning.flat': 'Flat late fee per stage',
+  'dunning.stages': 'Reminder stages (days overdue by level)',
+  'dunning.addStage': 'Add stage',
+  'dunning.save': 'Save policy',
+  'dunning.run': 'Run reminders now',
+  'dunning.saved': 'Policy saved',
+  'dunning.ranSummary': 'Reminders created:',
 } as const;
 
 export const LV: Record<keyof typeof EN, string> = {
@@ -794,6 +804,16 @@ export const LV: Record<keyof typeof EN, string> = {
   'reports.aging.total': 'Kopā saistības',
   'reports.tab.araging': 'Debitoru parādi pēc termiņa',
   'reports.aging.totalReceivable': 'Kopā debitori',
+  'dunning.heading': 'Maksājumu atgādinājumi',
+  'dunning.enabled': 'Atgādinājumi ieslēgti',
+  'dunning.annualBps': 'Kavējuma nauda (bāzes punkti gadā)',
+  'dunning.flat': 'Fiksēta kavējuma nauda katrā posmā',
+  'dunning.stages': 'Atgādinājumu posmi (nokavētās dienas pa līmeņiem)',
+  'dunning.addStage': 'Pievienot posmu',
+  'dunning.save': 'Saglabāt politiku',
+  'dunning.run': 'Palaist atgādinājumus tagad',
+  'dunning.saved': 'Politika saglabāta',
+  'dunning.ranSummary': 'Izveidoti atgādinājumi:',
 };
 
 export const RU: Record<keyof typeof EN, string> = {
@@ -1193,6 +1213,16 @@ export const RU: Record<keyof typeof EN, string> = {
   'reports.aging.total': 'Итого к оплате',
   'reports.tab.araging': 'Дебиторка по срокам',
   'reports.aging.totalReceivable': 'Итого к получению',
+  'dunning.heading': 'Напоминания об оплате',
+  'dunning.enabled': 'Напоминания включены',
+  'dunning.annualBps': 'Пеня (базисные пункты в год)',
+  'dunning.flat': 'Фиксированная пеня за этап',
+  'dunning.stages': 'Этапы напоминаний (дней просрочки по уровням)',
+  'dunning.addStage': 'Добавить этап',
+  'dunning.save': 'Сохранить политику',
+  'dunning.run': 'Запустить напоминания сейчас',
+  'dunning.saved': 'Политика сохранена',
+  'dunning.ranSummary': 'Создано напоминаний:',
 };
 
 export type Lang = 'lv' | 'en' | 'ru';
