@@ -24,7 +24,8 @@ export async function drainOnce(
     try {
       const handler = getHandler(job.type);
       if (!handler) throw new Error(`no handler registered for job type '${job.type}'`);
-      await withTenant(workerCtx(job), (tx) => handler(tx, workerCtx(job), job.payload));
+      const wctx = workerCtx(job);
+      await withTenant(wctx, (tx) => handler(tx, wctx, job.payload));
       await withWorker((tx) => completeJob(tx, job.id));
       ran += 1;
     } catch (err) {

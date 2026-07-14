@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, expect, test } from 'vitest';
 import { resetDb, closeDb, makeFirmAndClient, ctx } from '../helpers/db.js';
 import { withTenant, withWorker, workerPool } from '../../src/db/pool.js';
-import { enqueue, claimDue, completeJob, failJob } from '../../src/jobs/queue.js';
+import { enqueue, claimDue, completeJob, failJob, backoffMs } from '../../src/jobs/queue.js';
 
 beforeEach(async () => { await resetDb(); });
 afterAll(async () => { await closeDb(); });
@@ -81,6 +81,13 @@ test('failJob under max_attempts re-queues with backoff; at max it dies', async 
   await withWorker((tx) => failJob(tx, jobId, 'boom2', { now: new Date() }));
   row = await withWorker((tx) => tx.query(`SELECT status FROM jobs WHERE id=$1`, [jobId]));
   expect(row.rows[0].status).toBe('failed');
+});
+
+test('backoffMs is exponential and capped at one hour', () => {
+  expect(backoffMs(0)).toBe(1000);
+  expect(backoffMs(1)).toBe(2000);
+  expect(backoffMs(2)).toBe(4000);
+  expect(backoffMs(100)).toBe(3_600_000); // capped
 });
 
 test('completeJob marks done', async () => {

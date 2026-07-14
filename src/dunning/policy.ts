@@ -52,14 +52,14 @@ export async function listStages(tx: PoolClient, ctx: TenantContext): Promise<St
 export async function setStages(tx: PoolClient, ctx: TenantContext, stages: Stage[]): Promise<void> {
   const levels = stages.map((s) => s.level);
   if (new Set(levels).size !== levels.length) throw new Error('Stage levels must be distinct');
+  for (const s of stages) {
+    if (s.daysOverdue < 0) throw new Error('Stage days_overdue must be non-negative');
+  }
   const byLevel = [...stages].sort((a, b) => a.level - b.level);
   for (let i = 1; i < byLevel.length; i++) {
     if (byLevel[i]!.daysOverdue <= byLevel[i - 1]!.daysOverdue) {
       throw new Error('Stage days_overdue must be strictly ascending by level');
     }
-  }
-  for (const s of stages) {
-    if (s.daysOverdue < 0) throw new Error('Stage days_overdue must be non-negative');
   }
   await tx.query(`DELETE FROM dunning_stages WHERE client_company_id = $1`, [ctx.clientCompanyId]);
   for (const s of byLevel) {

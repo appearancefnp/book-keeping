@@ -16,6 +16,9 @@ test('worker sees jobs across all tenants; app sees only its own', async () => {
   }
   const workerSees = await withWorker((tx) => tx.query(`SELECT id FROM jobs`));
   expect(workerSees.rowCount).toBe(2);
+
+  const appSeesA = await withTenant(a, (tx) => tx.query(`SELECT id FROM jobs`));
+  expect(appSeesA.rowCount).toBe(1);
 });
 
 test('bookkeeping_worker has no privilege on business tables', async () => {

@@ -84,6 +84,7 @@ export async function completeJob(tx: PoolClient, jobId: string): Promise<void> 
 /**
  * Worker path. Reads the (already-incremented) attempts: at/over max_attempts the job dies
  * ('failed'); otherwise it returns to 'pending' with run_at pushed out by exponential backoff.
+ * Safe as read-then-write because claimDue's SKIP LOCKED + lease guarantees a single owner per running job.
  */
 export async function failJob(
   tx: PoolClient, jobId: string, error: string, args: { now: Date },
