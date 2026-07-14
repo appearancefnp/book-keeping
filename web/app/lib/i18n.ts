@@ -405,6 +405,7 @@ export const EN = {
   'dunning.run': 'Run reminders now',
   'dunning.saved': 'Policy saved',
   'dunning.ranSummary': 'Reminders created:',
+  'dunning.invalidFlat': 'Enter a valid flat fee',
 } as const;
 
 export const LV: Record<keyof typeof EN, string> = {
@@ -814,6 +815,7 @@ export const LV: Record<keyof typeof EN, string> = {
   'dunning.run': 'Palaist atgādinājumus tagad',
   'dunning.saved': 'Politika saglabāta',
   'dunning.ranSummary': 'Izveidoti atgādinājumi:',
+  'dunning.invalidFlat': 'Ievadiet derīgu fiksēto maksu',
 };
 
 export const RU: Record<keyof typeof EN, string> = {
@@ -1223,6 +1225,7 @@ export const RU: Record<keyof typeof EN, string> = {
   'dunning.run': 'Запустить напоминания сейчас',
   'dunning.saved': 'Политика сохранена',
   'dunning.ranSummary': 'Создано напоминаний:',
+  'dunning.invalidFlat': 'Введите корректную фиксированную плату',
 };
 
 export type Lang = 'lv' | 'en' | 'ru';

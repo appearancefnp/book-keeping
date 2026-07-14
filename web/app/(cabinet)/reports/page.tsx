@@ -46,6 +46,7 @@ function ReportsInner() {
   const [dunPolicy, setDunPolicy] = useState<{ enabled: boolean; lateFeeAnnualBps: number; lateFeeFlatCents: string } | null>(null);
   const [dunStages, setDunStages] = useState<{ level: number; daysOverdue: number }[]>([]);
   const [dunMsg, setDunMsg] = useState<string | null>(null);
+  const [dunFlatDraft, setDunFlatDraft] = useState('');
 
   const loadDunning = useCallback(async (id: string) => {
     const res = await fetch(`/api/receivables/dunning/policy?clientCompanyId=${encodeURIComponent(id)}`, { cache: 'no-store' });
@@ -53,16 +54,23 @@ function ReportsInner() {
     const data = (await res.json()) as { policy: typeof dunPolicy; stages: typeof dunStages };
     setDunPolicy(data.policy);
     setDunStages(data.stages);
+    setDunFlatDraft(data.policy ? (Number(data.policy.lateFeeFlatCents) / 100).toFixed(2) : '');
   }, []);
 
   const saveDunning = useCallback(async () => {
     if (!clientCompanyId || !dunPolicy) return;
+    const parsed = Number(dunFlatDraft.trim().replace(',', '.'));
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setDunMsg(t('dunning.invalidFlat'));
+      return;
+    }
+    const policy = { ...dunPolicy, lateFeeFlatCents: String(Math.round(parsed * 100)) };
     const res = await fetch(`/api/receivables/dunning/policy`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientCompanyId, policy: dunPolicy, stages: dunStages }),
+      body: JSON.stringify({ clientCompanyId, policy, stages: dunStages }),
     });
     setDunMsg(res.ok ? t('dunning.saved') : ((await res.json().catch(() => ({}))) as { error?: string }).error ?? t('state.error'));
-  }, [clientCompanyId, dunPolicy, dunStages, t]);
+  }, [clientCompanyId, dunPolicy, dunStages, dunFlatDraft, t]);
 
   const runDunningNow = useCallback(async () => {
     if (!clientCompanyId) return;
@@ -244,8 +252,8 @@ function ReportsInner() {
                 </label>
                 <label>{t('dunning.flat')}
                   <input type="text" inputMode="decimal"
-                    value={(Number(dunPolicy.lateFeeFlatCents) / 100).toFixed(2)}
-                    onChange={(e) => setDunPolicy({ ...dunPolicy, lateFeeFlatCents: String(Math.round(Number(e.target.value.replace(',', '.')) * 100) || 0) })} />
+                    value={dunFlatDraft}
+                    onChange={(e) => setDunFlatDraft(e.target.value)} />
                 </label>
                 <fieldset>
                   <legend>{t('dunning.stages')}</legend>
