@@ -10,7 +10,7 @@ export function registerReaper(fn: Reaper): void {
 }
 
 export function getReapers(): Reaper[] {
-  return reapers;
+  return [...reapers];
 }
 
 /**

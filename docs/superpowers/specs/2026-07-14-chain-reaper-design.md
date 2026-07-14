@@ -103,6 +103,13 @@ Recovery cases:
   retry-the-missed-period semantics; the mechanism supports it once `UPDATE` on `jobs` is granted —
   explicitly out of scope here.
 
+**Scope of "enabled":** the reaper (and backfill 035, and the policy-enable re-seed) key off an
+explicit `dunning_policy` row with `enabled = true`. `getDunningPolicy` defaults a *missing* row to
+`enabled: true`, but that default serves only the manual "run now" path — automated dunning requires
+an explicit enabled row (written by the enable flow). A client that has never configured dunning has
+no automated chain and is not seeded/revived by the reaper. This is intentional and matches backfill
+035's scope; it is not a recovery hole for any client that has been through the enable flow.
+
 ## Growth-cap fix (stop perpetuating when disabled)
 
 `runDunning` already no-ops when the policy is disabled, but the `dunning_run` handler perpetuates
