@@ -308,13 +308,13 @@ In the `thead` row, after the `einv.vidDue` header cell, add:
 
 - [ ] **Step 4: Add the three body cells**
 
-In the `tbody` `<tr>`, after the `r.vidDueDate` cell, add. Payment status shows the badge only for outbound rows that carry a status; inbound/null render "—". Outstanding uses `formatCents`:
+In the `tbody` `<tr>`, after the `r.vidDueDate` cell, add. All three AR cells render only for **outbound rows that carry a `status`** (an actual receivable); inbound rows render "—". Note: `outstandingCents`/`amountPaidCents` are `NOT NULL DEFAULT 0` in the DB, so they are non-null even for inbound rows — do **not** use `outstandingCents != null` as an inbound guard; gate on `r.status` (the genuinely-nullable field) instead. Outstanding uses `formatCents`:
 
 ```tsx
                     <td>{r.direction === 'outbound' && r.status ? <PaymentStatusBadge status={r.status} /> : '—'}</td>
-                    <td>{r.dueDate ? fmtDate(r.dueDate) : '—'}</td>
+                    <td>{r.direction === 'outbound' && r.status && r.dueDate ? fmtDate(r.dueDate) : '—'}</td>
                     <td className={styles.colAmount}>
-                      {r.outstandingCents != null ? (formatCents(r.outstandingCents, r.currency) ?? '—') : '—'}
+                      {r.direction === 'outbound' && r.status ? (formatCents(r.outstandingCents ?? '0', r.currency) ?? '—') : '—'}
                     </td>
 ```
 
