@@ -409,7 +409,7 @@ export const EN = {
   'settle.submit': 'Settle',
   'settle.void': 'Void invoice',
   'settle.cancel': 'Cancel',
-  'settle.success': 'Payment recorded',
+  'settle.invalidAmount': 'Enter a valid amount',
 } as const;
 
 export const LV: Record<keyof typeof EN, string> = {
@@ -823,7 +823,7 @@ export const LV: Record<keyof typeof EN, string> = {
   'settle.submit': 'Apmaksāt',
   'settle.void': 'Anulēt rēķinu',
   'settle.cancel': 'Atcelt',
-  'settle.success': 'Maksājums reģistrēts',
+  'settle.invalidAmount': 'Ievadiet derīgu summu',
 };
 
 export const RU: Record<keyof typeof EN, string> = {
@@ -1237,7 +1237,7 @@ export const RU: Record<keyof typeof EN, string> = {
   'settle.submit': 'Оплатить',
   'settle.void': 'Аннулировать счёт',
   'settle.cancel': 'Отмена',
-  'settle.success': 'Платёж записан',
+  'settle.invalidAmount': 'Введите корректную сумму',
 };
 
 export type Lang = 'lv' | 'en' | 'ru';

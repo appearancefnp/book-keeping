@@ -74,7 +74,13 @@ function InvoicesInner() {
     try {
       const body: Record<string, string> = { clientCompanyId, action };
       if (action === 'settle') {
-        body.amountCents = String(Math.round(Number(amount) * 100));
+        const parsed = Number(amount.trim().replace(',', '.'));
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+          setSettleError(t('settle.invalidAmount'));
+          setSettleBusy(false);
+          return;
+        }
+        body.amountCents = String(Math.round(parsed * 100));
         body.paidDate = paidDate;
       }
       const res = await fetch(`/api/receivables/${encodeURIComponent(settleRow.id)}`, {
@@ -179,7 +185,12 @@ function InvoicesInner() {
         )}
 
         {settleRow && (
-          <div className={styles.overlay} role="dialog" aria-modal="true" onClick={() => setSettleRow(null)}>
+          <div
+            className={styles.overlay}
+            role="dialog"
+            aria-modal="true"
+            onClick={() => { if (!settleBusy) setSettleRow(null); }}
+          >
             <div className={styles.drawer} onClick={(e) => e.stopPropagation()}>
               <h2>{t('settle.title')}</h2>
               <p className={styles.mono}>{settleRow.invoiceNumber}</p>
