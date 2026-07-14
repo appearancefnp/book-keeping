@@ -4,6 +4,7 @@ import type { TenantContext } from '../tenancy/context.js';
 export const adminPool = new Pool({ connectionString: process.env.ADMIN_DATABASE_URL });
 export const appPool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const workerPool = new Pool({ connectionString: process.env.WORKER_DATABASE_URL });
+export const supervisorPool = new Pool({ connectionString: process.env.SUPERVISOR_DATABASE_URL });
 
 /**
  * Runs `fn` inside a transaction on the APP pool with the tenant session var set,
@@ -36,6 +37,26 @@ export async function withTenant<T>(
  */
 export async function withWorker<T>(fn: (tx: PoolClient) => Promise<T>): Promise<T> {
   const tx = await workerPool.connect();
+  try {
+    await tx.query('BEGIN');
+    const result = await fn(tx);
+    await tx.query('COMMIT');
+    return result;
+  } catch (err) {
+    await tx.query('ROLLBACK');
+    throw err;
+  } finally {
+    tx.release();
+  }
+}
+
+/**
+ * Runs `fn` in a transaction on the SUPERVISOR pool (bookkeeping_supervisor). Used only by the
+ * chain reaper: reads active drivers cross-tenant and seeds recovery jobs. Does NOT set
+ * app.current_client_id.
+ */
+export async function withSupervisor<T>(fn: (tx: PoolClient) => Promise<T>): Promise<T> {
+  const tx = await supervisorPool.connect();
   try {
     await tx.query('BEGIN');
     const result = await fn(tx);
