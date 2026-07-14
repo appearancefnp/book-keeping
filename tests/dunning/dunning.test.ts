@@ -91,3 +91,17 @@ test('custom stages + late fee: task message includes the accrued fee', async ()
   const tasks = await withTenant(cid, (tx) => listTasks(tx, cid, {}));
   expect(tasks[0]!.detail).toMatch(/5\.00/); // flat 500 cents rendered as 5.00
 });
+
+test('idempotent: a pre-existing event at that level creates no duplicate task and does not throw', async () => {
+  const { cid, einvoiceId } = await overdueClient('2026-03-10');
+  // Simulate a prior run that already recorded the level-2 event (no task attached yet).
+  await withTenant(cid, (tx) => tx.query(
+    `INSERT INTO dunning_events(client_company_id, einvoice_id, level, accrued_fee_cents)
+     VALUES ($1,$2,2,0)`,
+    [cid.clientCompanyId, einvoiceId],
+  ));
+  const summary = await withTenant(cid, (tx) => runDunning(tx, cid, { asOf: '2026-03-30' })); // 20d -> L2
+  expect(summary.prompted).toBe(0); // level already claimed
+  const tasks = await withTenant(cid, (tx) => listTasks(tx, cid, {}));
+  expect(tasks).toHaveLength(0);
+});
