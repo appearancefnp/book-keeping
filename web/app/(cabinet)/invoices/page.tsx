@@ -10,12 +10,16 @@ import { SkeletonCard } from '@/app/components/SkeletonCard';
 import { ErrorState } from '@/app/components/ErrorState';
 import { EmptyState } from '@/app/components/EmptyState';
 import { formatCents } from '@/app/lib/format';
+import { PaymentStatusBadge } from '@/app/components/PaymentStatusBadge';
+import type { ReceivableStatus } from '@domain/receivables/receivables.js';
 import styles from './page.module.css';
 
 interface EinvoiceRow {
   id: string; direction: 'outbound' | 'inbound'; invoiceNumber: string; issueDate: string;
   grandTotalCents: string; currency: string; peppolStatus: string; peppolMessageId: string | null;
   vidStatus: string; vidDueDate: string | null;
+  status: ReceivableStatus | null; dueDate: string | null;
+  amountPaidCents: string | null; outstandingCents: string | null;
 }
 
 function InvoicesInner() {
@@ -88,6 +92,9 @@ function InvoicesInner() {
                   <th scope="col">{t('einv.peppol')}</th>
                   <th scope="col">{t('einv.vid')}</th>
                   <th scope="col">{t('einv.vidDue')}</th>
+                  <th scope="col">{t('einv.payment')}</th>
+                  <th scope="col">{t('einv.due')}</th>
+                  <th scope="col" className={styles.colAmount}>{t('einv.outstanding')}</th>
                   <th scope="col"><span className="sr-only">{t('einv.viewDoc')}</span></th>
                 </tr>
               </thead>
@@ -100,6 +107,11 @@ function InvoicesInner() {
                     <td>{statusLabel(r.peppolStatus)}</td>
                     <td>{statusLabel(r.vidStatus)}</td>
                     <td>{r.vidDueDate ? fmtDate(r.vidDueDate) : '—'}</td>
+                    <td>{r.direction === 'outbound' && r.status ? <PaymentStatusBadge status={r.status} /> : '—'}</td>
+                    <td>{r.direction === 'outbound' && r.status && r.dueDate ? fmtDate(r.dueDate) : '—'}</td>
+                    <td className={styles.colAmount}>
+                      {r.direction === 'outbound' && r.status ? (formatCents(r.outstandingCents ?? '0', r.currency) ?? '—') : '—'}
+                    </td>
                     <td>
                       {r.direction === 'outbound' && clientCompanyId ? (
                         <a
