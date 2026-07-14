@@ -26,10 +26,10 @@ function centsToMajor(cents: string): string {
 
 export async function runDunning(
   tx: PoolClient, ctx: TenantContext, opts: { asOf: string },
-): Promise<{ prompted: number; byLevel: Record<number, number> }> {
+): Promise<{ enabled: boolean; prompted: number; byLevel: Record<number, number> }> {
   const byLevel: Record<number, number> = {};
   const policy = await getDunningPolicy(tx, ctx);
-  if (!policy.enabled) return { prompted: 0, byLevel };
+  if (!policy.enabled) return { enabled: false, prompted: 0, byLevel };
 
   const stages = await listStages(tx, ctx); // ascending by level
   const overdue = await tx.query<OverdueRow>(
@@ -74,5 +74,5 @@ export async function runDunning(
     prompted += 1;
     byLevel[reached.level] = (byLevel[reached.level] ?? 0) + 1;
   }
-  return { prompted, byLevel };
+  return { enabled: true, prompted, byLevel };
 }

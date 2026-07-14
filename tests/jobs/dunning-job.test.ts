@@ -1,9 +1,11 @@
 import { afterAll, beforeEach, expect, test } from 'vitest';
-import { resetDb, closeDb } from '../helpers/db.js';
+import { resetDb, closeDb, makeFirmAndClient, ctx } from '../helpers/db.js';
 import { withTenant, withWorker } from '../../src/db/pool.js';
 import { setup, issueOpenReceivable } from '../receivables/helpers.js';
 import { drainOnce } from '../../src/jobs/worker.js';
 import { enqueueDunningRun, nextDay } from '../../src/dunning/schedule.js';
+import { setDunningPolicy } from '../../src/dunning/policy.js';
+import { enqueue } from '../../src/jobs/queue.js';
 import { listTasks } from '../../src/collab/tasks.js';
 import { getHandler } from '../../src/jobs/handlers.js';
 import '../../src/jobs/register.js';
@@ -55,4 +57,22 @@ test('nextDay rolls month and year boundaries (UTC)', () => {
   expect(nextDay('2026-03-31')).toBe('2026-04-01');
   expect(nextDay('2026-12-31')).toBe('2027-01-01');
   expect(nextDay('2026-02-28')).toBe('2026-03-01'); // 2026 is not a leap year
+});
+
+test('a disabled policy stops chain perpetuation (no successor job)', async () => {
+  const t = ctx(await makeFirmAndClient());
+  await withTenant(t, (tx) => setDunningPolicy(tx, t, { enabled: false, lateFeeAnnualBps: 0, lateFeeFlatCents: '0' }));
+  await withTenant(t, (tx) => enqueue(tx, t, { type: 'dunning_run', runAt: new Date('2026-05-10T00:00:00Z'), payload: { asOf: '2026-05-10' }, dedupKey: 'dunning:2026-05-10' }));
+  await drainOnce({ now: new Date('2026-05-10T09:00:00Z'), leaseTimeoutMs: 5 * 60 * 1000, limit: 10 });
+  const pending = await withWorker((tx) => tx.query(`SELECT count(*)::int AS n FROM jobs WHERE status='pending'`));
+  expect(pending.rows[0].n).toBe(0); // no tomorrow job enqueued
+});
+
+test('an enabled policy perpetuates exactly one successor job', async () => {
+  const t = ctx(await makeFirmAndClient());
+  await withTenant(t, (tx) => setDunningPolicy(tx, t, { enabled: true, lateFeeAnnualBps: 0, lateFeeFlatCents: '0' }));
+  await withTenant(t, (tx) => enqueue(tx, t, { type: 'dunning_run', runAt: new Date('2026-05-10T00:00:00Z'), payload: { asOf: '2026-05-10' }, dedupKey: 'dunning:2026-05-10' }));
+  await drainOnce({ now: new Date('2026-05-10T09:00:00Z'), leaseTimeoutMs: 5 * 60 * 1000, limit: 10 });
+  const pending = await withWorker((tx) => tx.query(`SELECT dedup_key FROM jobs WHERE status='pending'`));
+  expect(pending.rows).toEqual([{ dedup_key: 'dunning:2026-05-11' }]);
 });
