@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantContext } from '@domain/auth/context.js';
 import { withTenant } from '@domain/db/pool.js';
 import { getDunningPolicy, setDunningPolicy, listStages, setStages, type Stage } from '@domain/dunning/policy.js';
+import { enqueueDunningRun } from '@domain/dunning/schedule.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
 
@@ -42,6 +43,10 @@ export async function PUT(req: NextRequest) {
     await withTenant(ctx, async (tx) => {
       await setDunningPolicy(tx, ctx, body.policy!);
       await setStages(tx, ctx, body.stages!);
+      if (body.policy!.enabled) {
+        const asOf = new Date().toISOString().slice(0, 10);
+        await enqueueDunningRun(tx, ctx, { asOf });
+      }
     });
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err) {
