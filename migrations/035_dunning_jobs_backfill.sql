@@ -1,7 +1,7 @@
 -- Seed one dunning_run job for every client that already has dunning enabled, so existing
 -- tenants start on the queue without manual action. Deduped on today's date; the handler
--- chains subsequent days. Runs as admin (RLS FORCE does not apply to a plain admin INSERT here
--- because admin is the table owner and this migration is trusted setup).
+-- chains subsequent days. Runs as the admin superuser (ADMIN_DATABASE_URL), which bypasses
+-- RLS; FORCE RLS still binds the app/worker roles at runtime.
 INSERT INTO jobs (client_company_id, firm_id, type, run_at, payload, dedup_key)
 SELECT c.id, c.firm_id, 'dunning_run', now(),
        jsonb_build_object('asOf', now()::date::text),
