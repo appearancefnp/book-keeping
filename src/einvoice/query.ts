@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
+import type { ReceivableStatus } from '../receivables/receivables.js';
 
 export interface EinvoiceRow {
   id: string;
@@ -14,6 +15,10 @@ export interface EinvoiceRow {
   vidDueDate: string | null;
   journalEntryId: string | null;
   createdAt: string;
+  status: ReceivableStatus | null;
+  dueDate: string | null;
+  amountPaidCents: string | null;
+  outstandingCents: string | null;
 }
 
 export async function listEinvoices(
@@ -34,7 +39,11 @@ export async function listEinvoices(
             grand_total_cents::text AS grand_total_cents,
             currency, peppol_status, peppol_message_id,
             vid_status, to_char(vid_due_date, 'YYYY-MM-DD') AS vid_due_date,
-            journal_entry_id, created_at::text AS created_at
+            journal_entry_id, created_at::text AS created_at,
+            status,
+            to_char(due_date, 'YYYY-MM-DD') AS due_date,
+            amount_paid_cents::text AS amount_paid_cents,
+            (grand_total_cents - amount_paid_cents)::text AS outstanding_cents
        FROM einvoices
       WHERE ${where}
       ORDER BY issue_date DESC, created_at DESC
@@ -54,6 +63,10 @@ export async function listEinvoices(
     vidDueDate: r.vid_due_date,
     journalEntryId: r.journal_entry_id,
     createdAt: r.created_at,
+    status: r.status,
+    dueDate: r.due_date,
+    amountPaidCents: r.amount_paid_cents,
+    outstandingCents: r.outstanding_cents,
   }));
 }
 
