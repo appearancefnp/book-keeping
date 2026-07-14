@@ -33,6 +33,16 @@ test('no-op when a live pending job already exists', async () => {
   expect(jobs.rows[0].n).toBe(1);
 });
 
+test('no-op when a live pending job exists from an earlier day (NOT EXISTS guard, not the unique index)', async () => {
+  const t = ctx(await makeFirmAndClient());
+  await enablePolicy(t);
+  await withTenant(t, (tx) => enqueue(tx, t, { type: 'dunning_run', runAt: new Date('2026-05-09T00:00:00Z'), payload: { asOf: '2026-05-09' }, dedupKey: 'dunning:2026-05-09' }));
+  const { seeded } = await withSupervisor((tx) => reapDunning(tx, { now: NOW }));
+  expect(seeded).toBe(0);
+  const jobs = await withWorker((tx) => tx.query(`SELECT count(*)::int AS n FROM jobs`));
+  expect(jobs.rows[0].n).toBe(1);
+});
+
 test('no-op when the policy is disabled', async () => {
   const t = ctx(await makeFirmAndClient());
   await withTenant(t, (tx) => setDunningPolicy(tx, t, { enabled: false, lateFeeAnnualBps: 0, lateFeeFlatCents: '0' }));
