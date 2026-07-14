@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { adminPool, appPool } from '../../src/db/pool.js';
+import { adminPool, appPool, workerPool } from '../../src/db/pool.js';
 import { runMigrations } from '../../src/db/migrate.js';
 import { createFirm, createClientCompany } from '../../src/tenancy/firms.js';
 import type { TenantContext } from '../../src/tenancy/context.js';
@@ -13,7 +13,7 @@ export async function resetDb(): Promise<void> {
 }
 
 export async function closeDb(): Promise<void> {
-  await Promise.all([adminPool.end(), appPool.end()]);
+  await Promise.all([adminPool.end(), appPool.end(), workerPool.end()]);
 }
 
 export async function makeFirmAndClient(clientName = 'SIA Test'): Promise<{ firmId: string; clientCompanyId: string }> {
