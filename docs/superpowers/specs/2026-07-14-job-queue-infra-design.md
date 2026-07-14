@@ -271,6 +271,25 @@ tested end-to-end — it's awkward to test deterministically. Instead `claimDue`
 | Deferred | Job retention/prune; C-recurring (`'recurring_generate'` type + templates + CRUD + UI) as a separate spec |
 | Branching | Off `m4b-dunning` (needs slice A + the dunning code to migrate); C-recurring stacks on C-infra |
 
+## Known follow-ups (from the final whole-branch review)
+
+- **⚠️ REQUIRED before C-recurring — chain recovery / supervisor.** The self-perpetuating design
+  means the *only* thing that enqueues day D+1 is a **successful** run of day D. If a handler fails
+  deterministically (code bug, data condition) the job exhausts its retries, goes terminal
+  `failed`, and the chain dies with no recovery — and re-enabling the policy will **not** restart it
+  (the `dunning:<D>` dedup key blocks re-seeding across all statuses, including `failed`). For
+  dunning today this is low-stakes (informational bookkeeper tasks only), but **C-recurring rides
+  the identical mechanism for money-out invoices**, where a silently-dead chain is unacceptable. A
+  reaper/supervisor (a periodic sweep that guarantees every enabled client has a `pending` job, or a
+  re-seed-on-drop with a status-aware dedup) MUST be built before C-recurring. Decision on this
+  branch: tracked as a follow-up, not built here, to keep C-infra tightly scoped.
+- **Perpetuation while disabled + retention.** The handler enqueues the next day's job even when the
+  policy is disabled (`runDunning` no-ops but the chain continues), so `jobs` grows ~one retained
+  row per enabled client per day with no prune. Consider stopping perpetuation when disabled, and a
+  retention/prune policy for terminal jobs. Deferred.
+- **Minor:** `setStages`/policy validation throws a raw `SyntaxError` (still HTTP 400 via
+  `errorToStatus`, just a less-clean message) if `lateFeeFlatCents` is non-numeric garbage.
+
 ## House conventions (unchanged)
 
 `migration + domain (src/<module>/) + tests + API route + page`; RLS via `withTenant`, never
