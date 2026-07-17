@@ -175,7 +175,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
   - `advanceRunDate(isoDate: string, intervalMonths: number, anchorDay: number): string` — next occurrence (UTC), day taken from `anchorDay`.
   - `periodKey(isoDate: string): string` — `YYYY-MM`.
   - `buildRecurringInvoiceNumber(prefix: string | null, isoDate: string, templateId: string): string`.
-  - `enqueueRecurringGenerate(tx: PoolClient, ctx: TenantContext, args: { templateId: string; period: string; runAt: Date }): Promise<{ jobId: string } | { deduped: true }>` — dedup key `recurring:<templateId>:<period>`.
+  - `enqueueRecurringGenerate(tx: PoolClient, ctx: TenantContext, args: { templateId: string; period: string; runAt: Date; asOf?: string }): Promise<{ jobId: string } | { deduped: true }>` — dedup key `recurring:<templateId>:<period>`. Optional `asOf` (YYYY-MM-DD) is threaded into the payload so the handler can run deterministically in tests; omitted in production (the handler defaults to the real current date).
 - Consumes: `enqueue` from `src/jobs/queue.js`; `TenantContext` from `src/tenancy/context.js`.
 
 - [ ] **Step 1: Write the failing test**
@@ -247,14 +247,19 @@ export function buildRecurringInvoiceNumber(prefix: string | null, isoDate: stri
   return `${prefix ?? 'INV'}-${periodKey(isoDate)}-${templateId.slice(0, 8)}`;
 }
 
-/** Enqueue a recurring_generate for a template's period, deduped on recurring:<templateId>:<period>. */
+/**
+ * Enqueue a recurring_generate for a template's period, deduped on recurring:<templateId>:<period>.
+ * Optional asOf (YYYY-MM-DD) is threaded into the payload for deterministic tests; in production it
+ * is omitted and the handler bills against the real current date.
+ */
 export async function enqueueRecurringGenerate(
-  tx: PoolClient, ctx: TenantContext, args: { templateId: string; period: string; runAt: Date },
+  tx: PoolClient, ctx: TenantContext,
+  args: { templateId: string; period: string; runAt: Date; asOf?: string },
 ): Promise<{ jobId: string } | { deduped: true }> {
   return enqueue(tx, ctx, {
     type: 'recurring_generate',
     runAt: args.runAt,
-    payload: { templateId: args.templateId, period: args.period },
+    payload: { templateId: args.templateId, period: args.period, ...(args.asOf ? { asOf: args.asOf } : {}) },
     dedupKey: `recurring:${args.templateId}:${args.period}`,
   });
 }
@@ -922,8 +927,11 @@ const recurringAccounts = {
 
 registerHandler('recurring_generate', async (tx, ctx, payload) => {
   const templateId = payload.templateId as string;
+  // asOf lets tests run deterministically; production omits it and bills against the real date.
+  const asOf = payload.asOf as string | undefined;
+  const now = asOf ? new Date(asOf + 'T00:00:00Z') : new Date();
   const { active } = await generateDueRecurring(tx, ctx, {
-    templateId, now: new Date(), ap: recurringAccessPoint, accounts: recurringAccounts,
+    templateId, now, ap: recurringAccessPoint, accounts: recurringAccounts,
   });
   // Self-perpetuate only while active (else jobs would grow one row/template/period).
   if (active) {
@@ -994,7 +1002,7 @@ async function setup() {
 test('draining a recurring_generate job creates an open receivable that ages, and perpetuates one successor', async () => {
   const { t, templateId } = await setup();
   await withTenant(t, (tx) => enqueueRecurringGenerate(tx, t, {
-    templateId, period: '2026-05', runAt: utcMidnight('2026-05-10'),
+    templateId, period: '2026-05', runAt: utcMidnight('2026-05-10'), asOf: '2026-05-10',
   }));
 
   const { ran, failed } = await drainOnce({ now: new Date('2026-05-10T09:00:00Z'), leaseTimeoutMs: 5 * 60 * 1000, limit: 10 });
@@ -1014,7 +1022,7 @@ test('an inactive template stops chain perpetuation (no successor)', async () =>
   const { t, templateId } = await setup();
   await withTenant(t, (tx) => tx.query(`UPDATE recurring_invoice_templates SET active=false WHERE id=$1`, [templateId]));
   await withTenant(t, (tx) => enqueueRecurringGenerate(tx, t, {
-    templateId, period: '2026-05', runAt: utcMidnight('2026-05-10'),
+    templateId, period: '2026-05', runAt: utcMidnight('2026-05-10'), asOf: '2026-05-10',
   }));
   await drainOnce({ now: new Date('2026-05-10T09:00:00Z'), leaseTimeoutMs: 5 * 60 * 1000, limit: 10 });
   const pending = await withWorker((tx) => tx.query(`SELECT count(*)::int AS n FROM jobs WHERE status='pending'`));
