@@ -24,6 +24,16 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > M2 (accounts payable) — **done, shipped 2026-07-10** — `src/payables/` (bills, settlement,
 > pay-run, aging), camt.053 debit matching (clear transit / settle direct), `/bills` + pay-run UI,
 > aged-payables tab on `/reports` — the full money-out loop. M5 now has its AP half.
+> M7 (credit notes) — **done, shipped 2026-07-17** — both sides: AR `sendCreditNote`
+> (reverses receivable + output VAT, UBL `CreditNote`, `doc_type` on `einvoices`,
+> `/api/credit-notes` + composer "Credit note" mode + outbox column) and AP vendor credit
+> notes (`src/payables/credit-notes.ts` + `vendor_credit_notes` tables, reverses payables +
+> input VAT via the approval queue, inbound Peppol `CreditNote` routing, `/api/vendor-credit-notes`
+> + entry UI). `apAging` nets applied credit notes; **`computeVat` was fixed to net both
+> directions per VAT account** so credit notes reduce the return (the M7 spec's "no change
+> needed" assumption was wrong — no settlement postings hit the VAT accounts, so single-sided
+> historical data is unaffected). This lifts the M2 negative-bill rejection cleanly (bills stay
+> non-negative; credit notes are their own path) — no longer an open follow-up. Full suite 351/351.
 > Next unblocked in the market-gaps sequence: M3 (live bank feeds), M4 (AR lifecycle); M14
 > (report depth/export) now rides cheaply on `src/reports/`.
 >
