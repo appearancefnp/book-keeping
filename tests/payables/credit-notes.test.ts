@@ -102,3 +102,11 @@ test('approving the proposal posts the reversal and flips the credit note to app
   const entry = await withTenant(ctx(t), (tx) => getEntry(tx, ctx(t), detail.journalEntryId!));
   expect(entry.lines).toHaveLength(3);
 });
+
+test('createVendorCreditNote rejects negative line amounts', async () => {
+  const { t, vendorId } = await seedVendor();
+  await expect(withTenant(ctx(t), (tx) => createVendorCreditNote(tx, ctx(t), {
+    ...sampleCn(vendorId),
+    lines: [{ description: 'x', expenseAccount: '7710', net: '-100.00', vatRate: 21, vat: '0.00' }],
+  }, CN_ACCTS))).rejects.toThrow();
+});

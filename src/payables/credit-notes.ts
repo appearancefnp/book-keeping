@@ -2,7 +2,6 @@ import { z } from 'zod';
 import type { PoolClient } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
 import { createProposal, type Rationale } from '../proposals/proposals.js';
-import { rejectProposal } from '../proposals/lifecycle.js';
 import type { NewJournalEntry } from '../ledger/posting.js';
 import { toCents, fromCents, sumCents } from '../db/money.js';
 import { appendAudit } from '../audit/audit.js';
