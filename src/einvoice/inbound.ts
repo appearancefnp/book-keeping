@@ -1,9 +1,10 @@
 import type { PoolClient } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
 import type { AccessPoint } from './access-point.js';
-import { parseUblInvoice } from './ubl.js';
+import { parseUblInvoice, parseUblCreditNote, detectUblRoot } from './ubl.js';
 import type { PostingTemplate } from '../intake/map-posting.js';
 import { createBill, type BillAccounts } from '../payables/bills.js';
+import { createVendorCreditNote } from '../payables/credit-notes.js';
 import { listParties, createParty } from '../parties/parties.js';
 import { toCents, fromCents, sumCents } from '../db/money.js';
 
@@ -33,12 +34,58 @@ function reconciledLineVatCents(lines: { net: string; vatRate: number }[], vatTo
 export async function receiveInboundInvoices(
   tx: PoolClient, ctx: TenantContext,
   args: { ap: AccessPoint; template: PostingTemplate; accounts: BillAccounts; dueDays?: number },
-): Promise<{ billIds: string[]; proposalIds: string[] }> {
+): Promise<{ billIds: string[]; proposalIds: string[]; creditNoteIds: string[] }> {
   const batch = await args.ap.receive();
   const billIds: string[] = [];
   const proposalIds: string[] = [];
+  const creditNoteIds: string[] = [];
 
   for (const msg of batch) {
+    const root = detectUblRoot(msg.ublXml);
+
+    if (root === 'CreditNote') {
+      const cn = parseUblCreditNote(msg.ublXml);
+
+      // Same reconciliation guards as the invoice path (see below), applied to the
+      // vendor's declared credit note totals.
+      const netTotalCents = toCents(cn.netTotal);
+      const vatTotalCents = toCents(cn.vatTotal);
+      const grandTotalCents = toCents(cn.grandTotal);
+      if (netTotalCents + vatTotalCents !== grandTotalCents) {
+        throw new Error(
+          `Inbound credit note ${cn.invoiceNumber}: declared totals do not reconcile (net ${cn.netTotal} + VAT ${cn.vatTotal} ≠ grand ${cn.grandTotal}); manual review required`,
+        );
+      }
+      const lineNetCents = sumCents(cn.lines.map((l) => l.net));
+      if (lineNetCents !== netTotalCents) {
+        throw new Error(
+          `Inbound credit note ${cn.invoiceNumber}: line net total (${fromCents(lineNetCents)}) does not reconcile with the declared net total (${cn.netTotal}); manual review required`,
+        );
+      }
+
+      const rec = await tx.query(
+        `INSERT INTO einvoices(client_company_id, direction, doc_type, invoice_number, corrected_invoice_number, issue_date, grand_total_cents, currency, ubl_xml, peppol_status, vid_status)
+         VALUES ($1,'inbound','credit_note',$2,$3,$4,$5,$6,$7,'received','not_required') RETURNING id`,
+        [ctx.clientCompanyId, cn.invoiceNumber, cn.correctedInvoiceNumber ?? null, cn.issueDate, grandTotalCents.toString(), cn.currency, msg.ublXml],
+      );
+      const einvoiceId = rec.rows[0].id as string;
+
+      const vendorPartyId = await resolveOrCreateVendor(tx, ctx, cn.supplier);
+      const lineVat = reconciledLineVatCents(cn.lines, cn.vatTotal);
+      const { creditNoteId, proposalId } = await createVendorCreditNote(tx, ctx, {
+        vendorPartyId, creditNoteNumber: cn.invoiceNumber, issueDate: cn.issueDate, currency: cn.currency,
+        correctedBillNumber: cn.correctedInvoiceNumber ?? null,
+        lines: cn.lines.map((l, i) => ({
+          description: l.description, expenseAccount: args.template.expenseAccount,
+          net: l.net, vatRate: l.vatRate, vat: fromCents(lineVat[i]!),
+        })),
+        source: 'peppol', einvoiceId,
+      }, args.accounts);
+      creditNoteIds.push(creditNoteId);
+      proposalIds.push(proposalId);
+      continue;
+    }
+
     const ubl = parseUblInvoice(msg.ublXml);
 
     // The vendor's own declared totals must add up before we book anything: net + VAT
@@ -88,7 +135,7 @@ export async function receiveInboundInvoices(
     billIds.push(billId);
     proposalIds.push(proposalId);
   }
-  return { billIds, proposalIds };
+  return { billIds, proposalIds, creditNoteIds };
 }
 
 /** Find a vendor (or dual-role) party by reg-no, falling back to exact name match; create one if absent. */
