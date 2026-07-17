@@ -8,6 +8,7 @@ import { approveProposal } from '../../src/proposals/lifecycle.js';
 import { postApprovedPosting } from '../../src/proposals/post-proposal.js';
 import { createBill } from '../../src/payables/bills.js';
 import { apAging } from '../../src/payables/aging.js';
+import { createVendorCreditNote } from '../../src/payables/credit-notes.js';
 
 const ACCTS = { vatInputAccount: '5721', payablesAccount: '5310' };
 
@@ -42,4 +43,35 @@ test('apAging buckets outstanding by due date vs asOf', async () => {
   expect(aging.d1_30).toBe('50.00');
   expect(aging.d61_90).toBe('20.00');
   expect(aging.total).toBe('170.00');
+});
+
+test('apAging nets applied vendor credit notes into the bucket matching their own age', async () => {
+  const t = await makeFirmAndClient();
+  await withTenant(ctx(t), async (tx) => {
+    for (const [code, type] of [['7710','expense'],['5721','asset'],['5722','asset'],['5310','liability']] as const) await createAccount(tx, ctx(t), { code, name: code, type });
+    for (const m of [1,2,3,4,5,6,7]) await openPeriod(tx, ctx(t), { year: 2026, month: m });
+  });
+  await billDue(t, '2026-07-01', '100.00', 'A'); // asOf 2026-06-15 → not due → current, 100
+
+  // Credit notes age by issue date exactly as bills age by due date (asOf - date).
+  // A current-dated credit (issue == asOf → 0 days) nets `current`; an older credit
+  // (45 days before asOf) nets `d31_60` — proving age-based bucketing, not a blanket
+  // "credits always reduce current".
+  const addCredit = async (num: string, issueDate: string, net: string) =>
+    withTenant(ctx(t), async (tx) => {
+      const v = await createParty(tx, ctx(t), { kind: 'vendor', name: `CN-Vendor-${num}` });
+      const { proposalId } = await createVendorCreditNote(tx, ctx(t), {
+        vendorPartyId: v.id, creditNoteNumber: num, issueDate, currency: 'EUR',
+        lines: [{ description: 'return', expenseAccount: '7710', net, vatRate: 0, vat: '0.00' }],
+      }, { vatInputAccount: '5722', payablesAccount: '5310' });
+      await approveProposal(tx, ctx(t), proposalId);
+      await postApprovedPosting(tx, ctx(t), proposalId);
+    });
+  await addCredit('VCN-CUR', '2026-06-15', '40.00'); // 0 days → current
+  await addCredit('VCN-OLD', '2026-05-01', '20.00'); // 45 days → d31_60
+
+  const aging = await withTenant(ctx(t), (tx) => apAging(tx, ctx(t), { asOf: '2026-06-15' }));
+  expect(aging.current).toBe('60.00');  // 100 bill − 40 current credit
+  expect(aging.d31_60).toBe('-20.00');  // older credit nets its own bucket (net credit → negative)
+  expect(aging.total).toBe('40.00');    // 100 − 40 − 20
 });

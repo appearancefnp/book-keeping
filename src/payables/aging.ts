@@ -28,6 +28,23 @@ export async function apAging(
     else if (days <= 90) d61_90 += amt;
     else d90plus += amt;
   }
+  // Applied vendor credit notes net down the payable, aged by their own issue
+  // date the same way bills age by due date (asOf - date; positive = older).
+  const creditRes = await tx.query(
+    `SELECT ($2::date - issue_date) AS days, grand_total_cents AS amount
+     FROM vendor_credit_notes
+     WHERE client_company_id = $1 AND status = 'applied' AND grand_total_cents > 0`,
+    [ctx.clientCompanyId, opts.asOf],
+  );
+  for (const r of creditRes.rows) {
+    const days = Number(r.days);
+    const amt = BigInt(r.amount);
+    if (days <= 0) current -= amt;
+    else if (days <= 30) d1_30 -= amt;
+    else if (days <= 60) d31_60 -= amt;
+    else if (days <= 90) d61_90 -= amt;
+    else d90plus -= amt;
+  }
   const total = current + d1_30 + d31_60 + d61_90 + d90plus;
   return {
     asOf: opts.asOf,
