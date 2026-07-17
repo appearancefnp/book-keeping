@@ -20,14 +20,16 @@ export async function sendInvoice(
   // 2. Render UBL.
   const ubl = buildUblInvoice(inv);
 
-  // 3. Post the receivable: DR receivable (gross) / CR sales (net) / CR VAT (vat).
+  // 3. Post the receivable: DR receivable (gross) / CR sales (net) / CR VAT (vat, if > 0).
+  const invVat = toCents(inv.vatTotal);
+  const invLines = [
+    { accountCode: args.receivableAccount, debit: inv.grandTotal, credit: '0', description: 'Receivable' },
+    { accountCode: args.salesAccount, debit: '0', credit: inv.netTotal, description: 'Sales' },
+  ];
+  if (invVat > 0n) invLines.push({ accountCode: args.vatAccount, debit: '0', credit: inv.vatTotal, description: 'Output VAT' });
   const { entryId } = await postEntry(tx, ctx, {
     date: inv.issueDate, memo: `Sales invoice ${inv.invoiceNumber}`, currency: inv.currency,
-    lines: [
-      { accountCode: args.receivableAccount, debit: inv.grandTotal, credit: '0', description: 'Receivable' },
-      { accountCode: args.salesAccount, debit: '0', credit: inv.netTotal, description: 'Sales' },
-      { accountCode: args.vatAccount, debit: '0', credit: inv.vatTotal, description: 'Output VAT' },
-    ],
+    lines: invLines,
   });
 
   // 4. Dispatch via the Access Point.
@@ -60,14 +62,16 @@ export async function sendCreditNote(
   // 2. Render UBL.
   const ubl = buildUblCreditNote(cn);
 
-  // 3. Reverse the sale: DR sales (net) / DR output VAT (vat) / CR receivable (grand).
+  // 3. Reverse the sale: DR sales (net) / DR output VAT (vat, if > 0) / CR receivable (grand).
+  const cnVat = toCents(cn.vatTotal);
+  const cnLines = [
+    { accountCode: args.salesAccount, debit: cn.netTotal, credit: '0', description: 'Sales reversal' },
+  ];
+  if (cnVat > 0n) cnLines.push({ accountCode: args.vatAccount, debit: cn.vatTotal, credit: '0', description: 'Output VAT reversal' });
+  cnLines.push({ accountCode: args.receivableAccount, debit: '0', credit: cn.grandTotal, description: 'Receivable reduction' });
   const { entryId } = await postEntry(tx, ctx, {
     date: cn.issueDate, memo: `Credit note ${cn.invoiceNumber}`, currency: cn.currency,
-    lines: [
-      { accountCode: args.salesAccount, debit: cn.netTotal, credit: '0', description: 'Sales reversal' },
-      { accountCode: args.vatAccount, debit: cn.vatTotal, credit: '0', description: 'Output VAT reversal' },
-      { accountCode: args.receivableAccount, debit: '0', credit: cn.grandTotal, description: 'Receivable reduction' },
-    ],
+    lines: cnLines,
   });
 
   // 4. Dispatch via the Access Point.

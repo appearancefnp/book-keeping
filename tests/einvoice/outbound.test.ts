@@ -42,6 +42,29 @@ test('sends an invoice: dispatches via AP, posts a receivable, records the einvo
   expect(ap.sent).toHaveLength(1);
 });
 
+test('sends a zero-VAT invoice: posts a 2-line entry with no VAT line', async () => {
+  const t = await makeFirmAndClient();
+  const ap = new StubAccessPoint();
+  const zeroVatInv: EInvoice = {
+    ...inv, invoiceNumber: 'INV-2026-002',
+    lines: [{ description: 'Prece (intra-EU)', net: '100.00', vatRate: 0, vat: '0.00' }],
+    netTotal: '100.00', vatTotal: '0.00', grandTotal: '100.00',
+  };
+  const { entryId } = await withTenant(ctx(t), async (tx) => {
+    await createAccount(tx, ctx(t), { code: '2310', name: 'Debtors', type: 'asset' });
+    await createAccount(tx, ctx(t), { code: '6110', name: 'Sales', type: 'income' });
+    await createAccount(tx, ctx(t), { code: '5721', name: 'Output VAT', type: 'liability' });
+    await openPeriod(tx, ctx(t), { year: 2026, month: 3 });
+    return sendInvoice(tx, ctx(t), { invoice: zeroVatInv, recipientPeppolId: '0088:123', ap, receivableAccount: '2310', salesAccount: '6110', vatAccount: '5721' });
+  });
+  const entry = await withTenant(ctx(t), (tx) => getEntry(tx, ctx(t), entryId));
+  expect(entry.lines).toHaveLength(2);
+  const debits = entry.lines.reduce((s, l) => s + Number(l.debit), 0);
+  const credits = entry.lines.reduce((s, l) => s + Number(l.credit), 0);
+  expect(debits).toBe(credits);
+  expect(debits).toBe(100);
+});
+
 test('refuses to send an invalid invoice (fails EN16931 before dispatch)', async () => {
   const t = await makeFirmAndClient();
   const ap = new StubAccessPoint();

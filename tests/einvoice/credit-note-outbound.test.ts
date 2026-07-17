@@ -75,6 +75,38 @@ test('sendCreditNote without a correctedInvoiceNumber records a null reference',
   expect(row.correctedInvoiceNumber).toBeNull();
 });
 
+test('sendCreditNote with zero VAT posts a 2-line entry with no VAT line', async () => {
+  const t = await makeFirmAndClient();
+  const ap = new StubAccessPoint();
+  const zeroVatCn: ECreditNote = {
+    ...cn, invoiceNumber: 'CN-2026-002',
+    lines: [{ description: 'Atgriešana (intra-EU)', net: '100.00', vatRate: 0, vat: '0.00' }],
+    netTotal: '100.00', vatTotal: '0.00', grandTotal: '100.00',
+  };
+  const { entryId, salesId, vatId, receivableId } = await withTenant(ctx(t), async (tx) => {
+    const receivable = await createAccount(tx, ctx(t), { code: '2310', name: 'Debtors', type: 'asset' });
+    const sales = await createAccount(tx, ctx(t), { code: '6110', name: 'Sales', type: 'income' });
+    const vat = await createAccount(tx, ctx(t), { code: '5721', name: 'Output VAT', type: 'liability' });
+    await openPeriod(tx, ctx(t), { year: 2026, month: 3 });
+    const result = await sendCreditNote(tx, ctx(t), { creditNote: zeroVatCn, recipientPeppolId: '0088:123', ap, receivableAccount: '2310', salesAccount: '6110', vatAccount: '5721' });
+    return { ...result, receivableId: receivable.id, salesId: sales.id, vatId: vat.id };
+  });
+
+  const entry = await withTenant(ctx(t), (tx) => getEntry(tx, ctx(t), entryId));
+  expect(entry.lines).toHaveLength(2);
+  const debits = entry.lines.reduce((s, l) => s + Number(l.debit), 0);
+  const credits = entry.lines.reduce((s, l) => s + Number(l.credit), 0);
+  expect(debits).toBe(credits);
+  expect(debits).toBe(100);
+
+  // No line should hit the VAT account.
+  expect(entry.lines.some((l) => l.accountId === vatId)).toBe(false);
+  const salesLine = entry.lines.find((l) => l.accountId === salesId)!;
+  expect(salesLine.debit).toBe('100.00');
+  const receivableLine = entry.lines.find((l) => l.accountId === receivableId)!;
+  expect(receivableLine.credit).toBe('100.00');
+});
+
 test('sendCreditNote refuses an unbalanced credit note before dispatch', async () => {
   const t = await makeFirmAndClient();
   const ap = new StubAccessPoint();
