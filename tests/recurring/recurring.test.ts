@@ -56,3 +56,27 @@ test('updateTemplate changes future-run fields', async () => {
   expect(row.intervalMonths).toBe(3);
   expect(row.endDate).toBe('2027-06-01');
 });
+
+test('createTemplate rejects a payload whose totals do not reconcile', async () => {
+  const t = ctx(await makeFirmAndClient());
+  await expect(withTenant(t, async (tx) => {
+    const { id: customerPartyId } = await createParty(tx, t, { kind: 'customer', name: 'C' });
+    return createTemplate(tx, t, {
+      customerPartyId, recipientPeppolId: '0088:test',
+      invoicePayload: { ...PAYLOAD, grandTotal: '999.00' },
+      anchorDay: 1, intervalMonths: 1, firstRunDate: '2026-06-01',
+    });
+  })).rejects.toThrow(/BR-CO-15|payload/i);
+});
+
+test('createTemplate rejects a payload with no invoice lines', async () => {
+  const t = ctx(await makeFirmAndClient());
+  await expect(withTenant(t, async (tx) => {
+    const { id: customerPartyId } = await createParty(tx, t, { kind: 'customer', name: 'C' });
+    return createTemplate(tx, t, {
+      customerPartyId, recipientPeppolId: '0088:test',
+      invoicePayload: { ...PAYLOAD, lines: [] },
+      anchorDay: 1, intervalMonths: 1, firstRunDate: '2026-06-01',
+    });
+  })).rejects.toThrow(/BR-16|BR-CO-10|payload/i);
+});

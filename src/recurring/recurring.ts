@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
 import type { EInvoice } from '../einvoice/ubl.js';
 import { appendAudit } from '../audit/audit.js';
+import { validateEn16931 } from '../einvoice/validate.js';
 
 export type RecurringInvoicePayload = Omit<EInvoice, 'invoiceNumber' | 'issueDate' | 'dueDate'>;
 
@@ -22,10 +23,34 @@ export interface RecurringTemplateRow {
 }
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
+
+const invoicePartySchema = z.object({ name: z.string().min(1), regNo: z.string(), vatNo: z.string() });
+const invoiceLineSchema = z.object({ description: z.string(), net: z.string(), vatRate: z.number(), vat: z.string() });
+const invoicePayloadSchema = z.object({
+  currency: z.string(),
+  supplier: invoicePartySchema,
+  customer: invoicePartySchema,
+  lines: z.array(invoiceLineSchema),
+  netTotal: z.string(), vatTotal: z.string(), grandTotal: z.string(),
+  note: z.string().optional(),
+  paymentTerms: z.string().optional(),
+}).passthrough();
+
+/**
+ * Runs the EN16931 business-rule check against a payload that lacks invoiceNumber/issueDate
+ * (those are only known at bill time). Placeholders satisfy the validator's presence checks
+ * so the remaining structural/arithmetic rules (currency, VAT, line totals) are still enforced.
+ */
+function assertPayloadValid(payload: RecurringInvoicePayload): void {
+  const probe = { ...payload, invoiceNumber: '__probe__', issueDate: '__probe__' } as unknown as EInvoice;
+  const v = validateEn16931(probe);
+  if (!v.valid) throw new Error(`Invalid recurring invoice template payload: ${v.issues.join('; ')}`);
+}
+
 const createSchema = z.object({
   customerPartyId: z.string().uuid(),
   recipientPeppolId: z.string().min(1),
-  invoicePayload: z.record(z.unknown()),
+  invoicePayload: invoicePayloadSchema,
   anchorDay: z.number().int().min(1).max(31),
   intervalMonths: z.number().int().min(1),
   firstRunDate: isoDate,
@@ -44,6 +69,7 @@ export async function createTemplate(
   tx: PoolClient, ctx: TenantContext, input: z.input<typeof createSchema>,
 ): Promise<{ id: string }> {
   const p = createSchema.parse(input);
+  assertPayloadValid(p.invoicePayload);
   const res = await tx.query(
     `INSERT INTO recurring_invoice_templates
        (client_company_id, customer_party_id, recipient_peppol_id, invoice_payload,
@@ -80,7 +106,7 @@ export async function listTemplates(
 }
 
 const patchSchema = z.object({
-  invoicePayload: z.record(z.unknown()).optional(),
+  invoicePayload: invoicePayloadSchema.optional(),
   recipientPeppolId: z.string().min(1).optional(),
   anchorDay: z.number().int().min(1).max(31).optional(),
   intervalMonths: z.number().int().min(1).optional(),
@@ -105,6 +131,7 @@ export async function updateTemplate(
     endDate: p.endDate !== undefined ? p.endDate : before.endDate,
     occurrencesRemaining: p.occurrencesRemaining !== undefined ? p.occurrencesRemaining : before.occurrencesRemaining,
   };
+  assertPayloadValid(merged.invoicePayload);
   await tx.query(
     `UPDATE recurring_invoice_templates SET invoice_payload = $1::jsonb, recipient_peppol_id = $2,
        anchor_day = $3, interval_months = $4, next_run_date = $5, payment_terms_days = $6,
