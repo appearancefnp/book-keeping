@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
 import type { AccessPoint } from './access-point.js';
-import { buildUblInvoice, type EInvoice } from './ubl.js';
+import { buildUblInvoice, buildUblCreditNote, type EInvoice, type ECreditNote } from './ubl.js';
 import { validateEn16931 } from './validate.js';
 import { postEntry } from '../ledger/posting.js';
 import { toCents } from '../db/money.js';
@@ -44,5 +44,45 @@ export async function sendInvoice(
   );
   const einvoiceId = res.rows[0].id as string;
   await appendAudit(tx, ctx, { action: 'send', entityType: 'einvoice', entityId: einvoiceId, before: null, after: { invoiceNumber: inv.invoiceNumber, messageId, entryId } });
+  return { einvoiceId, entryId, messageId };
+}
+
+export async function sendCreditNote(
+  tx: PoolClient, ctx: TenantContext,
+  args: { creditNote: ECreditNote; recipientPeppolId: string; ap: AccessPoint; receivableAccount: string; salesAccount: string; vatAccount: string },
+): Promise<{ einvoiceId: string; entryId: string; messageId: string }> {
+  const cn = args.creditNote;
+
+  // 1. Validate against EN 16931 BEFORE anything else.
+  const v = validateEn16931(cn);
+  if (!v.valid) throw new Error(`EN16931 validation failed: ${v.issues.join('; ')}`);
+
+  // 2. Render UBL.
+  const ubl = buildUblCreditNote(cn);
+
+  // 3. Reverse the sale: DR sales (net) / DR output VAT (vat) / CR receivable (grand).
+  const { entryId } = await postEntry(tx, ctx, {
+    date: cn.issueDate, memo: `Credit note ${cn.invoiceNumber}`, currency: cn.currency,
+    lines: [
+      { accountCode: args.salesAccount, debit: cn.netTotal, credit: '0', description: 'Sales reversal' },
+      { accountCode: args.vatAccount, debit: cn.vatTotal, credit: '0', description: 'Output VAT reversal' },
+      { accountCode: args.receivableAccount, debit: '0', credit: cn.grandTotal, description: 'Receivable reduction' },
+    ],
+  });
+
+  // 4. Dispatch via the Access Point.
+  // NOTE: ap.send is a network side effect outside the DB transaction; if send succeeds but
+  // the subsequent einvoice INSERT fails, the credit note is dispatched-but-unrecorded. This is
+  // an accepted MVP limitation; a future outbox/idempotency-key pattern should close the window.
+  const { messageId } = await args.ap.send(ubl, args.recipientPeppolId);
+
+  // 5. Record the einvoice (vid_status pending — VID submission handled in Task 6).
+  const res = await tx.query(
+    `INSERT INTO einvoices(client_company_id, direction, doc_type, invoice_number, corrected_invoice_number, issue_date, grand_total_cents, currency, ubl_xml, vid_status, peppol_status, peppol_message_id, journal_entry_id)
+     VALUES ($1,'outbound','credit_note',$2,$3,$4,$5,$6,$7,'pending','sent',$8,$9) RETURNING id`,
+    [ctx.clientCompanyId, cn.invoiceNumber, cn.correctedInvoiceNumber ?? null, cn.issueDate, toCents(cn.grandTotal).toString(), cn.currency, ubl, messageId, entryId],
+  );
+  const einvoiceId = res.rows[0].id as string;
+  await appendAudit(tx, ctx, { action: 'send', entityType: 'einvoice', entityId: einvoiceId, before: null, after: { docType: 'credit_note', invoiceNumber: cn.invoiceNumber, messageId, entryId } });
   return { einvoiceId, entryId, messageId };
 }

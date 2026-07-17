@@ -14,6 +14,8 @@ export interface EinvoiceRow {
   vidDueDate: string | null;
   journalEntryId: string | null;
   createdAt: string;
+  docType: 'invoice' | 'credit_note';
+  correctedInvoiceNumber: string | null;
 }
 
 export async function listEinvoices(
@@ -34,7 +36,8 @@ export async function listEinvoices(
             grand_total_cents::text AS grand_total_cents,
             currency, peppol_status, peppol_message_id,
             vid_status, to_char(vid_due_date, 'YYYY-MM-DD') AS vid_due_date,
-            journal_entry_id, created_at::text AS created_at
+            journal_entry_id, created_at::text AS created_at,
+            doc_type, corrected_invoice_number
        FROM einvoices
       WHERE ${where}
       ORDER BY issue_date DESC, created_at DESC
@@ -54,6 +57,8 @@ export async function listEinvoices(
     vidDueDate: r.vid_due_date,
     journalEntryId: r.journal_entry_id,
     createdAt: r.created_at,
+    docType: r.doc_type,
+    correctedInvoiceNumber: r.corrected_invoice_number,
   }));
 }
 
