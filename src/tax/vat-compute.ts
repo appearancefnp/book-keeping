@@ -32,10 +32,12 @@ export async function computeVat(
   const contributions: VatContribution[] = [];
   for (const row of res.rows) {
     if (row.accountCode === args.config.outputVatAccount) {
-      const cents = BigInt(row.credit_cents);
+      // Invoices credit this account; AR credit notes reverse it with a debit — net both directions.
+      const cents = BigInt(row.credit_cents) - BigInt(row.debit_cents);
       if (cents !== 0n) { output += cents; contributions.push({ accountCode: row.accountCode, side: 'output', entryId: row.entryId, amountCents: cents.toString() }); }
     } else {
-      const cents = BigInt(row.debit_cents);
+      // Bills debit this account; AP credit notes reverse it with a credit — net both directions.
+      const cents = BigInt(row.debit_cents) - BigInt(row.credit_cents);
       if (cents !== 0n) { input += cents; contributions.push({ accountCode: row.accountCode, side: 'input', entryId: row.entryId, amountCents: cents.toString() }); }
     }
   }

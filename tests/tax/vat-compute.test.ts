@@ -53,3 +53,26 @@ test('excludes entries outside the period', async () => {
   expect(v.inputVatCents).toBe('0');
   expect(v.netPayableCents).toBe('0');
 });
+
+test('nets credit-note reversals against invoices/bills on the same VAT account', async () => {
+  const t = await makeFirmAndClient();
+  await seed(t);
+  await withTenant(ctx(t), async (tx) => {
+    // AR credit-note-style reversal: DR output VAT 4.20 (reverses part of the 21.00 output VAT credit).
+    await postEntry(tx, ctx(t), { date: '2026-03-10', memo: 'AR credit note reversal', currency: 'EUR', lines: [
+      { accountCode: '6110', debit: '20.00', credit: '0' },
+      { accountCode: '5721', debit: '4.20', credit: '0' },
+      { accountCode: '2310', debit: '0', credit: '24.20' },
+    ]});
+    // AP credit-note-style reversal: CR input VAT 4.20 (reverses part of the 10.50 input VAT debit).
+    await postEntry(tx, ctx(t), { date: '2026-03-11', memo: 'AP credit note reversal', currency: 'EUR', lines: [
+      { accountCode: '2310', debit: '24.20', credit: '0' },
+      { accountCode: '7710', debit: '0', credit: '20.00' },
+      { accountCode: '5722', debit: '0', credit: '4.20' },
+    ]});
+  });
+  const v = await withTenant(ctx(t), (tx) => computeVat(tx, ctx(t), { fromDate: '2026-03-01', toDate: '2026-03-31', config }));
+  expect(v.outputVatCents).toBe('1680'); // 2100 - 420
+  expect(v.inputVatCents).toBe('630'); // 1050 - 420
+  expect(v.netPayableCents).toBe('1050'); // 1680 - 630
+});
