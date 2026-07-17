@@ -38,6 +38,13 @@ export async function postApprovedPosting(
     [entryId, proposalId, ctx.clientCompanyId],
   );
 
+  // Link + apply a vendor credit note, if this posting proposal originated from one.
+  await tx.query(
+    `UPDATE vendor_credit_notes SET journal_entry_id = $1, status = 'applied'
+     WHERE posting_proposal_id = $2 AND client_company_id = $3 AND status = 'awaiting_approval'`,
+    [entryId, proposalId, ctx.clientCompanyId],
+  );
+
   await appendAudit(tx, ctx, {
     action: 'posted', entityType: 'proposal', entityId: proposalId,
     before: { status: 'approved' }, after: { status: 'posted', entryId },
