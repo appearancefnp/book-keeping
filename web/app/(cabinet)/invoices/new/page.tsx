@@ -41,6 +41,8 @@ function ComposerInner() {
   const [defaultRate, setDefaultRate] = useState<number>(21);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  const [docType, setDocType] = useState<'invoice' | 'credit_note'>('invoice');
+  const [correctedInvoiceNumber, setCorrectedInvoiceNumber] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [issueDate, setIssueDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [customerId, setCustomerId] = useState('');
@@ -141,12 +143,18 @@ function ComposerInner() {
       ...(dueDate.trim() && { dueDate: dueDate.trim() }),
       ...(note.trim() && { note: note.trim() }),
       ...(paymentTerms.trim() && { paymentTerms: paymentTerms.trim() }),
+      ...(docType === 'credit_note' && correctedInvoiceNumber.trim() && { correctedInvoiceNumber: correctedInvoiceNumber.trim() }),
     };
     try {
-      const res = await fetch('/api/einvoices', {
+      const endpoint = docType === 'credit_note' ? '/api/credit-notes' : '/api/einvoices';
+      const payload =
+        docType === 'credit_note'
+          ? { clientCompanyId, creditNote: invoice, recipientPeppolId: peppolId.trim() }
+          : { clientCompanyId, invoice, recipientPeppolId: peppolId.trim() };
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientCompanyId, invoice, recipientPeppolId: peppolId.trim() }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -177,7 +185,9 @@ function ComposerInner() {
   return (
     <div className={styles.page}>
       <main className={styles.main}>
-        <h1 className={styles.pageHeading}>{t('einv.compose')}</h1>
+        <h1 className={styles.pageHeading}>
+          {docType === 'credit_note' ? t('einv.composeCreditNote') : t('einv.compose')}
+        </h1>
 
         {customers.length === 0 ? (
           <p className={styles.notice}>{t('einv.noCustomers')}</p>
@@ -185,6 +195,13 @@ function ComposerInner() {
           <form className={styles.composer} onSubmit={(e) => { e.preventDefault(); issue(); }}>
             <section className={styles.card}>
               <div className={styles.fieldGrid}>
+                <label className={styles.field}>
+                  <span>{t('einv.docType')}</span>
+                  <select value={docType} onChange={(e) => setDocType(e.target.value as 'invoice' | 'credit_note')}>
+                    <option value="invoice">{t('einv.mode.invoice')}</option>
+                    <option value="credit_note">{t('einv.mode.creditNote')}</option>
+                  </select>
+                </label>
                 <label className={styles.field}>
                   <span>{t('einv.number')}</span>
                   <input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} required />
@@ -218,6 +235,12 @@ function ComposerInner() {
                   <span>{t('inv.note')}</span>
                   <input value={note} onChange={(e) => setNote(e.target.value)} />
                 </label>
+                {docType === 'credit_note' && (
+                  <label className={styles.field}>
+                    <span>{t('einv.correctedInvoice')}</span>
+                    <input value={correctedInvoiceNumber} onChange={(e) => setCorrectedInvoiceNumber(e.target.value)} />
+                  </label>
+                )}
               </div>
             </section>
 
@@ -316,7 +339,11 @@ function ComposerInner() {
               </dl>
               {issueError && <p className={styles.formError} role="alert">{issueError}</p>}
               <button type="submit" className={styles.primaryBtn} disabled={!canIssue || issuing}>
-                {issuing ? t('einv.issuing') : t('einv.issue')}
+                {issuing
+                  ? t('einv.issuing')
+                  : docType === 'credit_note'
+                    ? t('einv.issueCreditNote')
+                    : t('einv.issue')}
               </button>
             </section>
           </form>

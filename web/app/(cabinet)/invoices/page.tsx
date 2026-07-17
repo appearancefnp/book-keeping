@@ -16,6 +16,7 @@ interface EinvoiceRow {
   id: string; direction: 'outbound' | 'inbound'; invoiceNumber: string; issueDate: string;
   grandTotalCents: string; currency: string; peppolStatus: string; peppolMessageId: string | null;
   vidStatus: string; vidDueDate: string | null;
+  docType: 'invoice' | 'credit_note'; correctedInvoiceNumber: string | null;
 }
 
 function InvoicesInner() {
@@ -59,6 +60,15 @@ function InvoicesInner() {
     return label === key ? s : label;
   };
 
+  const docTypeLabel = (r: EinvoiceRow) => {
+    if (r.docType === 'credit_note') {
+      return r.correctedInvoiceNumber
+        ? t('einv.docType.credits').replace('{number}', r.correctedInvoiceNumber)
+        : t('einv.docType.creditNote');
+    }
+    return t('einv.docType.invoice');
+  };
+
   return (
     <div className={styles.page}>
       <main className={styles.main}>
@@ -82,6 +92,7 @@ function InvoicesInner() {
             <table className={styles.table}>
               <thead>
                 <tr>
+                  <th scope="col">{t('einv.docType')}</th>
                   <th scope="col">{t('einv.number')}</th>
                   <th scope="col">{t('einv.issueDate')}</th>
                   <th scope="col" className={styles.colAmount}>{t('einv.total')}</th>
@@ -94,6 +105,7 @@ function InvoicesInner() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
+                    <td>{docTypeLabel(r)}</td>
                     <td className={styles.mono}>{r.invoiceNumber}</td>
                     <td>{fmtDate(r.issueDate)}</td>
                     <td className={styles.colAmount}>{formatCents(r.grandTotalCents, r.currency) ?? '—'}</td>
