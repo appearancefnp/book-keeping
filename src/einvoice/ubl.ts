@@ -9,6 +9,7 @@ export interface EInvoice {
   netTotal: string; vatTotal: string; grandTotal: string;
   dueDate?: string; note?: string; paymentTerms?: string;
 }
+export interface ECreditNote extends EInvoice { correctedInvoiceNumber?: string; }
 
 const CUSTOMIZATION = 'urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0';
 const PROFILE = 'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0';
@@ -93,6 +94,86 @@ export function parseUblInvoice(xml: string): EInvoice {
     })),
     netTotal: txt(mon.LineExtensionAmount),
     vatTotal: txt(inv.TaxTotal?.TaxAmount),
+    grandTotal: txt(mon.PayableAmount),
+  };
+}
+
+const CN_PROFILE = 'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0';
+
+export function buildUblCreditNote(cn: ECreditNote): string {
+  const cur = cn.currency;
+  const lines = cn.lines.map((l, i) => [
+    `  <cac:CreditNoteLine>`,
+    `    <cbc:ID>${i + 1}</cbc:ID>`,
+    `    <cbc:CreditedQuantity unitCode="C62">1</cbc:CreditedQuantity>`,
+    `    <cbc:LineExtensionAmount currencyID="${cur}">${l.net}</cbc:LineExtensionAmount>`,
+    `    <cac:Item><cbc:Name>${escapeXml(l.description)}</cbc:Name>`,
+    `      <cac:ClassifiedTaxCategory><cbc:Percent>${l.vatRate}</cbc:Percent><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:ClassifiedTaxCategory></cac:Item>`,
+    `  </cac:CreditNoteLine>`,
+  ].join('\n')).join('\n');
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<CreditNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">',
+    `  <cbc:CustomizationID>${CUSTOMIZATION}</cbc:CustomizationID>`,
+    `  <cbc:ProfileID>${CN_PROFILE}</cbc:ProfileID>`,
+    `  <cbc:ID>${escapeXml(cn.invoiceNumber)}</cbc:ID>`,
+    `  <cbc:IssueDate>${escapeXml(cn.issueDate)}</cbc:IssueDate>`,
+    cn.note ? `  <cbc:Note>${escapeXml(cn.note)}</cbc:Note>` : null,
+    `  <cbc:DocumentCurrencyCode>${cur}</cbc:DocumentCurrencyCode>`,
+    cn.correctedInvoiceNumber
+      ? `  <cac:BillingReference><cac:InvoiceDocumentReference><cbc:ID>${escapeXml(cn.correctedInvoiceNumber)}</cbc:ID></cac:InvoiceDocumentReference></cac:BillingReference>`
+      : null,
+    party('AccountingSupplierParty', cn.supplier, cur),
+    party('AccountingCustomerParty', cn.customer, cur),
+    `  <cac:TaxTotal><cbc:TaxAmount currencyID="${cur}">${cn.vatTotal}</cbc:TaxAmount></cac:TaxTotal>`,
+    `  <cac:LegalMonetaryTotal>`,
+    `    <cbc:LineExtensionAmount currencyID="${cur}">${cn.netTotal}</cbc:LineExtensionAmount>`,
+    `    <cbc:TaxExclusiveAmount currencyID="${cur}">${cn.netTotal}</cbc:TaxExclusiveAmount>`,
+    `    <cbc:TaxInclusiveAmount currencyID="${cur}">${cn.grandTotal}</cbc:TaxInclusiveAmount>`,
+    `    <cbc:PayableAmount currencyID="${cur}">${cn.grandTotal}</cbc:PayableAmount>`,
+    `  </cac:LegalMonetaryTotal>`,
+    lines,
+    '</CreditNote>',
+  ].filter(Boolean).join('\n');
+}
+
+export function detectUblRoot(xml: string): 'Invoice' | 'CreditNote' | 'unknown' {
+  const parsed = parser.parse(xml);
+  if (parsed?.Invoice) return 'Invoice';
+  if (parsed?.CreditNote) return 'CreditNote';
+  return 'unknown';
+}
+
+export function parseUblCreditNote(xml: string): ECreditNote {
+  const cn = parser.parse(xml)?.CreditNote;
+  if (!cn) throw new Error('Not a UBL CreditNote');
+  const sup = cn.AccountingSupplierParty?.Party ?? {};
+  const cus = cn.AccountingCustomerParty?.Party ?? {};
+  const mon = cn.LegalMonetaryTotal ?? {};
+  const readParty = (p: Record<string, unknown>): InvoiceParty => ({
+    name: String((p.PartyLegalEntity as { RegistrationName?: string })?.RegistrationName ?? ''),
+    regNo: String((p.PartyLegalEntity as { CompanyID?: unknown })?.CompanyID ?? ''),
+    vatNo: String((p.PartyTaxScheme as { CompanyID?: unknown })?.CompanyID ?? ''),
+  });
+  const correctedInvoiceNumber = (cn.BillingReference as { InvoiceDocumentReference?: { ID?: unknown } })
+    ?.InvoiceDocumentReference?.ID;
+  return {
+    invoiceNumber: String(cn.ID ?? ''),
+    issueDate: String(cn.IssueDate ?? ''),
+    currency: String(cn.DocumentCurrencyCode ?? ''),
+    ...(cn.Note !== undefined && { note: String(cn.Note) }),
+    ...(correctedInvoiceNumber !== undefined && { correctedInvoiceNumber: String(correctedInvoiceNumber) }),
+    supplier: readParty(sup),
+    customer: readParty(cus),
+    lines: asArray(cn.CreditNoteLine).map((l: Record<string, unknown>) => ({
+      description: String((l.Item as { Name?: string })?.Name ?? ''),
+      net: txt(l.LineExtensionAmount),
+      vatRate: Number((((l.Item as { ClassifiedTaxCategory?: { Percent?: unknown } })?.ClassifiedTaxCategory)?.Percent) ?? 0),
+      vat: '0',
+    })),
+    netTotal: txt(mon.LineExtensionAmount),
+    vatTotal: txt(cn.TaxTotal?.TaxAmount),
     grandTotal: txt(mon.PayableAmount),
   };
 }

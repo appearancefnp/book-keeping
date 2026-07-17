@@ -1,8 +1,8 @@
-import type { EInvoice } from './ubl.js';
+import type { EInvoice, ECreditNote } from './ubl.js';
 import { toCents, sumCents } from '../db/money.js';
 
-/** A pragmatic subset of EN 16931 business rules relevant to the MVP. */
-export function validateEn16931(inv: EInvoice): { valid: boolean; issues: string[] } {
+/** A pragmatic subset of EN 16931 business rules relevant to the MVP (invoice or credit note). */
+export function validateEn16931(inv: EInvoice | ECreditNote): { valid: boolean; issues: string[] } {
   const issues: string[] = [];
   if (!inv.invoiceNumber) issues.push('BR-2: invoice number is required');
   if (!inv.issueDate) issues.push('BR-3: issue date is required');
