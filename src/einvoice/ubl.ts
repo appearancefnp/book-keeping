@@ -63,6 +63,13 @@ const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_
 
 function asArray<T>(v: T | T[] | undefined): T[] { return v === undefined ? [] : Array.isArray(v) ? v : [v]; }
 function txt(v: unknown): string { return v && typeof v === 'object' && '#text' in (v as object) ? String((v as { '#text': unknown })['#text']) : String(v ?? ''); }
+function readParty(p: Record<string, unknown>): InvoiceParty {
+  return {
+    name: String((p.PartyLegalEntity as { RegistrationName?: string })?.RegistrationName ?? ''),
+    regNo: String((p.PartyLegalEntity as { CompanyID?: unknown })?.CompanyID ?? ''),
+    vatNo: String((p.PartyTaxScheme as { CompanyID?: unknown })?.CompanyID ?? ''),
+  };
+}
 
 export function parseUblInvoice(xml: string): EInvoice {
   const inv = parser.parse(xml)?.Invoice;
@@ -70,11 +77,6 @@ export function parseUblInvoice(xml: string): EInvoice {
   const sup = inv.AccountingSupplierParty?.Party ?? {};
   const cus = inv.AccountingCustomerParty?.Party ?? {};
   const mon = inv.LegalMonetaryTotal ?? {};
-  const readParty = (p: Record<string, unknown>): InvoiceParty => ({
-    name: String((p.PartyLegalEntity as { RegistrationName?: string })?.RegistrationName ?? ''),
-    regNo: String((p.PartyLegalEntity as { CompanyID?: unknown })?.CompanyID ?? ''),
-    vatNo: String((p.PartyTaxScheme as { CompanyID?: unknown })?.CompanyID ?? ''),
-  });
   return {
     invoiceNumber: String(inv.ID ?? ''),
     issueDate: String(inv.IssueDate ?? ''),
@@ -98,8 +100,6 @@ export function parseUblInvoice(xml: string): EInvoice {
   };
 }
 
-const CN_PROFILE = 'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0';
-
 export function buildUblCreditNote(cn: ECreditNote): string {
   const cur = cn.currency;
   const lines = cn.lines.map((l, i) => [
@@ -116,7 +116,7 @@ export function buildUblCreditNote(cn: ECreditNote): string {
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<CreditNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">',
     `  <cbc:CustomizationID>${CUSTOMIZATION}</cbc:CustomizationID>`,
-    `  <cbc:ProfileID>${CN_PROFILE}</cbc:ProfileID>`,
+    `  <cbc:ProfileID>${PROFILE}</cbc:ProfileID>`,
     `  <cbc:ID>${escapeXml(cn.invoiceNumber)}</cbc:ID>`,
     `  <cbc:IssueDate>${escapeXml(cn.issueDate)}</cbc:IssueDate>`,
     cn.note ? `  <cbc:Note>${escapeXml(cn.note)}</cbc:Note>` : null,
@@ -151,11 +151,6 @@ export function parseUblCreditNote(xml: string): ECreditNote {
   const sup = cn.AccountingSupplierParty?.Party ?? {};
   const cus = cn.AccountingCustomerParty?.Party ?? {};
   const mon = cn.LegalMonetaryTotal ?? {};
-  const readParty = (p: Record<string, unknown>): InvoiceParty => ({
-    name: String((p.PartyLegalEntity as { RegistrationName?: string })?.RegistrationName ?? ''),
-    regNo: String((p.PartyLegalEntity as { CompanyID?: unknown })?.CompanyID ?? ''),
-    vatNo: String((p.PartyTaxScheme as { CompanyID?: unknown })?.CompanyID ?? ''),
-  });
   const correctedInvoiceNumber = (cn.BillingReference as { InvoiceDocumentReference?: { ID?: unknown } })
     ?.InvoiceDocumentReference?.ID;
   return {
