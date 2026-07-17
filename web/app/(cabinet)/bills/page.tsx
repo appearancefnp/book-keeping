@@ -62,6 +62,7 @@ function BillsInner() {
           <h1 className={styles.pageHeading}>{t('bills.title')}</h1>
           <div className={styles.actions}>
             <Link className={styles.payButton} href={`/bills/pay${q}`}>{t('bills.pay')}</Link>
+            <Link className={styles.newButton} href={`/bills/credit-notes/new${q}`}>{t('bills.creditNote.new')}</Link>
             <Link className={styles.newButton} href={`/bills/new${q}`}>{t('bills.new')}</Link>
           </div>
         </div>
