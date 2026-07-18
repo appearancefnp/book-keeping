@@ -380,7 +380,7 @@ function ReportsInner() {
                       {trial.map((r) => (
                         <tr key={r.code}>
                           <td className={styles.code}>
-                            <button type="button" className={styles.codeLink} onClick={() => drillToGl(r.code, from, to)}>{r.code}</button>
+                            <button type="button" className={styles.codeLink} onClick={() => drillToGl(r.code, `${todayIso().slice(0, 4)}-01-01`, todayIso())}>{r.code}</button>
                           </td>
                           <td className={styles.name}>{r.name}</td>
                           <td className={styles.amount}>{fmtMoney(r.debit)}</td>

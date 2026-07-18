@@ -49,6 +49,17 @@ test('comparativeProfitAndLoss computes variance and % vs comparison', async () 
   expect(c.netProfit).toMatchObject({ current: '240.00', comparison: '100.00', variance: '140.00' });
 });
 
+test('an account present only in the comparison period fills the current side with 0.00', async () => {
+  const t = await seed();
+  // Reverse direction: current = Feb (no expense), comparison = March (expense 60) → 7710 only in comparison.
+  const c = await withTenant(ctx(t), (tx) => comparativeProfitAndLoss(tx, ctx(t), {
+    current: { from: '2026-02-01', to: '2026-02-28' },
+    comparison: { from: '2026-03-01', to: '2026-03-31' },
+  }));
+  const exp = c.expense.lines.find((l) => l.code === '7710')!;
+  expect(exp).toMatchObject({ current: '0.00', comparison: '60.00', variance: '-60.00', variancePct: '-100.0' });
+});
+
 test('comparativeBalanceSheet computes variance between two as-of dates', async () => {
   const t = await seed();
   const c = await withTenant(ctx(t), (tx) => comparativeBalanceSheet(tx, ctx(t), {
