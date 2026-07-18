@@ -62,7 +62,7 @@ Already in our spec / `HANDOFF §5`; ordering reflects how visibly each hurts ag
 
 | # | Gap | Status | Notes |
 |---|-----|--------|-------|
-| M14 | **Report depth** — General Ledger detail, account-transactions drill, period-over-period comparatives, PDF/Excel/CSV export of any report | ⛔ | Competitors ship dozens of canned reports; we have overview + journal browser. Rides on M1's `src/reports/`. |
+| M14 | **Report depth** — General Ledger detail, account-transactions drill, period-over-period comparatives, PDF/Excel/CSV export of any report | 🔶 | **Data depth shipped 2026-07-18** — General Ledger detail (`src/reports/general-ledger.ts`: opening/running/closing per account), account drill-down (single-account GL + clickable P&L/Balance-Sheet/trial-balance line codes), and two-period comparatives with variance + % (`src/reports/comparative.ts`); new `/api/reports/general-ledger` + `/api/reports/trial-balance` routes, compare params on the P&L/BS routes, and General Ledger + Trial Balance tabs on `/reports`. All read-only over the existing ledger, no migration. **PDF/Excel/CSV export still ⛔** — deferred to its own follow-on spec (the natural next M14 slice). See `docs/superpowers/specs/2026-07-18-report-depth-design.md`. |
 | M15 | **Dimensional tracking** — projects / cost centers / departments / "tracking categories" | ⛔ | Used constantly for job costing and management reporting. Needs a dimension column on journal lines + rollups. |
 | M16 | **Budgeting & budget-vs-actual** | ⛔ | Standard in Xero/QB. |
 | M17 | **Cash-flow forecast / anomaly detection / proactive reminders** | ⛔ | `HANDOFF §5` (§6.9). New tools/jobs on the existing `src/assistant/` agent — and competitively visible as a headline feature. |

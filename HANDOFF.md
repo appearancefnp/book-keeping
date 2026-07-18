@@ -34,8 +34,15 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > needed" assumption was wrong — no settlement postings hit the VAT accounts, so single-sided
 > historical data is unaffected). This lifts the M2 negative-bill rejection cleanly (bills stay
 > non-negative; credit notes are their own path) — no longer an open follow-up. Full suite 351/351.
-> Next unblocked in the market-gaps sequence: M3 (live bank feeds), M4 (AR lifecycle); M14
-> (report depth/export) now rides cheaply on `src/reports/`.
+> M14 (report depth) — **data depth shipped 2026-07-18** — General Ledger detail
+> (`src/reports/general-ledger.ts`), account drill-down (single-account GL + clickable
+> statement/trial-balance line codes), two-period comparatives with variance + %
+> (`src/reports/comparative.ts`); new `/api/reports/general-ledger` + `/api/reports/trial-balance`,
+> compare params on the P&L/BS routes, and General Ledger + Trial Balance tabs on `/reports`.
+> Read-only over the ledger, no migration. **Report export (PDF/Excel/CSV) is the remaining
+> M14 slice — deferred to its own spec.**
+> Next unblocked in the market-gaps sequence: M3 (live bank feeds), M4 (AR lifecycle — being
+> handled separately); report export (M14 follow-on). M14 data-depth is done.
 >
 > **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`
 > (not yet merged to `main`); full backend suite **333/333**, root+web typecheck clean, web
