@@ -27,3 +27,32 @@ test('tableToCsv is RFC-4180 with BOM and CRLF', () => {
   expect(csv).toContain('Code,Account,Amount');          // header row
   expect(csv).toContain('Profit & Loss');                // title line
 });
+
+const injectionTable: ReportTable = {
+  title: 'Injection check',
+  meta: [],
+  columns: [
+    { key: 'code', label: 'Code', align: 'left' },
+    { key: 'desc', label: 'Description', align: 'left' },
+    { key: 'amount', label: 'Amount', align: 'right' },
+  ],
+  rows: [
+    { cells: ['1', '=SUM(A1:A9)', '0.00'], kind: 'data' },       // formula trigger, no comma
+    { cells: ['2', '=SUM(A1,A9)', '0.00'], kind: 'data' },       // formula trigger + comma → neutralized AND quoted
+    { cells: ['3', '@cmd', '0.00'], kind: 'data' },              // @ trigger
+    { cells: ['4', '+cmd', '0.00'], kind: 'data' },              // + trigger, non-numeric
+    { cells: ['5', '-- note', '0.00'], kind: 'data' },           // leading dash, non-numeric text
+    { cells: ['6', 'Refund', '-50.00'], kind: 'data' },          // legitimate negative money, must NOT be altered
+  ],
+};
+
+test('tableToCsv neutralizes CSV formula injection on non-numeric cells', () => {
+  const csv = tableToCsv(injectionTable);
+  expect(csv).toContain("'=SUM(A1:A9)");                  // bare formula → single-quote prefixed
+  expect(csv).toContain('"\'=SUM(A1,A9)"');               // neutralized AND comma-quoted
+  expect(csv).toContain("'@cmd");                         // @ trigger neutralized
+  expect(csv).toContain("'+cmd");                         // + trigger neutralized ('+1' would be numeric and skipped)
+  expect(csv).toContain("'-- note");                      // leading-dash text neutralized
+  expect(csv).toContain(',-50.00');                       // legitimate money value left intact, no leading quote
+  expect(csv).not.toContain("'-50.00");
+});
