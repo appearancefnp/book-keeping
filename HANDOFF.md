@@ -68,10 +68,10 @@ trilingual (LV/RU/EN), responsive, and accessible.
 >   instead of `5721` (Output VAT), matching `/api/bills`; captured purchase VAT no longer
 >   corrupts the VAT return. Misleading `5721` stand-in in `tests/intake/map-posting.test.ts`
 >   was also corrected to `5722`.
-> - **Bank-match reject doesn't free the transaction** (finding #5, pre-existing pattern shared
->   with the receivable matcher `proposeMatches`): a rejected `bank_match` leaves the bank
->   transaction stuck `matched`, never re-proposed. Fix generically in the reject flow (revert
->   the linked tx to `unmatched`).
+> - ~~**Bank-match reject doesn't free the transaction**~~ **FIXED 2026-07-18** (branch
+>   `fix/known-issues`): `rejectProposal` now reverts the linked transaction to `unmatched`
+>   (guarded so a `reconciled` transaction is never regressed) for all three `bank_match`
+>   payload variants; covered by `tests/banking/reject-frees-transaction.test.ts`.
 > - **Account-mapping is hard-coded** (`5310/5722/2620/2699` defaults in the bills + pay-run
 >   + ap-aging routes) — accountant to confirm LR chart codes; a per-client account-mapping
 >   settings screen is still deferred (same bucket as tariffs/templates).
@@ -301,6 +301,11 @@ quarterly periodicity logic.
   (tasks/notifications/proposals routes are the same; only `/api/admin/*` is
   role-gated), so it is not a regression, but a client-assigned `employee` could
   call these directly. Add server-side role checks when tightening authz.
+  **Update 2026-07-18:** the `Operation` matrix (`src/authz/policy.ts`) now also gates
+  proposal approve/reject via `proposals.decide` (firm_admin/accountant/owner), enforced in
+  the shared `src/api/handlers.ts` so web and mobile surfaces are covered. Migration-number
+  collisions are now CI-guarded (`tests/db/migration-numbering.test.ts` — the four historical
+  023–026 pairs are grandfathered; new collisions fail).
 - **Uniform error-status mapping** — most routes map caught errors to
   `/session/i ? 401 : 403`. The einvoices POST additionally maps validation/
   posting failures to 400. Other mutating routes (e.g. parties POST on a
