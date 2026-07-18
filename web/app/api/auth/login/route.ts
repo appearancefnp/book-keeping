@@ -18,14 +18,17 @@ export async function POST(req: Request) {
   const identifiers = [`email:${email.toLowerCase()}`, `ip:${ip}`];
   const at = nowUnix();
 
+  let allowed = false;
   try {
-    if (!(await checkLoginAllowed(identifiers, at))) {
-      // Same shape/message as a bad login — no lockout oracle.
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
-    }
+    allowed = await checkLoginAllowed(identifiers, at);
   } catch {
-    // Fail open: login() below needs the DB anyway, so a limiter/DB outage can't
-    // be ridden to bypass credentials — availability of legitimate login wins.
+    // Fail CLOSED: a limiter-only breakage (e.g. migration drift dropping
+    // login_attempts while login still works) must not disable brute-force
+    // protection. login() needs the same DB, so legitimate logins lose nothing.
+  }
+  if (!allowed) {
+    // Same shape/message as a bad login — no lockout oracle.
+    return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
   }
 
   let authenticated = false;
@@ -54,6 +57,11 @@ export async function POST(req: Request) {
   }
 }
 
+// Trust assumption: on Vercel (the deployment target — see docs/RUNNING.md §3),
+// the platform overwrites x-real-ip and x-forwarded-for at its edge, so neither
+// is client-suppliable there. Behind any OTHER proxy, re-derive this from the
+// proxy's documented behavior before trusting it. The IP identifier is
+// defense-in-depth; the per-email limiter never depends on headers.
 function clientIp(req: Request): string {
   const realIp = req.headers.get('x-real-ip');
   if (realIp) return realIp.trim();
