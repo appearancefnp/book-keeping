@@ -32,5 +32,19 @@ export async function approveProposal(tx: PoolClient, ctx: TenantContext, id: st
 }
 
 export async function rejectProposal(tx: PoolClient, ctx: TenantContext, id: string, reason: string): Promise<void> {
+  const prop = await getProposal(tx, ctx, id);
   await transition(tx, ctx, id, 'pending_approval', 'rejected', { rejectReason: reason });
+  // A rejected bank match must free the reserved bank transaction so the next
+  // propose run can re-propose it (HANDOFF finding: reject left it stuck 'matched').
+  // All bank_match payload variants carry bankTransactionId.
+  if (prop.type === 'bank_match') {
+    const bankTransactionId = (prop.payload as { bankTransactionId?: string }).bankTransactionId;
+    if (bankTransactionId) {
+      await tx.query(
+        `UPDATE bank_transactions SET status = 'unmatched'
+         WHERE id = $1 AND client_company_id = $2 AND status = 'matched'`,
+        [bankTransactionId, ctx.clientCompanyId],
+      );
+    }
+  }
 }
