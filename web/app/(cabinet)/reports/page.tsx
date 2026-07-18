@@ -50,7 +50,7 @@ function cmpSectionEmpty(s: ComparativeSection): boolean { return s.lines.length
 
 function ReportsInner() {
   const searchParams = useSearchParams();
-  const { t } = useMessages();
+  const { t, lang } = useMessages();
   const clientCompanyId = searchParams.get('client');
 
   const [tab, setTab] = useState<Tab>('pl');
@@ -158,6 +158,24 @@ function ReportsInner() {
   };
 
   const plIsLoss = useMemo(() => pl != null && Number(pl.netProfit) < 0, [pl]);
+
+  const exportUrl = useCallback((format: 'csv' | 'xlsx' | 'pdf'): string => {
+    const p = new URLSearchParams({ clientCompanyId: clientCompanyId ?? '', report: tab, format, lang });
+    if (tab === 'pl' || tab === 'gl') { p.set('from', from); p.set('to', to); }
+    if (tab === 'bs' || tab === 'trial' || tab === 'apaging') p.set('asOf', asOf);
+    if (tab === 'pl' && compareFrom && compareTo) { p.set('compareFrom', compareFrom); p.set('compareTo', compareTo); }
+    if (tab === 'bs' && compareAsOf) p.set('compareAsOf', compareAsOf);
+    if (tab === 'gl' && glAccount) p.set('account', glAccount);
+    return `/api/reports/export?${p.toString()}`;
+  }, [clientCompanyId, tab, lang, from, to, asOf, compareFrom, compareTo, compareAsOf, glAccount]);
+
+  const exportBar = (
+    <div className={styles.exportBar}>
+      <a className={styles.exportLink} href={exportUrl('csv')} download>{t('export.csv')}</a>
+      <a className={styles.exportLink} href={exportUrl('xlsx')} download>{t('export.excel')}</a>
+      <a className={styles.exportLink} href={exportUrl('pdf')} target="_blank" rel="noopener noreferrer">{t('export.pdf')}</a>
+    </div>
+  );
 
   const renderSection = (title: string, s: StatementSection, onDrill: (code: string) => void) => (
     <div className={styles.section}>
@@ -297,6 +315,14 @@ function ReportsInner() {
 
         {error && <ErrorState message={error} onRetry={load} />}
         {!error && loading && <div className={styles.skeletons}><SkeletonCard /><SkeletonCard /></div>}
+
+        {!error && !loading && clientCompanyId && (
+          (tab === 'pl' && (pl || plCmp)) ||
+          (tab === 'bs' && (bs || bsCmp)) ||
+          (tab === 'trial' && trial) ||
+          (tab === 'gl' && gl) ||
+          (tab === 'apaging' && aging)
+        ) && exportBar}
 
         {!error && !loading && tab === 'pl' && pl && (
           sectionEmpty(pl.income) && sectionEmpty(pl.expense)

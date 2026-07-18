@@ -43,6 +43,14 @@
   border-top: 2px solid var(--fg, #111827);
 }
 
+.exportBar { display: inline-flex; align-items: center; gap: .5rem; margin-bottom: 1rem; }
+.exportLink {
+  appearance: none; cursor: pointer; font: inherit; font-size: .8125rem; text-decoration: none;
+  padding: .375rem .625rem; border: 1px solid var(--border, #e5e7eb);
+  border-radius: .375rem; background: none; color: var(--fg, #111827);
+}
+.exportLink:hover { background: var(--border-subtle, #f3f4f6); }
+
 .balanced { color: var(--ok, #15803d); font-size: .875rem; padding: .25rem .5rem; }
 .unbalanced { color: var(--danger, #b91c1c); font-weight: 600; font-size: .875rem; padding: .5rem; border: 1px solid currentColor; border-radius: .375rem; }
 
