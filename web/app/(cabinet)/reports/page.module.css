@@ -12,7 +12,7 @@
 
 .controls { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; margin-bottom: 1.5rem; }
 .field { display: flex; flex-direction: column; gap: .25rem; font-size: .8125rem; color: var(--muted, #6b7280); }
-.field input { font: inherit; padding: .375rem .5rem; border: 1px solid var(--border, #e5e7eb); border-radius: .375rem; }
+.field input, .field select { font: inherit; padding: .375rem .5rem; border: 1px solid var(--border, #e5e7eb); border-radius: .375rem; }
 .presets { display: flex; gap: .375rem; }
 .presets button {
   appearance: none; cursor: pointer; font: inherit; font-size: .8125rem;
@@ -22,11 +22,20 @@
 
 .statement { display: flex; flex-direction: column; gap: 1.5rem; }
 .sectionTitle { font-size: .9375rem; font-weight: 600; margin: 0 0 .5rem; }
+.tableWrapper { overflow-x: auto; max-width: 100%; }
 .table { width: 100%; border-collapse: collapse; }
+.table th { padding: .3125rem .5rem; text-align: left; font-size: .8125rem; color: var(--muted, #6b7280); font-weight: 600; border-bottom: 1px solid var(--border, #e5e7eb); }
+.table th.amount { text-align: right; }
 .table td { padding: .3125rem .5rem; border-bottom: 1px solid var(--border-subtle, #f3f4f6); }
 .code { color: var(--muted, #6b7280); font-variant-numeric: tabular-nums; width: 4.5rem; }
 .amount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .subtotalRow td { font-weight: 600; border-top: 1px solid var(--border, #e5e7eb); border-bottom: none; }
+.grandTotalRow td { font-weight: 700; border-top: 2px solid var(--fg, #111827); border-bottom: none; }
+.codeLink {
+  appearance: none; background: none; border: none; cursor: pointer; font: inherit;
+  color: inherit; padding: 0; text-decoration: underline; text-underline-offset: 2px;
+}
+.codeLink:hover { color: var(--fg, #111827); }
 
 .grandTotal {
   display: flex; justify-content: space-between; align-items: baseline;
