@@ -6,12 +6,8 @@ import { resolveTenantContext } from '@domain/auth/context.js';
 import { withTenant } from '@domain/db/pool.js';
 import { accountBalances } from '@domain/ledger/balances.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
-
-function isValidIsoDate(s: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const d = new Date(`${s}T00:00:00Z`);
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
-}
+import { errorToStatus } from '@/app/lib/authz';
+import { isValidIsoDate } from '@/app/lib/date';
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
@@ -30,6 +26,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ rows }, { status: 200 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: /session/i.test(msg) ? 401 : 403 });
+    return NextResponse.json({ error: msg }, { status: errorToStatus(msg) });
   }
 }
