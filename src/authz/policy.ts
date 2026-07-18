@@ -17,7 +17,8 @@ export type Operation =
   | 'invoice_profile.write' // set invoice profile (payment terms, numbering, defaults)
   | 'bills.write' // create/void accounts-payable bills
   | 'payruns.write' // create accounts-payable pay-runs (SEPA pain.001)
-  | 'proposals.decide'; // approve/reject proposals in the approval queue
+  | 'proposals.decide' // approve/reject proposals in the approval queue
+  | 'users.write'; // create users / issue credential-reset invites
 
 /**
  * Which roles may perform each mutating operation.
@@ -38,6 +39,7 @@ const OPERATION_ROLES: Record<Operation, readonly UserRole[]> = {
   'bills.write': ['firm_admin', 'accountant', 'employee'],
   'payruns.write': ['firm_admin', 'accountant', 'employee'],
   'proposals.decide': ['firm_admin', 'accountant', 'owner'],
+  'users.write': ['firm_admin'],
 };
 
 /** True if `role` is permitted to perform `op`. Unrecognised roles are denied. */

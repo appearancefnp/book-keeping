@@ -17,6 +17,7 @@ const MATRIX: Record<Operation, UserRole[]> = {
   'bills.write': ['firm_admin', 'accountant', 'employee'],
   'payruns.write': ['firm_admin', 'accountant', 'employee'],
   'proposals.decide': ['firm_admin', 'accountant', 'owner'],
+  'users.write': ['firm_admin'],
 };
 
 describe('authz policy — role matrix', () => {
@@ -43,4 +44,11 @@ describe('authz policy — unknown role', () => {
       expect(() => assertRoleAllowed('agent', op)).toThrow(/forbidden/i);
     }
   });
+});
+
+test('users.write is firm_admin only', () => {
+  expect(isRoleAllowed('firm_admin', 'users.write')).toBe(true);
+  for (const role of ['accountant', 'owner', 'employee', 'agent', 'nonsense']) {
+    expect(isRoleAllowed(role, 'users.write')).toBe(false);
+  }
 });
