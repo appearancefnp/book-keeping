@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { useMessages } from '@/app/lib/i18n-context';
 import { LOCALE_FOR, type Lang, type MsgKey } from '@/app/lib/i18n';
 import { EmptyState } from './EmptyState';
+import { InviteUserPanel, InviteLinkDisplay, type InviteResult } from './InviteUserPanel';
 import styles from './AdminTables.module.css';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -35,6 +37,7 @@ interface AdminTablesProps {
   clients: ClientCompany[];
   users: UserRow[];
   audit: AuditRow[];
+  role: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -53,7 +56,7 @@ function fmtDate(iso: string, lang: Lang): string {
 
 // Known machine values → message keys. Unknown values fall back to the raw
 // string so new audit vocabulary degrades visibly instead of breaking.
-const ROLE_KEYS: Record<string, MsgKey> = {
+export const ROLE_KEYS: Record<string, MsgKey> = {
   accountant: 'role.accountant',
   firm_admin: 'role.firm_admin',
   owner: 'role.owner',
@@ -133,7 +136,11 @@ function ClientsTable({ clients }: { clients: ClientCompany[] }) {
 
 // ── Users table ───────────────────────────────────────────────────────────────
 
-function UsersTable({ users }: { users: UserRow[] }) {
+function UsersTable({
+  users, canInvite, reinvitingId, onReinvite,
+}: {
+  users: UserRow[]; canInvite: boolean; reinvitingId: string | null; onReinvite: (userId: string) => void;
+}) {
   const { t } = useMessages();
   if (users.length === 0) {
     return <EmptyState message={t('admin.noUsers')} detail={t('admin.noUsersDetail')} />;
@@ -145,6 +152,7 @@ function UsersTable({ users }: { users: UserRow[] }) {
           <tr>
             <th scope="col">{t('admin.email')}</th>
             <th scope="col">{t('admin.role')}</th>
+            {canInvite && <th aria-hidden="true" />}
           </tr>
         </thead>
         <tbody>
@@ -152,6 +160,17 @@ function UsersTable({ users }: { users: UserRow[] }) {
             <tr key={u.id}>
               <td>{u.email}</td>
               <td className={styles.role}>{translated(ROLE_KEYS, u.role, t)}</td>
+              {canInvite && (
+                <td className={styles.colActions}>
+                  <button
+                    type="button"
+                    onClick={() => onReinvite(u.id)}
+                    disabled={reinvitingId === u.id}
+                  >
+                    {t('admin.reinvite')}
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -202,8 +221,37 @@ function AuditTable({ audit, users }: { audit: AuditRow[]; users: UserRow[] }) {
 
 // ── Default export ────────────────────────────────────────────────────────────
 
-export function AdminTables({ clients, users, audit }: AdminTablesProps) {
+export function AdminTables({ clients, users, audit, role }: AdminTablesProps) {
   const { t } = useMessages();
+  const canInvite = role === 'firm_admin';
+
+  // Holds the most recently issued invite link so it can be shown exactly
+  // once (new invite or re-invite both replace it); it is plain component
+  // state, never persisted, so it disappears on reload/navigation.
+  const [invite, setInvite] = useState<InviteResult | null>(null);
+  const [reinvitingId, setReinvitingId] = useState<string | null>(null);
+  const [reinviteError, setReinviteError] = useState(false);
+
+  async function handleReinvite(userId: string) {
+    setReinvitingId(userId);
+    setReinviteError(false);
+    setInvite(null);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { inviteUrl: string; expiresAt: string };
+      setInvite(data);
+    } catch {
+      setReinviteError(true);
+    } finally {
+      setReinvitingId(null);
+    }
+  }
+
   return (
     <div className={styles.sections}>
       <section className={styles.section} aria-labelledby="admin-clients-heading">
@@ -213,7 +261,22 @@ export function AdminTables({ clients, users, audit }: AdminTablesProps) {
 
       <section className={styles.section} aria-labelledby="admin-users-heading">
         <h2 id="admin-users-heading" className={styles.sectionHeading}>{t('admin.users')}</h2>
-        <UsersTable users={users} />
+        {canInvite && (
+          <InviteUserPanel
+            clients={clients}
+            onInvited={(result) => { setReinviteError(false); setInvite(result); }}
+          />
+        )}
+        {invite && <InviteLinkDisplay invite={invite} />}
+        {reinviteError && (
+          <p className={styles.error} role="status" aria-live="polite">{t('admin.onb.error')}</p>
+        )}
+        <UsersTable
+          users={users}
+          canInvite={canInvite}
+          reinvitingId={reinvitingId}
+          onReinvite={handleReinvite}
+        />
       </section>
 
       <section className={styles.section} aria-labelledby="admin-audit-heading">

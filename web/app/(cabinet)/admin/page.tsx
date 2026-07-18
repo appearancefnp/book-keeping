@@ -139,6 +139,7 @@ function AdminInner() {
               clients={data.clients}
               users={data.users}
               audit={data.audit}
+              role={data.role}
             />
             <TariffTable tariffs={data.tariffs} role={data.role} onSaved={load} />
             <OnboardingPanel
