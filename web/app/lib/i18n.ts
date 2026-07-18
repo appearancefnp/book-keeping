@@ -426,6 +426,12 @@ export const EN = {
   'reports.aging.d61_90': '61–90 days',
   'reports.aging.d90plus': '90+ days',
   'reports.aging.total': 'Total payable',
+  'reports.col.amount': 'Amount',
+  'export.print': 'Print',
+  'export.csv': 'CSV',
+  'export.excel': 'Excel',
+  'export.pdf': 'PDF',
+  'export.generated': 'Generated',
 } as const;
 
 export const LV: Record<keyof typeof EN, string> = {
@@ -856,6 +862,12 @@ export const LV: Record<keyof typeof EN, string> = {
   'reports.aging.d61_90': '61–90 dienas',
   'reports.aging.d90plus': '90+ dienas',
   'reports.aging.total': 'Kopā saistības',
+  'reports.col.amount': 'Summa',
+  'export.print': 'Drukāt',
+  'export.csv': 'CSV',
+  'export.excel': 'Excel',
+  'export.pdf': 'PDF',
+  'export.generated': 'Ģenerēts',
 };
 
 export const RU: Record<keyof typeof EN, string> = {
@@ -1286,6 +1298,12 @@ export const RU: Record<keyof typeof EN, string> = {
   'reports.aging.d61_90': '61–90 дней',
   'reports.aging.d90plus': '90+ дней',
   'reports.aging.total': 'Итого к оплате',
+  'reports.col.amount': 'Сумма',
+  'export.print': 'Печать',
+  'export.csv': 'CSV',
+  'export.excel': 'Excel',
+  'export.pdf': 'PDF',
+  'export.generated': 'Сформировано',
 };
 
 export type Lang = 'lv' | 'en' | 'ru';
