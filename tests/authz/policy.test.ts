@@ -16,6 +16,7 @@ const MATRIX: Record<Operation, UserRole[]> = {
   'invoice_profile.write': ['firm_admin', 'accountant'],
   'bills.write': ['firm_admin', 'accountant', 'employee'],
   'payruns.write': ['firm_admin', 'accountant', 'employee'],
+  'proposals.decide': ['firm_admin', 'accountant', 'owner'],
 };
 
 describe('authz policy — role matrix', () => {

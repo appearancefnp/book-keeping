@@ -1,5 +1,6 @@
 import { withTenant } from '../db/pool.js';
 import { resolveTenantContext } from '../auth/context.js';
+import { assertRoleAllowed } from '../authz/policy.js';
 import type { AuthedRequest, ApiResponse } from './types.js';
 import { listProposals, getProposal } from '../proposals/proposals.js';
 import { approveProposal, rejectProposal } from '../proposals/lifecycle.js';
@@ -42,6 +43,8 @@ export function approveHandler(req: AuthedRequest): Promise<ApiResponse> {
   return authed(req, async (ctx) => {
     const id = req.params?.id;
     if (!id) return { status: 400, body: { error: 'missing proposal id' } };
+    try { assertRoleAllowed(ctx.actorRole, 'proposals.decide'); }
+    catch (e) { return { status: 403, body: { error: e instanceof Error ? e.message : String(e) } }; }
     const result = await withTenant(ctx, async (tx) => {
       const prop = await getProposal(tx, ctx, id);
       await approveProposal(tx, ctx, id);
@@ -58,6 +61,8 @@ export function rejectHandler(req: AuthedRequest): Promise<ApiResponse> {
   return authed(req, async (ctx) => {
     const id = req.params?.id;
     if (!id) return { status: 400, body: { error: 'missing proposal id' } };
+    try { assertRoleAllowed(ctx.actorRole, 'proposals.decide'); }
+    catch (e) { return { status: 403, body: { error: e instanceof Error ? e.message : String(e) } }; }
     const reason = (req.body as { reason?: string })?.reason ?? 'rejected';
     await withTenant(ctx, (tx) => rejectProposal(tx, ctx, id, reason));
     return { status: 200, body: { ok: true } };
