@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import {
-  profitAndLossTable, comparativeProfitAndLossTable, balanceSheetTable,
+  profitAndLossTable, comparativeProfitAndLossTable, balanceSheetTable, comparativeBalanceSheetTable,
   generalLedgerTable, trialBalanceTable, apAgingTable, type ReportLabels,
 } from '../../src/reports/tabular.js';
 
@@ -74,4 +74,60 @@ test('trialBalanceTable and apAgingTable produce expected columns', () => {
     { asOf: '2026-06-15', current: '60.00', d1_30: '0.00', d31_60: '0.00', d61_90: '0.00', d90plus: '0.00', total: '60.00' }, L);
   expect(aging.columns.map((c) => c.key)).toEqual(['current', 'd1_30', 'd31_60', 'd61_90', 'd90plus', 'total']);
   expect(aging.rows[0]!.cells).toEqual(['60.00', '0.00', '0.00', '0.00', '0.00', '60.00']);
+});
+
+// Labels whose text deliberately DIFFERS from the upstream English `name` strings baked into
+// the report fixtures below, so a serializer that ever falls back to `l.name` for a ''-coded
+// line would fail these assertions instead of silently passing with English text.
+const M: ReportLabels = {
+  ...L,
+  netProfit: 'NET', currentResult: 'REZ', totalAssets: 'TA', totalLiabEquity: 'TLE',
+};
+
+test('balanceSheetTable localizes the "" -coded equity result line via labels.currentResult', () => {
+  const bs = {
+    asOf: '2026-03-31',
+    assets: { lines: [{ code: '1000', name: 'Cash', amount: '500.00' }], subtotal: '500.00' },
+    liabilities: { lines: [{ code: '2000', name: 'Payables', amount: '100.00' }], subtotal: '100.00' },
+    // '' code + hardcoded English name, exactly as balance-sheet.ts produces for the current-period result line.
+    equity: { lines: [{ code: '', name: 'Current-period result', amount: '400.00' }], subtotal: '400.00' },
+    currentPeriodResult: '400.00', totalAssets: '500.00', totalLiabilitiesAndEquity: '500.00', balanced: true,
+  };
+  const t = balanceSheetTable(bs, M);
+  const resultRow = t.rows.find((r) => r.cells[0] === '' && r.kind === 'data')!;
+  expect(resultRow.cells[1]).toBe('REZ');
+  expect(resultRow.cells[1]).not.toBe('Current-period result');
+});
+
+test('comparativeProfitAndLossTable localizes the netProfit line via labels.netProfit', () => {
+  const c = {
+    current: { from: '2026-03-01', to: '2026-03-31' }, comparison: { from: '2026-02-01', to: '2026-02-28' },
+    income: { lines: [{ code: '6110', name: 'Sales', current: '300.00', comparison: '100.00', variance: '200.00', variancePct: '200.0' }], current: '300.00', comparison: '100.00', variance: '200.00', variancePct: '200.0' },
+    expense: { lines: [{ code: '7710', name: 'Expenses', current: '60.00', comparison: '0.00', variance: '60.00', variancePct: null }], current: '60.00', comparison: '0.00', variance: '60.00', variancePct: null },
+    // '' code + hardcoded English name, as comparative.ts produces via line('', 'Net profit', ...).
+    netProfit: { code: '', name: 'Net profit', current: '240.00', comparison: '100.00', variance: '140.00', variancePct: '140.0' },
+  };
+  const t = comparativeProfitAndLossTable(c, M);
+  const netRow = t.rows.at(-1)!;
+  expect(netRow.cells[1]).toBe('NET');
+  expect(netRow.cells[1]).not.toBe('Net profit');
+});
+
+test('comparativeBalanceSheetTable localizes totalAssets/totalLiabilitiesAndEquity via labels', () => {
+  const c = {
+    asOf: '2026-03-31', comparisonAsOf: '2026-02-28',
+    assets: { lines: [{ code: '1000', name: 'Cash', current: '500.00', comparison: '400.00', variance: '100.00', variancePct: '25.0' }], current: '500.00', comparison: '400.00', variance: '100.00', variancePct: '25.0' },
+    liabilities: { lines: [{ code: '2000', name: 'Payables', current: '100.00', comparison: '80.00', variance: '20.00', variancePct: '25.0' }], current: '100.00', comparison: '80.00', variance: '20.00', variancePct: '25.0' },
+    equity: { lines: [{ code: '3000', name: 'Capital', current: '400.00', comparison: '320.00', variance: '80.00', variancePct: '25.0' }], current: '400.00', comparison: '320.00', variance: '80.00', variancePct: '25.0' },
+    // '' code + hardcoded English names, as comparative.ts produces via line('', 'Total assets', ...) etc.
+    currentPeriodResult: { code: '', name: 'Current-period result', current: '0.00', comparison: '0.00', variance: '0.00', variancePct: null },
+    totalAssets: { code: '', name: 'Total assets', current: '500.00', comparison: '400.00', variance: '100.00', variancePct: '25.0' },
+    totalLiabilitiesAndEquity: { code: '', name: 'Total liabilities & equity', current: '500.00', comparison: '400.00', variance: '100.00', variancePct: '25.0' },
+  };
+  const t = comparativeBalanceSheetTable(c, M);
+  const rows = t.rows.filter((r) => r.kind === 'subtotal');
+  expect(rows.at(-2)!.cells[1]).toBe('TA');
+  expect(rows.at(-2)!.cells[1]).not.toBe('Total assets');
+  expect(rows.at(-1)!.cells[1]).toBe('TLE');
+  expect(rows.at(-1)!.cells[1]).not.toBe('Total liabilities & equity');
 });

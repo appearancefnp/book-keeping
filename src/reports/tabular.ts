@@ -2,8 +2,8 @@ import type { ProfitAndLoss, StatementSection } from './profit-and-loss.js';
 import type { BalanceSheet } from './balance-sheet.js';
 import type { ComparativeProfitAndLoss, ComparativeBalanceSheet, ComparativeSection, ComparativeLine } from './comparative.js';
 import type { GeneralLedger } from './general-ledger.js';
-import type { DatedBalanceRow } from './../ledger/balances.js';
-import type { ApAging } from './../payables/aging.js';
+import type { DatedBalanceRow } from '../ledger/balances.js';
+import type { ApAging } from '../payables/aging.js';
 
 export type CellKind = 'data' | 'subtotal' | 'section' | 'opening' | 'closing';
 export interface ReportColumn { key: string; label: string; align: 'left' | 'right' }
@@ -21,7 +21,7 @@ export interface ReportLabels {
 }
 
 const PCT = (v: string | null): string => (v === null ? '—' : v);
-const nameFor = (code: string, name: string, labels: ReportLabels): string => (code === '' ? (name || labels.currentResult) : name);
+const nameFor = (code: string, name: string, labels: ReportLabels): string => (code === '' ? labels.currentResult : name);
 
 // ---- single-period statements ----
 function statementSection(title: string, s: StatementSection, labels: ReportLabels): ReportRow[] {
@@ -76,8 +76,9 @@ const cmpCols = (labels: ReportLabels): ReportColumn[] => [
   { key: 'variance', label: labels.variance, align: 'right' },
   { key: 'variancePct', label: labels.variancePct, align: 'right' },
 ];
-function cmpLineRow(l: ComparativeLine, labels: ReportLabels, kind: CellKind = 'data'): ReportRow {
-  return { cells: [l.code, nameFor(l.code, l.name, labels), l.current, l.comparison, l.variance, PCT(l.variancePct)], kind };
+function cmpLineRow(l: ComparativeLine, labels: ReportLabels, kind: CellKind = 'data', nameOverride?: string): ReportRow {
+  const nm = nameOverride ?? nameFor(l.code, l.name, labels);
+  return { cells: [l.code, nm, l.current, l.comparison, l.variance, PCT(l.variancePct)], kind };
 }
 function cmpSection(title: string, s: ComparativeSection, labels: ReportLabels): ReportRow[] {
   const rows: ReportRow[] = [{ cells: [title, '', '', '', '', ''], kind: 'section' }];
@@ -94,7 +95,7 @@ export function comparativeProfitAndLossTable(c: ComparativeProfitAndLoss, label
       { label: labels.comparisonPeriod, value: `${c.comparison.from} – ${c.comparison.to}` },
     ],
     columns: cmpCols(labels),
-    rows: [...cmpSection(labels.income, c.income, labels), ...cmpSection(labels.expense, c.expense, labels), cmpLineRow(c.netProfit, labels, 'subtotal')],
+    rows: [...cmpSection(labels.income, c.income, labels), ...cmpSection(labels.expense, c.expense, labels), cmpLineRow(c.netProfit, labels, 'subtotal', labels.netProfit)],
   };
 }
 
@@ -110,8 +111,8 @@ export function comparativeBalanceSheetTable(c: ComparativeBalanceSheet, labels:
       ...cmpSection(labels.assets, c.assets, labels),
       ...cmpSection(labels.liabilities, c.liabilities, labels),
       ...cmpSection(labels.equity, c.equity, labels),
-      cmpLineRow(c.totalAssets, labels, 'subtotal'),
-      cmpLineRow(c.totalLiabilitiesAndEquity, labels, 'subtotal'),
+      cmpLineRow(c.totalAssets, labels, 'subtotal', labels.totalAssets),
+      cmpLineRow(c.totalLiabilitiesAndEquity, labels, 'subtotal', labels.totalLiabEquity),
     ],
   };
 }
