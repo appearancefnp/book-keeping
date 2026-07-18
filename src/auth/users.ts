@@ -27,9 +27,9 @@ export async function createUser(input: {
   return { id: res.rows[0].id, totpSecret };
 }
 
-export async function findUserByEmail(email: string): Promise<(UserRow & { passwordHash: string; totpSecret: string }) | null> {
+export async function findUserByEmail(email: string): Promise<(UserRow & { passwordHash: string; totpSecret: string; status: 'invited' | 'active' }) | null> {
   const res = await appPool.query(
-    `SELECT id, firm_id AS "firmId", email, role, language, password_hash AS "passwordHash", totp_secret AS "totpSecret"
+    `SELECT id, firm_id AS "firmId", email, role, language, status, password_hash AS "passwordHash", totp_secret AS "totpSecret"
      FROM users WHERE email = $1`,
     [email],
   );

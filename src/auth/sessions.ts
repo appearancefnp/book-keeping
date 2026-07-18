@@ -8,7 +8,7 @@ const SESSION_TTL_SECONDS = 60 * 60 * 12; // 12h
 
 export async function login(email: string, password: string, totpCode: string, atUnixSeconds: number): Promise<{ sessionToken: string }> {
   const user = await findUserByEmail(email);
-  if (!user || !verifyPassword(password, user.passwordHash)) throw new Error('Invalid credentials');
+  if (!user || user.status !== 'active' || !verifyPassword(password, user.passwordHash)) throw new Error('Invalid credentials');
   if (!verifyTotp(user.totpSecret, totpCode, atUnixSeconds)) throw new Error('Invalid 2FA code');
 
   const token = randomBytes(32).toString('hex');
