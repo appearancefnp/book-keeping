@@ -13,3 +13,6 @@ graphify-out/
 
 # Local dev document blobs
 web/.blob-store/
+
+# generated knowledge graph
+graphify-out/
