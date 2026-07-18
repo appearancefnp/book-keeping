@@ -14,15 +14,24 @@ export async function POST(req: Request) {
   if (!email || !password || !code)
     return NextResponse.json({ error: 'email, password and code are required' }, { status: 400 });
 
-  const ip = (req.headers.get('x-forwarded-for') ?? 'unknown').split(',')[0]!.trim();
+  const ip = clientIp(req);
   const identifiers = [`email:${email.toLowerCase()}`, `ip:${ip}`];
   const at = nowUnix();
-  if (!(await checkLoginAllowed(identifiers, at))) {
-    // Same shape/message as a bad login — no lockout oracle.
-    return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+
+  try {
+    if (!(await checkLoginAllowed(identifiers, at))) {
+      // Same shape/message as a bad login — no lockout oracle.
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    }
+  } catch {
+    // Fail open: login() below needs the DB anyway, so a limiter/DB outage can't
+    // be ridden to bypass credentials — availability of legitimate login wins.
   }
+
+  let authenticated = false;
   try {
     const { sessionToken } = await login(email, password, code, at);
+    authenticated = true;
     await clearLoginFailures(identifiers);
     (await cookies()).set(SESSION_COOKIE, sessionToken, {
       httpOnly: true,
@@ -33,8 +42,25 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (e) {
-    await recordLoginFailure(identifiers, at);
+    if (!authenticated) {
+      try {
+        await recordLoginFailure(identifiers, at);
+      } catch {
+        // Fail open, same rationale as the checkLoginAllowed guard above.
+      }
+    }
     const msg = e instanceof Error ? e.message : 'login failed';
     return NextResponse.json({ error: msg }, { status: 401 });
   }
+}
+
+function clientIp(req: Request): string {
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp) return realIp.trim();
+  const forwarded = req.headers.get('x-forwarded-for');
+  if (forwarded) {
+    const hops = forwarded.split(',');
+    return hops[hops.length - 1]!.trim();
+  }
+  return 'unknown';
 }
