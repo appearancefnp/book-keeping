@@ -7,6 +7,7 @@ import { withTenant } from '@domain/db/pool.js';
 import { listTasks, createTask } from '@domain/collab/tasks.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { parsePaging } from '@/app/lib/paging';
+import { assertRoleAllowed } from '@/app/lib/authz';
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
@@ -45,6 +46,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const ctx = await resolveTenantContext(token, body.clientCompanyId, nowUnix());
+    assertRoleAllowed(ctx.actorRole, 'tasks.write');
     const result = await withTenant(ctx, async (tx) => {
       return createTask(tx, ctx, { title: body.title!, detail: body.detail });
     });

@@ -6,7 +6,7 @@ import { validateSession } from '@domain/auth/sessions.js';
 import { listCurrentTariffsForFirm, setTariff } from '@domain/tariffs/tariffs.js';
 import { withTenant, appPool } from '@domain/db/pool.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
-import { errorToStatus } from '@/app/lib/authz';
+import { errorToStatus, isRoleAllowed } from '@/app/lib/authz';
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   if (!token) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
   const session = await validateSession(token, nowUnix());
   if (!session) return NextResponse.json({ error: 'Invalid or expired session' }, { status: 401 });
-  if (session.role !== 'firm_admin') {
+  if (!isRoleAllowed(session.role, 'tariffs.write')) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 

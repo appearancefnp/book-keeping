@@ -16,6 +16,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   if (!body.clientCompanyId) return NextResponse.json({ error: 'missing clientCompanyId' }, { status: 400 });
 
   try {
+    // Deliberately not role-gated: self-scoped mutation (affects only the caller's own rows).
     const tenantCtx = await resolveTenantContext(token, body.clientCompanyId, nowUnix());
     await withTenant(tenantCtx, async (tx) => {
       await markRead(tx, tenantCtx, id);

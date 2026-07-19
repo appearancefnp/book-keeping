@@ -7,7 +7,7 @@ import { listTemplatesForFirm, snapshotClientAsTemplate } from '@domain/onboardi
 import { withTenant, appPool } from '@domain/db/pool.js';
 import type { TenantContext } from '@domain/tenancy/context.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
-import { errorToStatus } from '@/app/lib/authz';
+import { errorToStatus, isRoleAllowed } from '@/app/lib/authz';
 
 export async function GET() {
   const token = await getSessionToken();
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   if (!token) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
   const session = await validateSession(token, nowUnix());
   if (!session) return NextResponse.json({ error: 'Invalid or expired session' }, { status: 401 });
-  if (session.role !== 'firm_admin') {
+  if (!isRoleAllowed(session.role, 'templates.write')) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 

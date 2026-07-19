@@ -6,7 +6,7 @@ import { validateSession } from '@domain/auth/sessions.js';
 import { listClientCompaniesForFirm } from '@domain/tenancy/firms.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { createClientFromTemplate } from '@domain/onboarding/templates.js';
-import { errorToStatus } from '@/app/lib/authz';
+import { errorToStatus, isRoleAllowed } from '@/app/lib/authz';
 
 export async function GET() {
   const token = await getSessionToken();
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   if (!token) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
   const session = await validateSession(token, nowUnix());
   if (!session) return NextResponse.json({ error: 'Invalid or expired session' }, { status: 401 });
-  if (session.role !== 'firm_admin') {
+  if (!isRoleAllowed(session.role, 'clients.write')) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 

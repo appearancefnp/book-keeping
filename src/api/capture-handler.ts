@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { withTenant } from '../db/pool.js';
 import { authed } from './handlers.js';
+import { assertRoleAllowed } from '../authz/policy.js';
 import type { AuthedRequest, ApiResponse } from './types.js';
 import type { BlobStore } from '../blob/blob-store.js';
 import type { DocumentExtractor } from '../intake/extractor.js';
@@ -12,6 +13,9 @@ export function makeCaptureHandler(deps: {
   blob: BlobStore; extractor: DocumentExtractor; resolveTemplate: (clientCompanyId: string) => PostingTemplate;
 }): (req: AuthedRequest) => Promise<ApiResponse> {
   return (req) => authed(req, async (ctx) => {
+    try { assertRoleAllowed(ctx.actorRole, 'documents.capture'); }
+    catch (e) { return { status: 403, body: { error: e instanceof Error ? e.message : String(e) } }; }
+
     const body = (req.body ?? {}) as { bytesBase64?: string; mime?: string };
     if (!body.bytesBase64 || !body.mime) return { status: 400, body: { error: 'bytesBase64 and mime are required' } };
 

@@ -1,6 +1,6 @@
-import { assertRoleAllowed, type Operation } from '@domain/authz/policy.js';
+import { assertRoleAllowed, isRoleAllowed, type Operation } from '@domain/authz/policy.js';
 
-export { assertRoleAllowed };
+export { assertRoleAllowed, isRoleAllowed };
 export type { Operation };
 
 /**

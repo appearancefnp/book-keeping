@@ -6,6 +6,7 @@ import { resolveTenantContext } from '@domain/auth/context.js';
 import { withTenant } from '@domain/db/pool.js';
 import { listComments, addComment } from '@domain/collab/comments.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
+import { assertRoleAllowed } from '@/app/lib/authz';
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const token = await getSessionToken();
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
   try {
     const tenantCtx = await resolveTenantContext(token, body.clientCompanyId, nowUnix());
+    assertRoleAllowed(tenantCtx.actorRole, 'tasks.write');
     const result = await withTenant(tenantCtx, async (tx) => {
       return addComment(tx, tenantCtx, { entityType: 'task', entityId: id, body: body.body! });
     });

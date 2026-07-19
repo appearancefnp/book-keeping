@@ -16,6 +16,7 @@ const model = process.env.ANTHROPIC_API_KEY
 const handler = makeAssistantHandler({ model, config });
 
 export async function POST(req: Request) {
+  // Deliberately not role-gated: per-user conversational surface, no direct ledger mutation.
   const token = await getSessionToken();
   if (!token) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
   const body = (await req.json().catch(() => ({}))) as { clientCompanyId?: string; question?: string; threadId?: string };

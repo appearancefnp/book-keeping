@@ -18,7 +18,12 @@ export type Operation =
   | 'bills.write' // create/void accounts-payable bills
   | 'payruns.write' // create accounts-payable pay-runs (SEPA pain.001)
   | 'proposals.decide' // approve/reject proposals in the approval queue
-  | 'users.write'; // create users / issue credential-reset invites
+  | 'users.write' // create users / issue credential-reset invites
+  | 'tasks.write' // create/resolve/comment on collab tasks
+  | 'documents.capture' // photograph/upload a document for AI intake
+  | 'clients.write' // admin: create client companies
+  | 'tariffs.write' // admin: manage tariffs
+  | 'templates.write'; // admin: manage onboarding templates
 
 /**
  * Which roles may perform each mutating operation.
@@ -40,6 +45,11 @@ const OPERATION_ROLES: Record<Operation, readonly UserRole[]> = {
   'payruns.write': ['firm_admin', 'accountant', 'employee'],
   'proposals.decide': ['firm_admin', 'accountant', 'owner'],
   'users.write': ['firm_admin'],
+  'tasks.write': ['firm_admin', 'accountant', 'owner', 'employee'],
+  'documents.capture': ['firm_admin', 'accountant', 'owner', 'employee'],
+  'clients.write': ['firm_admin'],
+  'tariffs.write': ['firm_admin'],
+  'templates.write': ['firm_admin'],
 };
 
 /** True if `role` is permitted to perform `op`. Unrecognised roles are denied. */
