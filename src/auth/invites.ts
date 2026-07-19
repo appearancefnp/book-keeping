@@ -25,6 +25,8 @@ export async function createInvite(
   try {
     await client.query('BEGIN');
     await client.query(`DELETE FROM user_invites WHERE user_id = $1 AND used_at IS NULL`, [userId]);
+    // Re-invite is the credential-reset path — live sessions must not survive it.
+    await client.query(`DELETE FROM sessions WHERE user_id = $1`, [userId]);
     await client.query(
       `UPDATE users SET status = 'invited', totp_secret = $2 WHERE id = $1`,
       [userId, generateTotpSecret()],

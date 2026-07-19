@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest';
 import { resetDb, closeDb } from '../helpers/db.js';
 import { createFirm } from '../../src/tenancy/firms.js';
 import { createUser } from '../../src/auth/users.js';
-import { login } from '../../src/auth/sessions.js';
+import { login, validateSession } from '../../src/auth/sessions.js';
 import { totpCodeFor } from '../../src/auth/totp.js';
 import { createInvite, previewInvite, acceptInvite } from '../../src/auth/invites.js';
 
@@ -72,6 +72,18 @@ test('re-invite rotates the TOTP secret and invalidates prior invites', async ()
   const secondPreview = await previewInvite(second, NOW);
   expect(secondPreview!.totpSecret).not.toBe(firstPreview!.totpSecret);
   expect(secondPreview!.otpauthUri).toContain(secondPreview!.totpSecret);
+});
+
+test('re-invite revokes the account\'s live sessions', async () => {
+  const { adminId, userId } = await setup();
+  const { token } = await createInvite(userId, adminId, NOW);
+  const preview = await previewInvite(token, NOW);
+  await acceptInvite(token, { password: 'a-strong-password-12', totpCode: totpCodeFor(preview!.totpSecret, NOW) }, NOW);
+  const { sessionToken } = await login('new@t.lv', 'a-strong-password-12', totpCodeFor(preview!.totpSecret, NOW), NOW);
+  expect(await validateSession(sessionToken, NOW)).not.toBeNull();
+
+  await createInvite(userId, adminId, NOW);
+  expect(await validateSession(sessionToken, NOW)).toBeNull();
 });
 
 test('short password is rejected', async () => {
