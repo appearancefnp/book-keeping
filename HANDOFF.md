@@ -348,6 +348,28 @@ quarterly periodicity logic.
   posting failures to 400. Other mutating routes (e.g. parties POST on a
   duplicate `UNIQUE(client, kind, reg_no)`) return 403 for what is really a
   400/409. Fold a shared error→status helper in when hardening.
+- **Hobby-release follow-ups (final branch review, 2026-07-19)** — none blocking,
+  triaged post-merge:
+  1. Prune/cap `login_attempts` (attacker-chosen identifiers grow the table
+     unbounded; fold into the session-row cleanup debt).
+  2. `POST /api/admin/users`: friendly duplicate-email message instead of raw
+     `e.message` pass-through (leaks constraint names; cross-firm email oracle
+     for firm_admins).
+  3. Firm-scope `clientCompanyIds` in the admin invite route (currently inert —
+     `resolveTenantContext` re-filters — but cheap defense-in-depth).
+  4. Health/startup signal when `VERCEL_ENV` is set without
+     `BLOB_READ_WRITE_TOKEN` (today the first upload 500s with EROFS).
+  5. Skip or scope the `ip:unknown` limiter identifier off-Vercel (shared
+     lockout bucket for headerless clients).
+  6. Route-level limiter tests (900s boundary, combined identifiers), bootstrap
+     `VERCEL_ENV` guard test, index on `user_invites.user_id`.
+  7. Cosmetics for the next `/simplify` pass: stale "fail open" comment in the
+     login route, hardcoded busy-ellipsis glyph, `admin.onb.error` key reuse,
+     invite-route GET/POST try-catch symmetry.
+  Accepted trade-offs (documented, no action): invited-login timing
+  side-channel, unrestricted created-role (product decision), invite token in
+  URL path (72h/single-use), blob-not-found → 400 mapping (pre-existing
+  pattern).
 
 ---
 
