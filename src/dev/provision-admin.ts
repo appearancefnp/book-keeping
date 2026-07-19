@@ -19,8 +19,18 @@ async function main() {
   let user = await findUserByEmail(email);
   let userId: string;
   if (user) {
+    const existingFirm = await appPool.query<{ name: string }>('SELECT name FROM firms WHERE id = $1', [user.firmId]);
+    const actualFirmName = existingFirm.rows[0]?.name ?? '(unknown firm)';
+    if (actualFirmName !== firmName) {
+      console.error(
+        `Refusing to provision: ${email} already belongs to firm "${actualFirmName}", not requested firm "${firmName}". ` +
+          'No invite issued and nothing was changed.',
+      );
+      process.exit(1);
+      return;
+    }
     userId = user.id;
-    console.log(`User ${email} exists — issuing a credential-reset invite.`);
+    console.log(`User ${email} exists in firm "${actualFirmName}" — issuing a credential-reset invite.`);
   } else {
     const firm = await createFirm(firmName);
     const created = await createUser({ firmId: firm.id, email, password: randomBytes(24).toString('hex'), role: 'firm_admin' });
