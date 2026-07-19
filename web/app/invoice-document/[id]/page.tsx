@@ -6,13 +6,13 @@ import { getEinvoiceUbl } from '@domain/einvoice/query.js';
 import { parseUblInvoice } from '@domain/einvoice/ubl.js';
 import { getInvoiceProfile } from '@domain/einvoice/invoice-profile.js';
 import { renderInvoiceHtml } from '@domain/einvoice/invoice-html.js';
-import { LocalBlobStore } from '@domain/blob/blob-store.js';
+import { makeBlobStore } from '@domain/blob/factory.js';
 import { PrintButton } from './PrintButton';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const blob = new LocalBlobStore(process.env.BLOB_DIR ?? '.blob-store');
+const blob = makeBlobStore();
 const LABEL_PRINT: Record<'lv' | 'en' | 'ru', string> = { lv: 'Drukāt / Saglabāt PDF', en: 'Print / Save as PDF', ru: 'Печать / Сохранить PDF' };
 
 export default async function InvoiceDocumentPage(

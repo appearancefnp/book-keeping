@@ -5,11 +5,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveTenantContext } from '@domain/auth/context.js';
 import { withTenant } from '@domain/db/pool.js';
 import { setInvoiceLogo } from '@domain/einvoice/invoice-profile.js';
-import { LocalBlobStore } from '@domain/blob/blob-store.js';
+import { makeBlobStore } from '@domain/blob/factory.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
 
-const blob = new LocalBlobStore(process.env.BLOB_DIR ?? '.blob-store');
+const blob = makeBlobStore();
 const MAX_BYTES = 1_000_000;
 
 export async function POST(req: NextRequest) {

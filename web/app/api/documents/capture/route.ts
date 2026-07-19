@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { makeCaptureHandler } from '@domain/api/capture-handler.js';
-import { LocalBlobStore } from '@domain/blob/blob-store.js';
+import { makeBlobStore } from '@domain/blob/factory.js';
 import { StubExtractor } from '@domain/intake/extractor.js';
 import { AnthropicExtractor } from '@domain/intake/anthropic-extractor.js';
 import { GeminiExtractor } from '@domain/intake/gemini-extractor.js';
@@ -33,7 +33,7 @@ function selectExtractor(): DocumentExtractor {
 }
 
 const handler = makeCaptureHandler({
-  blob: new LocalBlobStore(process.env.BLOB_DIR ?? '.blob-store'),
+  blob: makeBlobStore(),
   extractor: selectExtractor(),
   resolveTemplate: () => TEMPLATE,
 });
