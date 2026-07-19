@@ -57,6 +57,17 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > resolving it — still needs the same per-client account-mapping settings screen.
 > Next unblocked in the market-gaps sequence: M4 (AR lifecycle — being handled separately);
 > report export (M14 follow-on). M14 data-depth is done.
+> **Pre-cutover follow-ups (final branch review, 2026-07-19):**
+> 1. Run `scripts/bankfeed-sandbox.ts` against the live GoCardless sandbox before enabling
+>    real keys (acceptance was keyless/stub).
+> 2. A 429 on the account-details call fails the whole sync at connection level (now
+>    mitigated by per-requisition caching; residual on first sync).
+> 3. Cosmetics that ride: non-timing-safe cron secret compare, no confirmation on connection
+>    Remove, misleading success toast when a manual sync finds the consent expired, no
+>    maxDuration on the cron route, raw provider error text untranslated in `last_error`.
+> 4. With GoCardless keys unset in production the stub will "connect" a demo bank and import
+>    demo transactions into real books — the real-key cutover must remove stub-imported rows
+>    via the normal reversal flow.
 >
 > **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`
 > (not yet merged to `main`); full backend suite **333/333**, root+web typecheck clean, web

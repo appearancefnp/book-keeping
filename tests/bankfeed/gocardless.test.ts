@@ -60,3 +60,33 @@ test('malformed JSON body is normalized to the bank feed provider prefix', async
   const provider = new GoCardlessProvider('id', 'key');
   await expect(provider.listInstitutions('lv')).rejects.toThrow(/^bank feed provider/);
 });
+
+test('booked transaction with neither transactionId nor internalTransactionId throws', () => {
+  expect(() => mapBookedTransaction({
+    bookingDate: '2026-07-15',
+    transactionAmount: { amount: '-10.00', currency: 'EUR' },
+  })).toThrow(/^bank feed provider/);
+});
+
+test('getRequisition caches account details per requisition — /details/ fetched once across two calls', async () => {
+  let detailsCalls = 0;
+  vi.stubGlobal('fetch', (url: string) => {
+    if (url.endsWith('/token/new/')) {
+      return Promise.resolve(new Response(JSON.stringify({ access: 'tok', access_expires: 3600 }), { status: 200 }));
+    }
+    if (url.endsWith('/requisitions/req-1/')) {
+      return Promise.resolve(new Response(JSON.stringify({ status: 'LN', accounts: ['acc-1'] }), { status: 200 }));
+    }
+    if (url.endsWith('/accounts/acc-1/details/')) {
+      detailsCalls++;
+      return Promise.resolve(new Response(JSON.stringify({ account: { iban: 'LV11TEST0000000000001', currency: 'EUR' } }), { status: 200 }));
+    }
+    return Promise.resolve(new Response('not found', { status: 404 }));
+  });
+  const provider = new GoCardlessProvider('id', 'key');
+  const first = await provider.getRequisition('req-1');
+  const second = await provider.getRequisition('req-1');
+  expect(first.accounts).toEqual([{ providerAccountId: 'acc-1', iban: 'LV11TEST0000000000001', currency: 'EUR' }]);
+  expect(second.accounts).toEqual(first.accounts);
+  expect(detailsCalls).toBe(1);
+});

@@ -27,6 +27,8 @@ export interface GcBookedTransaction {
 export function mapBookedTransaction(t: GcBookedTransaction): FeedTxn {
   const amount = t.transactionAmount?.amount ?? '0';
   const debit = amount.startsWith('-');
+  const providerTxId = t.transactionId ?? t.internalTransactionId;
+  if (!providerTxId) throw new Error('bank feed provider: booked transaction has neither transactionId nor internalTransactionId');
   return {
     bookingDate: t.bookingDate ?? '',
     amount,
@@ -34,7 +36,7 @@ export function mapBookedTransaction(t: GcBookedTransaction): FeedTxn {
     reference: t.remittanceInformationUnstructured ?? (t.remittanceInformationUnstructuredArray ?? []).join(' '),
     counterparty: (debit ? t.creditorName : t.debtorName) ?? '',
     endToEndId: t.endToEndId ?? '',
-    providerTxId: t.transactionId ?? t.internalTransactionId ?? '',
+    providerTxId,
   };
 }
 
@@ -49,6 +51,9 @@ export function consentExpiry(accepted: string | null, accessValidForDays: numbe
 export class GoCardlessProvider implements BankFeedProvider {
   readonly name = 'gocardless';
   private token: { access: string; expiresAt: number } | null = null;
+  /** Accounts of a requisition are immutable at the provider — cached to avoid burning the
+   *  ~4/day per-account rate budget on `/accounts/{id}/details/` on every sync. */
+  private accountsCache = new Map<string, RequisitionState['accounts']>();
   constructor(private secretId: string, private secretKey: string) {}
 
   /** fetch() with every rejection normalized to the `bank feed provider` prefix. */
@@ -119,11 +124,17 @@ export class GoCardlessProvider implements BankFeedProvider {
       const agr = await this.api<{ accepted?: string | null; access_valid_for_days?: number }>(`/agreements/enduser/${req.agreement}/`);
       consentExpiresAt = consentExpiry(agr.accepted ?? null, agr.access_valid_for_days ?? null);
     }
-    const accounts: RequisitionState['accounts'] = [];
+    let accounts: RequisitionState['accounts'] = [];
     if (status === 'linked') {
-      for (const accountId of req.accounts) {
-        const det = await this.api<{ account?: { iban?: string; currency?: string } }>(`/accounts/${accountId}/details/`);
-        accounts.push({ providerAccountId: accountId, iban: det.account?.iban ?? '', currency: det.account?.currency ?? 'EUR' });
+      const cached = this.accountsCache.get(requisitionId);
+      if (cached) {
+        accounts = cached;
+      } else {
+        for (const accountId of req.accounts) {
+          const det = await this.api<{ account?: { iban?: string; currency?: string } }>(`/accounts/${accountId}/details/`);
+          accounts.push({ providerAccountId: accountId, iban: det.account?.iban ?? '', currency: det.account?.currency ?? 'EUR' });
+        }
+        this.accountsCache.set(requisitionId, accounts);
       }
     }
     return { status, consentExpiresAt, accounts };
@@ -137,5 +148,6 @@ export class GoCardlessProvider implements BankFeedProvider {
 
   async deleteRequisition(requisitionId: string): Promise<void> {
     await this.api(`/requisitions/${requisitionId}/`, { method: 'DELETE' });
+    this.accountsCache.delete(requisitionId);
   }
 }
