@@ -7,6 +7,7 @@ import { withTenant } from '@domain/db/pool.js';
 import { listBankTransactions } from '@domain/banking/query.js';
 import type { BankTxnStatus } from '@domain/banking/query.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
+import { errorToStatus } from '@/app/lib/authz';
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
@@ -24,6 +25,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ transactions }, { status: 200 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: /session/i.test(msg) ? 401 : 403 });
+    return NextResponse.json({ error: msg }, { status: errorToStatus(msg) });
   }
 }

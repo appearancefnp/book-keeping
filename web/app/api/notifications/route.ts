@@ -7,6 +7,7 @@ import { withTenant } from '@domain/db/pool.js';
 import { listNotifications } from '@domain/collab/notifications.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { parsePaging } from '@/app/lib/paging';
+import { errorToStatus } from '@/app/lib/authz';
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
@@ -26,7 +27,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ notifications }, { status: 200 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    const httpStatus = /session/i.test(msg) ? 401 : 403;
-    return NextResponse.json({ error: msg }, { status: httpStatus });
+    return NextResponse.json({ error: msg }, { status: errorToStatus(msg) });
   }
 }

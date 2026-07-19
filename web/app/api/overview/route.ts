@@ -8,6 +8,7 @@ import { trialBalance } from '@domain/ledger/balances.js';
 import { explainVat } from '@domain/tax/explain.js';
 import { outstandingReceivables } from '@domain/banking/sepa.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
+import { errorToStatus } from '@/app/lib/authz';
 
 const VAT_CONFIG = { outputVatAccount: '5721', inputVatAccount: '5722' };
 
@@ -47,7 +48,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(data, { status: 200 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    const status = /session/i.test(msg) ? 401 : 403;
-    return NextResponse.json({ error: msg }, { status });
+    return NextResponse.json({ error: msg }, { status: errorToStatus(msg) });
   }
 }

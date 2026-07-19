@@ -7,7 +7,7 @@ import { withTenant } from '@domain/db/pool.js';
 import { listTasks, createTask } from '@domain/collab/tasks.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { parsePaging } from '@/app/lib/paging';
-import { assertRoleAllowed } from '@/app/lib/authz';
+import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
@@ -27,8 +27,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ tasks }, { status: 200 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    const httpStatus = /session/i.test(msg) ? 401 : 403;
-    return NextResponse.json({ error: msg }, { status: httpStatus });
+    return NextResponse.json({ error: msg }, { status: errorToStatus(msg) });
   }
 }
 
@@ -53,7 +52,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    const httpStatus = /session/i.test(msg) ? 401 : 403;
-    return NextResponse.json({ error: msg }, { status: httpStatus });
+    return NextResponse.json({ error: msg }, { status: errorToStatus(msg) });
   }
 }
