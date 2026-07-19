@@ -41,7 +41,13 @@ export class VercelBlobStore implements BlobStore {
 
   async get(key: string): Promise<{ bytes: Buffer; mime: string }> {
     const { get } = await import('@vercel/blob');
-    const result = await get(key, { access: 'private' });
+    // useCache: false — most keys are immutable (UUID document keys), but the
+    // invoice-logo key (invoice-logo/<clientCompanyId>) is overwritten in
+    // place via put()'s allowOverwrite: true and re-read by the invoice
+    // document page. At this app's volume, correctness of re-uploaded content
+    // outweighs the latency saved by CDN read caching, so always fetch fresh
+    // from origin rather than risk serving a stale blob for the cache TTL.
+    const result = await get(key, { access: 'private', useCache: false });
     if (!result) throw new Error(`blob not found: ${key}`);
     if (result.statusCode !== 200) throw new Error(`blob fetch failed: status ${result.statusCode}`);
     const bytes = Buffer.from(await new Response(result.stream).arrayBuffer());
