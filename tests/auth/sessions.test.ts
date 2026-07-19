@@ -44,14 +44,22 @@ test('an expired session does not validate', async () => {
   const { sessionToken } = await login('a@b.lv', 'password123', totpCodeFor(totpSecret, NOW), NOW);
   expect(await validateSession(sessionToken, NOW + 60 * 60 * 24 * 30)).toBeNull(); // 30 days later
 });
-test('successful login sweeps expired session rows', async () => {
+test('successful login sweeps expired session rows on the injected clock, and does not touch live ones', async () => {
   const { userId, totpSecret } = await seedUser();
-  // seed an expired session directly
+  // seed an expired session relative to the test's own clock (NOW), not DB now() —
+  // the sweep must compare against atUnixSeconds, not the database's wall clock.
   await appPool.query(
-    `INSERT INTO sessions(token, user_id, expires_at) VALUES ('deadbeef', $1, now() - interval '1 hour')`,
-    [userId],
+    `INSERT INTO sessions(token, user_id, expires_at) VALUES ('deadbeef', $1, to_timestamp($2))`,
+    [userId, NOW - 3600],
+  );
+  // and a live session (per the test clock) that must survive the sweep
+  await appPool.query(
+    `INSERT INTO sessions(token, user_id, expires_at) VALUES ('alive1234', $1, to_timestamp($2))`,
+    [userId, NOW + 3600],
   );
   await login('a@b.lv', 'password123', totpCodeFor(totpSecret, NOW), NOW);
   const gone = await appPool.query(`SELECT 1 FROM sessions WHERE token = 'deadbeef'`);
   expect(gone.rowCount).toBe(0);
+  const alive = await appPool.query(`SELECT 1 FROM sessions WHERE token = 'alive1234'`);
+  expect(alive.rowCount).toBe(1);
 });

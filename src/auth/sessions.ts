@@ -13,8 +13,12 @@ export async function login(email: string, password: string, totpCode: string, a
 
   const token = randomBytes(32).toString('hex');
   const expiresAt = new Date((atUnixSeconds + SESSION_TTL_SECONDS) * 1000).toISOString();
-  // Opportunistic sweep: expired rows accumulate otherwise (12h TTL, no cron by design).
-  await appPool.query('DELETE FROM sessions WHERE expires_at < now()');
+  // Opportunistic sweep: expired rows accumulate otherwise (12h TTL, no cron by
+  // design). Best-effort — a sweep failure must not block a valid login — and on
+  // the injected clock so tests with fixed time behave like production.
+  try {
+    await appPool.query('DELETE FROM sessions WHERE expires_at < to_timestamp($1)', [atUnixSeconds]);
+  } catch { /* best-effort */ }
   await appPool.query('INSERT INTO sessions(token, user_id, expires_at) VALUES ($1,$2,$3)', [token, user.id, expiresAt]);
   return { sessionToken: token };
 }

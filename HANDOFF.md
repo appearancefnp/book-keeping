@@ -361,11 +361,18 @@ quarterly periodicity logic.
   `src/api/capture-handler.ts` (web + mobile), admin POSTs via `isRoleAllowed`, and
   `proposals.decide` in the shared `src/api/handlers.ts` (as before). Notifications
   read/read-all and the assistant stay deliberately ungated (self-scoped, per-user).
+  Migration-number collisions are now CI-guarded
+  (`tests/db/migration-numbering.test.ts` — the four historical 023–026 pairs
+  are grandfathered; new collisions fail).
 - **Uniform error-status mapping** — most routes map caught errors to
   `/session/i ? 401 : 403`. The einvoices POST additionally maps validation/
   posting failures to 400. Other mutating routes (e.g. parties POST on a
   duplicate `UNIQUE(client, kind, reg_no)`) return 403 for what is really a
-  400/409. ~~**Fold a shared error→status helper in when hardening.**~~ **FIXED 2026-07-19** — all routes now use `errorToStatus`.
+  400/409. ~~**Fold a shared error→status helper in when hardening.**~~ **FIXED 2026-07-19** — all web routes now use `errorToStatus`. One
+  exception: the shared `authed()` wrapper in `src/api/handlers.ts` keeps its
+  own local `/session/i ? 401 : 403` mapping rather than calling the helper —
+  currently equivalent since `resolveTenantContext` only ever throws one of
+  two messages, but fold it into `errorToStatus` the next time that file changes.
 - **Hobby-release follow-ups (final branch review, 2026-07-19)** — none blocking,
   triaged post-merge:
   1. ~~**Prune/cap `login_attempts`**~~ **FIXED 2026-07-19** (attacker-chosen identifiers grow the table
@@ -377,7 +384,12 @@ quarterly periodicity logic.
      `resolveTenantContext` re-filters — but cheap defense-in-depth).
   4. ~~**Health/startup signal when `VERCEL_ENV` is set without `BLOB_READ_WRITE_TOKEN`**~~ **FIXED 2026-07-19** (today the first upload 500s with EROFS).
   5. ~~**Skip or scope the `ip:unknown` limiter identifier off-Vercel**~~ **FIXED 2026-07-19** (shared
-     lockout bucket for headerless clients).
+     lockout bucket for headerless clients). Login route: fixed properly — a
+     null IP now falls back to email-only identifiers, so headerless clients
+     no longer share a bucket. Invite route: deliberately still uses the
+     shared `ip:unknown` bucket, because IP is the *only* identifier available
+     there — skipping the limiter for headerless clients would remove rate
+     limiting entirely, and a shared fail-closed bucket beats no limiting.
   6. ~~**Route-level limiter tests, bootstrap `VERCEL_ENV` guard test, index on `user_invites.user_id`**~~ **FIXED 2026-07-19** (900s boundary, combined identifiers).
   7. ~~**Cosmetics for the next `/simplify` pass: stale "fail open" comment in the login route, hardcoded busy-ellipsis glyph, `admin.onb.error` key reuse, invite-route GET/POST try-catch symmetry.**~~ **FIXED 2026-07-19**
   Accepted trade-offs (documented, no action): invited-login timing
