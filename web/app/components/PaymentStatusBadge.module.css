@@ -1,0 +1,30 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.open {
+  background: color-mix(in oklch, var(--ink-soft) 10%, var(--surface));
+  color: var(--ink-soft);
+}
+
+.partial {
+  background: color-mix(in oklch, var(--attention) 18%, var(--surface));
+  color: var(--attention);
+}
+
+.paid {
+  background: color-mix(in oklch, var(--ok) 18%, var(--surface));
+  color: var(--ok);
+}
+
+.void {
+  background: color-mix(in oklch, var(--ink-soft) 10%, var(--surface));
+  color: var(--ink-soft);
+  text-decoration: line-through;
+}

@@ -45,6 +45,10 @@ test('lists outbound einvoices with statuses', async () => {
   expect(row.peppolStatus).toBe('sent');
   expect(row.vidStatus).toBe('pending');
   expect(row.direction).toBe('outbound');
+  expect(row.status).toBe('open');
+  expect(row.amountPaidCents).toBe('0');
+  expect(row.outstandingCents).toBe('12100');
+  expect(row.dueDate).toBeNull();
 });
 
 test('getEinvoiceUbl returns the stored UBL for its id, null otherwise', async () => {
