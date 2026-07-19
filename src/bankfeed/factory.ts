@@ -2,18 +2,20 @@ import type { BankFeedProvider } from './provider.js';
 import { GoCardlessProvider } from './gocardless.js';
 import { StubBankFeedProvider } from './stub.js';
 
-let instance: BankFeedProvider | null = null;
+// Module-level state is NOT shared across Next.js route bundles in dev — each
+// route would get its own stub with its own in-memory requisitions. Stash the
+// singleton on globalThis so every route sees the same provider instance.
+const g = globalThis as typeof globalThis & { __bankFeedProvider?: BankFeedProvider };
 
 /**
  * GoCardless when credentials are present, auto-linking stub otherwise (keyless dev).
- * Singleton so the stub's in-memory requisitions survive across route invocations
- * within one dev server process. Tests construct StubBankFeedProvider directly.
+ * Tests construct StubBankFeedProvider directly.
  */
 export function makeBankFeedProvider(): BankFeedProvider {
-  if (!instance) {
+  if (!g.__bankFeedProvider) {
     const id = process.env.GOCARDLESS_SECRET_ID;
     const key = process.env.GOCARDLESS_SECRET_KEY;
-    instance = id && key ? new GoCardlessProvider(id, key) : new StubBankFeedProvider({ autoLink: true });
+    g.__bankFeedProvider = id && key ? new GoCardlessProvider(id, key) : new StubBankFeedProvider({ autoLink: true });
   }
-  return instance;
+  return g.__bankFeedProvider;
 }
