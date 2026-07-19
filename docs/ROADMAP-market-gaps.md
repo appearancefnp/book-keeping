@@ -35,7 +35,7 @@ These are absent everywhere (backend + UI) and, unlike the Phase 2–3 modules, 
 |---|-----|--------|-------|
 | M1 | **Financial statements** — Profit & Loss / Income Statement, Balance Sheet, Cash-Flow statement, Statement of Equity, on demand for any period | 🔶 | **P&L + Balance Sheet shipped 2026-07-10** — `src/reports/` (`profitAndLoss`, `balanceSheet` over `accountBalances`), read-only API routes, and the `/reports` page (period picker, trilingual, balanced-invariant indicator). Balance Sheet folds the unclosed current-period result into equity. **Cash-Flow statement + Statement of Equity still ⛔** (Cash-Flow needs activity classification — its own design). Distinct from the statutory *annual report* (`HANDOFF §5`, §6.8). Unblocks M5 (aged reports) and M14 (report depth). See `docs/superpowers/plans/2026-07-10-financial-statements.md`. |
 | M2 | **Accounts payable / vendor bills** — enter supplier bills, track what's owed, schedule/batch pay, AP aging | ✅ | **Shipped 2026-07-10** — `src/payables/` (bills, settlement, pay-run, aging), camt.053 debit matching (clear transit / settle direct), `/bills` + pay-run UI, aged-payables tab on `/reports` — the full money-out loop. M5 now has its AP half. |
-| M3 | **Live bank feeds (open banking / PSD2)** | 🔶 | `camt.053` file upload only — reads as "legacy" against every cloud competitor. Wire a feed provider (e.g. GoCardless Bank Account Data / Nordigen, Salt Edge) behind a new adapter mirroring the `AccessPoint`/`VidClient` seam; the existing matching engine consumes it unchanged. |
+| M3 | **Live bank feeds (open banking / PSD2)** | ✅ | **Shipped 2026-07-19** — `src/bankfeed/` (GoCardless Bank Account Data behind a `BankFeedProvider` seam mirroring `AccessPoint`/`VidClient`, plus a keyless auto-linking stub), connections/consent lifecycle UI on `/bank` + `/bank/callback`, daily Vercel cron (`web/vercel.json`) and manual "Sync now" feeding the existing camt.053 matching engine unchanged. Accepted limitations: cross-source dedup vs a camt.053 upload of the same account depends on the bank populating the end-to-end id in both sources; the hard-coded LR chart constants in `src/bankfeed/sync.ts` extend the pre-existing account-mapping debt (see M2 row / `HANDOFF.md`). See `docs/superpowers/specs/2026-07-19-bank-feeds-design.md`. |
 | M4 | **AR lifecycle** — quotes/estimates → convert to invoice; **recurring / subscription invoices**; automated payment reminders (dunning); customer statements; late fees | ⛔ | The invoice composer issues one-off invoices only. Recurring invoices + reminders are headline features in Xero/QB/FreshBooks. Builds on the existing `einvoice` + parties + notifications/task substrate. |
 | M5 | **Aged receivables / payables reports** | 🔶 | AP half shipped with M2 2026-07-10 (`src/payables/aging`, aged-payables tab on `/reports`). AR aging still ⛔ — `/overview` shows a receivables total but no aging buckets. |
 | M6 | **Expense claims / reimbursements** — employee expenses, mileage, receipt → claim → approve → reimburse | ⛔ | OCR intake exists but there is no claim workflow. Ties into payroll (reimbursement via pay) and the approval queue. |
@@ -101,8 +101,8 @@ The three that decide a head-to-head demo, do first, in order:
    existing ledger; no migration to start. Unlocks M5 and M14 cheaply.
 2. **M2 — Accounts payable / bills.** Completes the money-out half of bookkeeping; reuses
    parties + proposals + the `pain.001` composer.
-3. **M3 — Live bank feeds.** Feed adapter behind the established interface+stub seam; existing
-   matching engine consumes it unchanged.
+3. **M3 — Live bank feeds.** ✅ Shipped 2026-07-19 — feed adapter (GoCardless Bank Account Data)
+   behind the established interface+stub seam; existing matching engine consumes it unchanged.
 
 Then M4 (AR lifecycle) and M7 (credit notes) round out invoicing; M8–M13 follow the spec's
 Phase 2–3 order; Tiers 3–4 are opportunistic. Every item follows the house convention:

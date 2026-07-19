@@ -44,8 +44,19 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > printable-HTML PDF (`src/reports/report-html.ts`) for all five reports, over a neutral
 > `src/reports/tabular.ts` model, via `GET /api/reports/export` + per-tab export buttons.
 > **M14 is now complete.** ExcelJS is the one new (web-only) dependency.
-> Next unblocked in the market-gaps sequence: M3 (live bank feeds), M4 (AR lifecycle — being
-> handled separately); report export (M14 follow-on). M14 data-depth is done.
+> M3 (live bank feeds) — **shipped 2026-07-19** — `src/bankfeed/` (GoCardless Bank Account Data
+> behind the `BankFeedProvider` seam, mirroring `AccessPoint`/`VidClient`, plus a keyless
+> auto-linking stub for dev/demo), connections/consent lifecycle UI on `/bank` (`/bank/callback`
+> finalize), and a daily Vercel cron (`web/vercel.json`, `GET /api/cron/bank-sync`) plus manual
+> "Sync now" that both feed the existing camt.053 matching pipeline unchanged. Two accepted
+> limitations, both documented in `docs/superpowers/specs/2026-07-19-bank-feeds-design.md`:
+> cross-source dedup against a camt.053 upload of the same account only holds when the bank
+> populates the end-to-end id in both sources (normal for SEPA, but not guaranteed); and the
+> hard-coded LR chart account constants in `src/bankfeed/sync.ts` (`2310`/`5310`/`2620`/`2699`)
+> extend the existing "account-mapping is hard-coded" debt (§M2 follow-ups above) rather than
+> resolving it — still needs the same per-client account-mapping settings screen.
+> Next unblocked in the market-gaps sequence: M4 (AR lifecycle — being handled separately);
+> report export (M14 follow-on). M14 data-depth is done.
 >
 > **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`
 > (not yet merged to `main`); full backend suite **333/333**, root+web typecheck clean, web

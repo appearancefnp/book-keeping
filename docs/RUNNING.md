@@ -112,6 +112,25 @@ For real responses, set one of these env vars in `web/.env.local`:
 The assistant and the document extractor each pick up whichever key is set (Anthropic takes
 precedence, then Gemini, then Ollama, else Stub).
 
+### Bank feeds (GoCardless Bank Account Data)
+
+Defaults to a **Stub provider with auto-linking** — no API keys required; connecting a bank on
+`/bank` links a fake account and consent instantly for local/demo use.
+
+For a real feed, set these env vars in `web/.env.local` (and, in production, on the Vercel
+project — see §3.3):
+
+| Env var | Effect |
+|---|---|
+| `GOCARDLESS_SECRET_ID` / `GOCARDLESS_SECRET_KEY` | GoCardless Bank Account Data API credentials; both must be set to use the real provider (`src/bankfeed/factory.ts`) — absent ⇒ falls back to the keyless stub provider |
+| `CRON_SECRET` | Bearer token required by `GET /api/cron/bank-sync`; Vercel sends it automatically as the `Authorization` header for crons it triggers (`web/vercel.json`) — set it manually only when calling the route yourself (e.g. local testing) |
+
+To exercise the real GoCardless sandbox end-to-end outside the test suite, run
+`npx tsx scripts/bankfeed-sandbox.ts` (needs `GOCARDLESS_SECRET_ID`/`GOCARDLESS_SECRET_KEY` set) —
+it creates a requisition against the `SANDBOXFINANCE_SFIN0000` sandbox institution and prints a
+consent URL; open and approve it, then re-run the script with the printed requisition id to list
+the linked sandbox account(s) and a page of transactions.
+
 ---
 
 ## 3. Deploying on Vercel (Neon + Vercel Blob)
@@ -165,9 +184,14 @@ npm run migrate
    | `ADMIN_DATABASE_URL` | Neon **direct** string + `?sslmode=require` |
    | `BLOB_READ_WRITE_TOKEN` | from the Blob store (auto-set if linked) — enables `VercelBlobStore` (`src/blob/factory.ts` picks it over `LocalBlobStore` whenever this var is present) |
    | `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` | real AI extraction/assistant. Gemini's free tier is **not zero-retention** — don't feed real client documents through it until you're on a paid/zero-retention tier or have switched to `ANTHROPIC_API_KEY` (it takes precedence when both are set). Ollama is local-only; it does not run on Vercel. |
+   | `GOCARDLESS_SECRET_ID` / `GOCARDLESS_SECRET_KEY` | real GoCardless Bank Account Data provider for `/bank` feeds; leave unset to keep the keyless stub provider (auto-links a fake account, fine for a demo deployment) |
+   | `CRON_SECRET` | required once `web/vercel.json`'s cron is live — Vercel generates and injects it automatically for cron-triggered requests to `GET /api/cron/bank-sync`; no manual value needed unless you call the route yourself |
 
    Full var reference: `.env.example` (repo root) — it documents the Neon pooled/direct split and
    the Blob/Gemini notes inline; don't duplicate it here.
+
+   The daily bank-sync cron (`web/vercel.json`, `0 5 * * *` UTC) requires no setup beyond the repo
+   containing the file — Vercel registers it from the deployed project automatically.
 4. Deploy. `/api/dev/bootstrap` is dead in this environment on purpose — it self-guards on
    `NODE_ENV === 'production' || process.env.VERCEL_ENV` (`web/app/api/dev/bootstrap/route.ts`),
    and Vercel always sets `VERCEL_ENV`, so it 403s on every Vercel deployment, preview or
