@@ -168,8 +168,9 @@ building.
 **What exists:**
 - `src/einvoice/vid.ts` — **the seam.** `interface VidClient { submit(ublXml):
   Promise<{ ok; detail }> }`, `submitToVid(...)` records attempts + status,
-  `addWorkingDays()` for the 5-day due date (⚠️ **skips weekends only — LR public
-  holidays are deferred**; wire in the holiday calendar here).
+  `addWorkingDays()` for the 5-day due date (skips weekends **and** LR public
+  holidays — shared calendar `src/calendar/holidays.ts`, incl. the May 4 / Nov 18
+  observed-Monday rule).
 - `src/einvoice/outbound.ts` — overdue-VID detection.
 - `migrations/016_vid_submission_attempts.sql` — attempt audit trail.
 - `src/tax/vat-declaration.ts` — assembles the VAT declaration and exports XML
@@ -183,8 +184,8 @@ building.
   (spec §10.1) — the exact forms and norm references are not something to guess.
 - A submission scheduler: enqueue within the 5-working-day window, retry on
   failure, surface overdue items to the accountant.
-- The 5-day due-date calc needs the **LR public-holiday calendar** (currently
-  only weekends are skipped).
+- ~~The 5-day due-date calc needs the **LR public-holiday calendar** (currently
+  only weekends are skipped).~~ **FIXED 2026-07-19** — shared `src/calendar/holidays.ts` (observed-Monday rule included), also wired into payroll workdays.
 
 **Acceptance:** file a VAT declaration and push invoice data to the VID test
 environment; attempts recorded, overdue detection drives a notification/task.
@@ -283,7 +284,7 @@ LR-specific rules in every one.
   deliberately last), order PDF + eParaksts, employee self-service portal
   (instr. 2.3), AI helpers (7.x), scheduled auto-run (7.1), business-trip
   orders, company-level setup (2.1), MUN-regime calc (flag stored), advances,
-  LR public-holiday calendar (shared gap with `vid.ts`), EDS tax-book/sick-leave
+  EDS tax-book/sick-leave
   auto-import (manual monthly entry today).
 - **Fixed assets (§6.5)** — asset register, accounting + tax depreciation with
   automatic postings, disposal.
