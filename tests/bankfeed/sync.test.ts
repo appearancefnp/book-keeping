@@ -124,6 +124,30 @@ test('per-account failure records last_error, sibling account still imports, suc
   expect(conn.lastError).toBe('');
 });
 
+test('provider error carrying a .code property (e.g. ETIMEDOUT) stays per-account, not fatal', async () => {
+  const t = await makeFirmAndClient();
+  const p = new StubBankFeedProvider();
+  const id = await linkedConnection(t, p, [
+    { providerAccountId: 'acc-1', iban: 'LV11TEST0000000000001', currency: 'EUR' },
+    { providerAccountId: 'acc-2', iban: 'LV22TEST0000000000002', currency: 'EUR' },
+  ]);
+  p.transactionsByAccount.set('acc-2', [txn({ providerTxId: 'x2', endToEndId: '' })]);
+  const orig = p.fetchTransactions.bind(p);
+  p.fetchTransactions = async (accId: string, from: string) => {
+    if (accId === 'acc-1') throw Object.assign(new Error('fetch failed'), { code: 'ETIMEDOUT' });
+    return orig(accId, from);
+  };
+  const r = await withTenant(ctx(t), (tx) => syncConnection(tx, ctx(t), p, id, TODAY));
+  const byIban = Object.fromEntries(r.accounts.map((a) => [a.iban, a]));
+  expect(byIban['LV11TEST0000000000001']!.error).toMatch(/fetch failed/);
+  expect(byIban['LV22TEST0000000000002']!.imported).toBe(1);
+  const conn = await withTenant(ctx(t), (tx) => getConnection(tx, ctx(t), id));
+  expect(conn.lastError).toMatch(/fetch failed/);
+  const cursors = Object.fromEntries(conn.accounts.map((a) => [a.iban, a.lastSyncedDate]));
+  expect(cursors['LV11TEST0000000000001']).toBeNull();
+  expect(cursors['LV22TEST0000000000002']).toBe(TODAY);
+});
+
 test('database-level failure (malformed booking date) fails the whole sync atomically', async () => {
   const t = await makeFirmAndClient();
   const p = new StubBankFeedProvider();

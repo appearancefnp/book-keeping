@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg';
+import { DatabaseError } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
 import type { BankFeedProvider } from './provider.js';
 import type { BankStatement } from '../banking/camt-parser.js';
@@ -74,9 +75,10 @@ export async function syncConnection(
         [todayIso, a.id, ctx.clientCompanyId]);
       results.push({ iban: a.iban as string, imported: r.imported, skipped: r.skipped, error: null });
     } catch (err) {
-      // A database error has poisoned the transaction — no further queries can
-      // succeed, so fail the whole sync atomically (pg errors carry a SQLSTATE code).
-      if (err && typeof err === 'object' && 'code' in err) throw err;
+      // A Postgres error has poisoned the transaction — no further queries can
+      // succeed, so fail the whole sync atomically. Provider/network errors
+      // (including code-bearing ones like ETIMEDOUT) stay per-account.
+      if (err instanceof DatabaseError) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       lastError = lastError || `${a.iban}: ${msg}`;
       results.push({ iban: a.iban as string, imported: 0, skipped: 0, error: msg });
