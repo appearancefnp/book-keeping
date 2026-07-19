@@ -338,11 +338,11 @@ quarterly periodicity logic.
 >   concurrency.
 >
 > Still open from that audit (not blocking a pilot, but real gaps): **GDPR**
-> data export/erasure, **audit-log tamper detection (hash chain)**, **expired
-> session cleanup** (rows accumulate; correctness unaffected), **e-signature**,
-> and a real **password-reset UI** (today an admin re-invites the user via
-> Admin → Users, which resets credentials + 2FA — there's no self-service
-> "forgot password" flow).
+> data export/erasure, **audit-log tamper detection (hash chain)**, ~~**expired
+> session cleanup**~~ **FIXED 2026-07-19** (opportunistic sweep on login),
+> **e-signature**, and a real **password-reset UI** (today an admin re-invites
+> the user via Admin → Users, which resets credentials + 2FA — there's no
+> self-service "forgot password" flow).
 
 - **GDPR (§7/§9)** — data export + erasure workflows; none exist.
 - **E-signature (§6.7)** — document signing; not implemented.
@@ -353,18 +353,14 @@ quarterly periodicity logic.
 - **Open API + marketplace (§9, Phase 4)** — future ecosystem.
 - ~~**Rate limiting on login, audit-log tamper detection (hash chain)**~~ — rate
   limiting **FIXED 2026-07-19** (see above); the audit-log hash chain remains open.
-- **Role-gating on mutating API routes** — the settings screens (`/settings`:
-  periods, autonomy) are gated in the UI (Sidebar shows them only to
-  accountant/firm_admin), but the routes themselves (`/api/periods`,
-  `/api/autonomy`, and the other new mutating routes) only run
-  `resolveTenantContext` — no role check. This matches the existing posture
-  (tasks/notifications/proposals routes are the same; only `/api/admin/*` is
-  role-gated), so it is not a regression, but a client-assigned `employee` could
-  call these directly. ~~**Add server-side role checks when tightening authz.**~~ **FIXED 2026-07-19** — the `Operation` matrix (`src/authz/policy.ts`) now gates
-  tasks/capture/admin mutations (firm_admin/accountant/owner), enforced in
-  the shared `src/api/handlers.ts` so web and mobile surfaces are covered. Migration-number
-  collisions are now CI-guarded (`tests/db/migration-numbering.test.ts` — the four historical
-  023–026 pairs are grandfathered; new collisions fail).
+- ~~**Role-gating on mutating API routes**~~ **FIXED 2026-07-19** — the `Operation`
+  matrix (`src/authz/policy.ts`) is the single auditable policy and now also covers
+  `tasks.write` + `documents.capture` (all four roles; unknown roles denied) and the
+  admin mutations `clients.write`/`tariffs.write`/`templates.write` (firm_admin only).
+  Enforcement sits at each surface: task routes inline, document capture in the shared
+  `src/api/capture-handler.ts` (web + mobile), admin POSTs via `isRoleAllowed`, and
+  `proposals.decide` in the shared `src/api/handlers.ts` (as before). Notifications
+  read/read-all and the assistant stay deliberately ungated (self-scoped, per-user).
 - **Uniform error-status mapping** — most routes map caught errors to
   `/session/i ? 401 : 403`. The einvoices POST additionally maps validation/
   posting failures to 400. Other mutating routes (e.g. parties POST on a
