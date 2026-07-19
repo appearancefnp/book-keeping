@@ -1,15 +1,14 @@
 /**
- * Latvian public-holiday calendar for VID working-day due-date calculation (HANDOFF G6).
+ * Shared LR statutory public-holiday calendar ("Par svētku, atceres un atzīmējamām dienām").
+ * Consumers: VID working-day due dates (src/einvoice/vid.ts) and payroll workday math
+ * (src/payroll/workdays.ts). Computed per-year — fixed dates, Easter-derived movable
+ * feasts, and the observed-Monday rule (when May 4 or Nov 18 falls on a weekend, the
+ * following Monday is a holiday) — so no table needs maintaining. `addWorkingDays`
+ * takes an injectable `isHoliday` predicate, so the exact list stays confirmable/
+ * adjustable with the accountant (spec §10.1) without touching the arithmetic.
  *
- * Statutory source: "Par svētku, atceres un atzīmējamām dienām". The set is computed
- * per-year (fixed dates + Easter-derived movable feasts) so no table needs maintaining.
- * Kept as a pure, injectable source: `addWorkingDays` takes an `isHoliday` predicate,
- * so the exact list stays confirmable/adjustable with the accountant (spec §10.1)
- * without touching the working-day arithmetic.
- *
- * NOTE: only days that can fall on a weekday matter for a working-day count (weekends
- * are already skipped). Easter Sunday and Whit Sunday are Sundays by construction and
- * are included for completeness/reuse, not because they affect the count.
+ * NOTE: Easter Sunday and Whit Sunday are Sundays by construction — included for
+ * completeness/reuse; they never affect a working-day count.
  */
 
 function iso(y: number, m: number, d: number): string {
@@ -45,10 +44,18 @@ function shiftIso(date: string, days: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
+/** The following Monday when `date` falls on a weekend, else null (May 4 / Nov 18 rule). */
+function observedMonday(date: string): string | null {
+  const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
+  if (dow === 6) return shiftIso(date, 2); // Saturday → Monday
+  if (dow === 0) return shiftIso(date, 1); // Sunday → Monday
+  return null;
+}
+
 /** The set of Latvian public holidays ('YYYY-MM-DD') for a given calendar year. */
 export function latvianHolidays(year: number): Set<string> {
   const easter = easterSunday(year);
-  return new Set<string>([
+  const set = new Set<string>([
     iso(year, 1, 1), // Jaunais gads — New Year
     shiftIso(easter, -2), // Lielā Piektdiena — Good Friday
     easter, // Lieldienas — Easter Sunday
@@ -64,6 +71,12 @@ export function latvianHolidays(year: number): Set<string> {
     iso(year, 12, 26), // Otrie Ziemassvētki — Second day of Christmas
     iso(year, 12, 31), // Vecgada vakars — New Year's Eve
   ]);
+  // Observed-Monday rule: only May 4 and Nov 18 shift when they fall on a weekend.
+  for (const d of [iso(year, 5, 4), iso(year, 11, 18)]) {
+    const observed = observedMonday(d);
+    if (observed) set.add(observed);
+  }
+  return set;
 }
 
 const cache = new Map<number, Set<string>>();

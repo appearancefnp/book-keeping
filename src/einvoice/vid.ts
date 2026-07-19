@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
 import { appendAudit } from '../audit/audit.js';
-import { isLatvianHoliday } from './holidays.js';
+import { isLatvianHoliday } from '../calendar/holidays.js';
 
 export interface VidClient { submit(ublXml: string): Promise<{ ok: boolean; detail: string }>; }
 
