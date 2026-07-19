@@ -1,5 +1,9 @@
-import { expect, test } from 'vitest';
-import { mapRequisitionStatus, mapBookedTransaction, consentExpiry } from '../../src/bankfeed/gocardless.js';
+import { afterEach, expect, test, vi } from 'vitest';
+import { mapRequisitionStatus, mapBookedTransaction, consentExpiry, GoCardlessProvider } from '../../src/bankfeed/gocardless.js';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 test('requisition status mapping', () => {
   expect(mapRequisitionStatus('LN')).toBe('linked');
@@ -43,4 +47,16 @@ test('consent expiry = accepted + access_valid_for_days', () => {
   expect(consentExpiry('2026-07-19T10:00:00Z', 90)).toBe('2026-10-17T10:00:00.000Z');
   expect(consentExpiry(null, 90)).toBeNull();
   expect(consentExpiry('2026-07-19T10:00:00Z', null)).toBeNull();
+});
+
+test('network failure (fetch rejects) is normalized to the bank feed provider prefix', async () => {
+  vi.stubGlobal('fetch', () => Promise.reject(new TypeError('fetch failed')));
+  const provider = new GoCardlessProvider('id', 'key');
+  await expect(provider.listInstitutions('lv')).rejects.toThrow(/^bank feed provider/);
+});
+
+test('malformed JSON body is normalized to the bank feed provider prefix', async () => {
+  vi.stubGlobal('fetch', () => Promise.resolve(new Response('not json', { status: 200 })));
+  const provider = new GoCardlessProvider('id', 'key');
+  await expect(provider.listInstitutions('lv')).rejects.toThrow(/^bank feed provider/);
 });

@@ -51,29 +51,51 @@ export class GoCardlessProvider implements BankFeedProvider {
   private token: { access: string; expiresAt: number } | null = null;
   constructor(private secretId: string, private secretKey: string) {}
 
+  /** fetch() with every rejection normalized to the `bank feed provider` prefix. */
+  private async request(url: string, init: RequestInit | undefined, what: string): Promise<Response> {
+    try {
+      return await fetch(url, init);
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('bank feed provider')) throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`bank feed provider: ${what} failed (network: ${msg})`);
+    }
+  }
+
+  /** res.json() with every rejection normalized to the `bank feed provider` prefix. */
+  private async json<T>(res: Response, what: string): Promise<T> {
+    try {
+      return (await res.json()) as T;
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('bank feed provider')) throw err;
+      throw new Error(`bank feed provider: ${what} returned malformed JSON`);
+    }
+  }
+
   private async accessToken(): Promise<string> {
     if (this.token && Date.now() < this.token.expiresAt) return this.token.access;
-    const res = await fetch(`${BASE}/token/new/`, {
+    const res = await this.request(`${BASE}/token/new/`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ secret_id: this.secretId, secret_key: this.secretKey }),
-    });
+    }, 'token request');
     if (!res.ok) throw new Error(`bank feed provider: token request failed (${res.status})`);
-    const body = (await res.json()) as { access: string; access_expires: number };
+    const body = await this.json<{ access: string; access_expires: number }>(res, 'token request');
     this.token = { access: body.access, expiresAt: Date.now() + (body.access_expires - 60) * 1000 };
     return this.token.access;
   }
 
   private async api<T>(path: string, init?: RequestInit): Promise<T> {
     const token = await this.accessToken();
-    const res = await fetch(`${BASE}${path}`, {
+    const what = `${init?.method ?? 'GET'} ${path}`;
+    const res = await this.request(`${BASE}${path}`, {
       ...init,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(init?.headers ?? {}) },
-    });
+    }, what);
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
-      throw new Error(`bank feed provider: ${init?.method ?? 'GET'} ${path} failed (${res.status}) ${detail.slice(0, 200)}`);
+      throw new Error(`bank feed provider: ${what} failed (${res.status}) ${detail.slice(0, 200)}`);
     }
-    return (await res.json()) as T;
+    return this.json<T>(res, what);
   }
 
   async listInstitutions(country: string): Promise<Institution[]> {
