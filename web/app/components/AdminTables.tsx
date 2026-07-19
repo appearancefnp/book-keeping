@@ -269,7 +269,7 @@ export function AdminTables({ clients, users, audit, role }: AdminTablesProps) {
         )}
         {invite && <InviteLinkDisplay invite={invite} />}
         {reinviteError && (
-          <p className={styles.error} role="status" aria-live="polite">{t('admin.onb.error')}</p>
+          <p className={styles.error} role="status" aria-live="polite">{t('admin.error')}</p>
         )}
         <UsersTable
           users={users}

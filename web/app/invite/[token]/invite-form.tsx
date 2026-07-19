@@ -164,7 +164,7 @@ export function InviteForm({ token }: { token: string }) {
           className={styles.btn}
           disabled={busy || password.length < 12 || totpCode.length !== 6}
         >
-          {busy ? '…' : t('invite.activate')}
+          {busy ? t('state.loading') : t('invite.activate')}
         </button>
       </div>
     </form>

@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { runMigrations } from '@domain/db/migrate.js';
+import { devBootstrapAllowed } from '@domain/dev/guard.js';
 import { createFirm, createClientCompany } from '@domain/tenancy/firms.js';
 import { createUser, findUserByEmail } from '@domain/auth/users.js';
 import { assignUserToClient, resolveTenantContext } from '@domain/auth/context.js';
@@ -21,7 +22,7 @@ const DEV_EMAIL = 'accountant@demo.lv';
 const DEV_PASSWORD = 'password123';
 
 export async function GET(req: Request) {
-  if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV) {
+  if (!devBootstrapAllowed(process.env)) {
     return NextResponse.json({ error: 'not available in production' }, { status: 403 });
   }
 

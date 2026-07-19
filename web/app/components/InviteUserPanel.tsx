@@ -104,7 +104,7 @@ export function InviteUserPanel({ clients, onInvited }: InviteUserPanelProps) {
       )}
       {error && (
         <p className={styles.error} role="status" aria-live="polite">
-          {t('admin.onb.error')}
+          {t('admin.error')}
         </p>
       )}
     </div>
