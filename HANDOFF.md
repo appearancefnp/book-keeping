@@ -284,6 +284,43 @@ quarterly periodicity logic.
 
 ## Cross-cutting, before or alongside the above
 
+> **Production-readiness go-live work, closed 2026-07-19** (see
+> `docs/audit/PRODUCTION-READINESS.md` for the original blocker/gap list and
+> `docs/RUNNING.md` §3 for the Neon+Vercel deploy runbook this unblocked):
+> - ~~No user provisioning over HTTP; no 2FA enrolment~~ **FIXED** — invite-based
+>   provisioning (`src/auth/invites.ts`, `migrations/033_user_invites.sql`):
+>   `npm run provision-admin` (CLI, first admin only) or **Admin → Users**
+>   (`POST /api/admin/users`, `users.write`) issue a single-use, 72h `/invite/<token>`;
+>   the `/invite/[token]` page collects a password and enrols TOTP via QR before
+>   the account activates.
+> - ~~Blob storage is local-disk only (uploads lost between invocations)~~
+>   **FIXED** — `VercelBlobStore` (`src/blob/vercel-blob-store.ts`), selected by
+>   `makeBlobStore()` whenever `BLOB_READ_WRITE_TOKEN` is set
+>   (`src/blob/factory.ts`), `LocalBlobStore` remains the dev/test default.
+>   Private access; a cache-bypass fix (`useCache: false` on read) ships
+>   alongside so an overwritten key (the invoice logo) never serves stale bytes.
+> - ~~No login rate limiting / lockout~~ **FIXED** — 5 failures / 15 minutes,
+>   tracked per email *and* per IP (`src/auth/rate-limit.ts`), wired into
+>   `POST /api/auth/login` and the invite-accept route, fail-closed on limiter
+>   errors.
+> - ~~Session cookie missing `secure: true`; no security headers~~ **FIXED** —
+>   `secure: true` in production on the session cookie
+>   (`web/app/api/auth/login/route.ts`); HSTS, `X-Content-Type-Options`,
+>   `X-Frame-Options: DENY`, `Referrer-Policy` on every response
+>   (`web/next.config.ts`).
+> - ~~No `/api/health` route; pool has no `max`/timeouts~~ **FIXED** —
+>   `GET /api/health` (`web/app/api/health/route.ts`, `SELECT 1`); pools capped
+>   at `max: 5` with `connectionTimeoutMillis`/`idleTimeoutMillis`
+>   (`src/db/pool.ts`), sized for Neon's pooled endpoint under serverless
+>   concurrency.
+>
+> Still open from that audit (not blocking a pilot, but real gaps): **GDPR**
+> data export/erasure, **audit-log tamper detection (hash chain)**, **expired
+> session cleanup** (rows accumulate; correctness unaffected), **e-signature**,
+> and a real **password-reset UI** (today an admin re-invites the user via
+> Admin → Users, which resets credentials + 2FA — there's no self-service
+> "forgot password" flow).
+
 - **GDPR (§7/§9)** — data export + erasure workflows; none exist.
 - **E-signature (§6.7)** — document signing; not implemented.
 - **Push dispatch** — `src/push/device-tokens.ts` queues, but no APNs/FCM send.
@@ -291,8 +328,8 @@ quarterly periodicity logic.
   app with camera capture (added in the adapt pass); the spec wants a native
   app with offline photo queueing.
 - **Open API + marketplace (§9, Phase 4)** — future ecosystem.
-- **Rate limiting on login, audit-log tamper detection (hash chain)** — security
-  hardening flagged in the audit.
+- ~~**Rate limiting on login, audit-log tamper detection (hash chain)**~~ — rate
+  limiting **FIXED 2026-07-19** (see above); the audit-log hash chain remains open.
 - **Role-gating on mutating API routes** — the settings screens (`/settings`:
   periods, autonomy) are gated in the UI (Sidebar shows them only to
   accountant/firm_admin), but the routes themselves (`/api/periods`,

@@ -114,32 +114,127 @@ precedence, then Gemini, then Ollama, else Stub).
 
 ---
 
-## 3. Deploying on Vercel
+## 3. Deploying on Vercel (Neon + Vercel Blob)
 
 The `web/` Next.js app deploys to Vercel; the backend domain ships with it (route handlers run as
-**Node.js** serverless functions — `pg` needs the Node runtime, not Edge).
+**Node.js** serverless functions — `pg` needs the Node runtime, not Edge). This is the concrete,
+copy-paste sequence used for the hobby release; the only things you fill in are your own
+`<your-deployment>` hostname and secrets.
 
-1. **Managed Postgres.** Add one from the Vercel Marketplace (Neon or Supabase) or bring your own.
-   You need two connection strings / roles:
-   - an **admin/owner** connection to run migrations (`ADMIN_DATABASE_URL`),
-   - the **runtime app role** `bookkeeping_app` (`DATABASE_URL`).
-   On a managed DB, create the `bookkeeping_app` role + grants once — `migrations/000_bootstrap.sql`
-   does this when migrations run as the admin/owner. If the provider won't let you create roles, you
-   can point both URLs at the same role for a quick POC, but you lose the DB-enforced role separation
-   (append-only + RLS still work via `FORCE ROW LEVEL SECURITY`; ownership-level protections relax).
-2. **Env vars** (Vercel Project → Settings → Environment Variables): `DATABASE_URL`,
-   `ADMIN_DATABASE_URL`, and — for real extraction — `GEMINI_API_KEY` or `ANTHROPIC_API_KEY`.
-   (Ollama is local-only; it won't run on Vercel — use a hosted model there.)
-3. **Run migrations against the hosted DB** once before/at first deploy: `npm run migrate` locally
-   with `.env` pointing at the hosted `ADMIN_DATABASE_URL`, or as a one-off deploy step.
-4. **Root Directory** = `web` in the Vercel project settings (the deployable app). Framework preset:
-   Next.js. Build command / output are auto-detected.
-5. Disable or guard the **`/api/dev/bootstrap`** route in production — it is dev-only (it self-guards
-   on `NODE_ENV !== 'production'`, but confirm before shipping publicly).
-6. Consider **Vercel AI Gateway** to front the LLM provider with fallbacks (optional; see oss-poc-options.md).
+### 3.1 Create the Neon project
 
-> Optional: front the whole thing with a `vercel.ts` config (`@vercel/config`) if you need custom
-> rewrites/headers/crons later. Not required for the POC.
+1. [console.neon.tech](https://console.neon.tech) → **New project** (free tier is fine).
+2. Neon gives you a **pooled** connection string (host contains `-pooler`) and a **direct** one
+   (same host without `-pooler`). You need both, each with `?sslmode=require` appended:
+   - **pooled** → `DATABASE_URL` (the app's runtime role, `bookkeeping_app`; every route handler
+     runs as a short-lived serverless invocation, so this must go through Neon's pooler)
+   - **direct** → `ADMIN_DATABASE_URL` (migrations + `provision-admin`; infrequent, needs a plain
+     session-mode connection, not the transaction pooler)
+   - Both roles matter because `src/db/pool.ts` caps each pool at **`max: 5`** connections
+     (`connectionTimeoutMillis: 10_000`, `idleTimeoutMillis: 30_000`) — sized to survive many
+     concurrent serverless invocations against a free-tier Postgres without exhausting it.
+3. On a fresh Neon DB, connect **as the Neon-created owner role** for `ADMIN_DATABASE_URL` —
+   `migrations/000_bootstrap.sql` creates the non-owner `bookkeeping_app` role (and its grants +
+   `FORCE ROW LEVEL SECURITY` policies) the first time migrations run, so `DATABASE_URL` only
+   works *after* step 3.2.
+
+### 3.2 Run migrations against the hosted DB (from your machine, once)
+
+```bash
+# repo root — point .env at the Neon DB for this one run
+ADMIN_DATABASE_URL="postgres://<owner>:<pw>@<direct-host>/<db>?sslmode=require" \
+DATABASE_URL="postgres://<owner>:<pw>@<pooled-host>/<db>?sslmode=require" \
+npm run migrate
+```
+
+`npm run migrate` is idempotent (`node --env-file=.env --import tsx src/db/migrate.ts`,
+`package.json`) — safe to re-run after every subsequent deploy that adds migrations.
+
+### 3.3 Create the Vercel project
+
+1. Import the repo → **Root Directory** = `web` (the deployable app; Framework preset Next.js,
+   build/output auto-detected — `next build --webpack`, per `web/package.json`).
+2. **Storage → Blob** in the Vercel dashboard → create a store, **private** access. Linking it to
+   the project auto-injects `BLOB_READ_WRITE_TOKEN`; if you created the store separately, copy its
+   read-write token into the env var by hand.
+3. **Project → Settings → Environment Variables**, set for Production (and Preview if you use it):
+
+   | Var | Value |
+   |---|---|
+   | `DATABASE_URL` | Neon **pooled** string + `?sslmode=require` |
+   | `ADMIN_DATABASE_URL` | Neon **direct** string + `?sslmode=require` |
+   | `BLOB_READ_WRITE_TOKEN` | from the Blob store (auto-set if linked) — enables `VercelBlobStore` (`src/blob/factory.ts` picks it over `LocalBlobStore` whenever this var is present) |
+   | `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` | real AI extraction/assistant. Gemini's free tier is **not zero-retention** — don't feed real client documents through it until you're on a paid/zero-retention tier or have switched to `ANTHROPIC_API_KEY` (it takes precedence when both are set). Ollama is local-only; it does not run on Vercel. |
+
+   Full var reference: `.env.example` (repo root) — it documents the Neon pooled/direct split and
+   the Blob/Gemini notes inline; don't duplicate it here.
+4. Deploy. `/api/dev/bootstrap` is dead in this environment on purpose — it self-guards on
+   `NODE_ENV === 'production' || process.env.VERCEL_ENV` (`web/app/api/dev/bootstrap/route.ts`),
+   and Vercel always sets `VERCEL_ENV`, so it 403s on every Vercel deployment, preview or
+   production.
+
+Security posture that ships without any extra config: `web/next.config.ts` sends
+`Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and
+`Referrer-Policy: strict-origin-when-cross-origin` on every response; the session cookie sets
+`secure: true` whenever `NODE_ENV === 'production'` (`web/app/api/auth/login/route.ts`); and login
+is rate-limited to **5 failures / 15 minutes**, tracked per email *and* per IP
+(`src/auth/rate-limit.ts`, wired into `POST /api/auth/login` and the invite-accept route).
+
+### 3.4 Provision the first admin user
+
+There is no seed data in a hosted DB — `npm run provision-admin` creates (or re-invites) exactly
+one firm + `firm_admin` user and prints a single-use invite link. It's idempotent on email: run it
+again for the same email and it re-invites; run it for an email that already belongs to a
+*different* firm and it aborts without changing anything (`src/dev/provision-admin.ts`).
+
+```bash
+# repo root — same hosted connection strings as step 3.2
+ADMIN_DATABASE_URL="postgres://<owner>:<pw>@<direct-host>/<db>?sslmode=require" \
+DATABASE_URL="postgres://<owner>:<pw>@<pooled-host>/<db>?sslmode=require" \
+PROVISION_FIRM="My Firm" PROVISION_EMAIL="me@myfirm.lv" \
+npm run provision-admin
+```
+
+It prints:
+
+```
+Invite path (valid until <ISO timestamp>, single use):
+  /invite/<token>
+
+Open it as https://<your-deployment>/invite/<token>
+```
+
+The invite is valid **72 hours** and single-use (`src/auth/invites.ts` — `INVITE_TTL_SECONDS`).
+Open `https://<your-deployment>/invite/<token>` in a browser: the page (`web/app/invite/[token]/`)
+lets you set a password and shows a QR code (+ manual secret) to enrol TOTP 2FA in an
+authenticator app before the account activates. Once activated, invite more users the same way
+from **Admin → Users** in the cabinet (`POST /api/admin/users`, role-gated `users.write`) instead
+of re-running the CLI script — the CLI is only for the very first admin.
+
+### 3.5 Smoke-test checklist
+
+Run through all of these against the live deployment before calling it launched:
+
+- [ ] `GET https://<your-deployment>/api/health` → `{"ok":true}` (200; checks `SELECT 1` against
+      `DATABASE_URL` — `web/app/api/health/route.ts`).
+- [ ] Log in as the provisioned admin: email + password + current TOTP code.
+- [ ] Upload a document (Documents screen) and confirm OCR/extraction runs (Stub unless an AI key
+      is set).
+- [ ] Issue an invoice (Invoices → New) and confirm it posts and appears in the outbox.
+- [ ] **Blob cache-bypass check:** re-upload the invoice logo (Settings), then *immediately* open
+      an invoice document view — the **new** logo must render, not a stale cached one. This
+      exercises `VercelBlobStore.get`'s `useCache: false` read (`src/blob/vercel-blob-store.ts`),
+      which exists precisely because the logo key is overwritten in place
+      (`allowOverwrite: true`) rather than given a fresh key per upload.
+- [ ] Confirm `/api/dev/bootstrap` returns 403 on the deployed URL (it should — `VERCEL_ENV` is
+      always set on Vercel).
+
+### 3.6 Backups
+
+Neon's free tier includes point-in-time-restore (PITR) with a limited retention window — fine for
+a pilot, but add a scheduled `pg_dump` (e.g. a cron hitting a small script, or a manual habit)
+against `ADMIN_DATABASE_URL` **before** real client data volume grows, since free-tier PITR history
+is short.
 
 ---
 
@@ -150,6 +245,7 @@ The `web/` Next.js app deploys to Vercel; the backend domain ships with it (rout
 | `docker compose up -d db` | start local Postgres (5433) |
 | `npm run migrate` | apply migrations |
 | `npm run seed` | **wipe** + seed demo data (prints logins + 2FA) |
+| `PROVISION_FIRM=... PROVISION_EMAIL=... npm run provision-admin` | create/re-invite one firm_admin against a **hosted** DB; prints a single-use `/invite/<token>` link (72h TTL) |
 | `npm test` | full backend suite |
 | `npm run typecheck` | type-check backend |
 | `cd web && npm run dev` | run the cabinet UI at http://localhost:3000 |
