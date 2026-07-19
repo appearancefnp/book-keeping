@@ -53,7 +53,7 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > cross-source dedup against a camt.053 upload of the same account only holds when the bank
 > populates the end-to-end id in both sources (normal for SEPA, but not guaranteed); and the
 > hard-coded LR chart account constants in `src/bankfeed/sync.ts` (`2310`/`5310`/`2620`/`2699`)
-> extend the existing "account-mapping is hard-coded" debt (§M2 follow-ups above) rather than
+> extend the existing "account-mapping is hard-coded" debt (§M2 follow-ups below) rather than
 > resolving it — still needs the same per-client account-mapping settings screen.
 > Next unblocked in the market-gaps sequence: M4 (AR lifecycle — being handled separately);
 > report export (M14 follow-on). M14 data-depth is done.
