@@ -49,6 +49,7 @@ describe('latvianHolidays', () => {
 
   test('Nov 18 falling on a Saturday adds the following Monday (2028: Nov 18 = Saturday)', () => {
     const set = latvianHolidays(2028);
+    expect(set.has('2028-11-18')).toBe(true); // the day itself stays a holiday
     expect(set.has('2028-11-20')).toBe(true);
   });
 

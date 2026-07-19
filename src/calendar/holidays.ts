@@ -9,6 +9,9 @@
  *
  * NOTE: Easter Sunday and Whit Sunday are Sundays by construction — included for
  * completeness/reuse; they never affect a working-day count.
+ *
+ * LIMITATION: the Song and Dance Festival closing day (declared per festival, not
+ * computable) is not included — confirm per-festival with the accountant (spec §10.1).
  */
 
 function iso(y: number, m: number, d: number): string {
