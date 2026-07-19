@@ -18,7 +18,6 @@ function CallbackInner() {
   useEffect(() => {
     if (ran.current) return;
     if (!cid || !client) {
-      setDetail('missing parameters');
       setState('fail');
       return;
     }

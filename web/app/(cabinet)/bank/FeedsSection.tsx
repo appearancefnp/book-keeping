@@ -172,7 +172,7 @@ export function FeedsSection({ clientCompanyId }: { clientCompanyId: string }) {
           <button type="button" className={styles.primaryBtn} onClick={connect} disabled={!chosen || busy !== null}>
             {busy === 'connect' ? t('state.loading') : t('bankfeed.start')}
           </button>
-          <button type="button" className={styles.ghostBtn} onClick={() => setPicking(false)} disabled={busy !== null}>
+          <button type="button" className={styles.ghostBtn} onClick={() => { setPicking(false); setChosen(''); }} disabled={busy !== null}>
             {t('bankfeed.cancel')}
           </button>
         </div>
