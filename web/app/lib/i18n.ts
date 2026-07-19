@@ -132,6 +132,7 @@ export const EN = {
   'parties.kind.both': 'Customer & vendor',
   'parties.regNo': 'Reg. no.',
   'parties.vatNo': 'VAT no.',
+  'parties.paymentTerms': 'Payment terms (days)',
   'parties.save': 'Save',
   'parties.cancel': 'Cancel',
   'parties.edit': 'Edit',
@@ -187,6 +188,7 @@ export const EN = {
   'inv.note': 'Note',
   'inv.paymentTerms': 'Payment terms',
   'inv.dueDate': 'Due date',
+  'invoices.dueDate': 'Due date',
   'vid.strip': 'VID submissions',
   'vid.stripHint': 'Invoice data goes to VID within 5 working days of issue. Nothing here needs urgent action unless marked overdue.',
   'vid.due': 'due {date}',
@@ -470,6 +472,8 @@ export const EN = {
   'export.excel': 'Excel',
   'export.pdf': 'PDF',
   'export.generated': 'Generated',
+  'reports.tab.araging': 'Aged receivables',
+  'reports.aging.totalReceivable': 'Total receivable',
 } as const;
 
 export const LV: Record<keyof typeof EN, string> = {
@@ -606,6 +610,7 @@ export const LV: Record<keyof typeof EN, string> = {
   'parties.kind.both': 'Klients un piegādātājs',
   'parties.regNo': 'Reģ. nr.',
   'parties.vatNo': 'PVN nr.',
+  'parties.paymentTerms': 'Apmaksas termiņš (dienas)',
   'parties.save': 'Saglabāt',
   'parties.cancel': 'Atcelt',
   'parties.edit': 'Rediģēt',
@@ -661,6 +666,7 @@ export const LV: Record<keyof typeof EN, string> = {
   'inv.note': 'Piezīme',
   'inv.paymentTerms': 'Apmaksas nosacījumi',
   'inv.dueDate': 'Apmaksas termiņš',
+  'invoices.dueDate': 'Apmaksas termiņš',
   'vid.strip': 'VID iesniegšana',
   'vid.stripHint': 'Rēķinu dati VID jānodod 5 darbdienu laikā no izrakstīšanas. Nekas šeit neprasa steidzamu rīcību, ja vien nav atzīmēts kā nokavēts.',
   'vid.due': 'termiņš {date}',
@@ -944,6 +950,8 @@ export const LV: Record<keyof typeof EN, string> = {
   'export.excel': 'Excel',
   'export.pdf': 'PDF',
   'export.generated': 'Ģenerēts',
+  'reports.tab.araging': 'Debitoru parādi pēc termiņa',
+  'reports.aging.totalReceivable': 'Kopā debitori',
 };
 
 export const RU: Record<keyof typeof EN, string> = {
@@ -1080,6 +1088,7 @@ export const RU: Record<keyof typeof EN, string> = {
   'parties.kind.both': 'Клиент и поставщик',
   'parties.regNo': 'Рег. №',
   'parties.vatNo': '№ НДС',
+  'parties.paymentTerms': 'Срок оплаты (дни)',
   'parties.save': 'Сохранить',
   'parties.cancel': 'Отмена',
   'parties.edit': 'Изменить',
@@ -1135,6 +1144,7 @@ export const RU: Record<keyof typeof EN, string> = {
   'inv.note': 'Примечание',
   'inv.paymentTerms': 'Условия оплаты',
   'inv.dueDate': 'Срок оплаты',
+  'invoices.dueDate': 'Срок оплаты',
   'vid.strip': 'Подача в VID',
   'vid.stripHint': 'Данные счетов передаются в VID в течение 5 рабочих дней с выставления. Срочных действий не требуется, если нет пометки о просрочке.',
   'vid.due': 'срок {date}',
@@ -1418,6 +1428,8 @@ export const RU: Record<keyof typeof EN, string> = {
   'export.excel': 'Excel',
   'export.pdf': 'PDF',
   'export.generated': 'Сформировано',
+  'reports.tab.araging': 'Дебиторка по срокам',
+  'reports.aging.totalReceivable': 'Итого к получению',
 };
 
 export type Lang = 'lv' | 'en' | 'ru';

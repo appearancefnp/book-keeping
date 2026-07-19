@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   if (!token) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
 
   const body = (await req.json().catch(() => ({}))) as {
-    clientCompanyId?: string; kind?: PartyKind; name?: string; regNo?: string | null; vatNo?: string | null;
+    clientCompanyId?: string; kind?: PartyKind; name?: string; regNo?: string | null; vatNo?: string | null; paymentTermsDays?: number | null;
   };
   if (!body.clientCompanyId) return NextResponse.json({ error: 'missing clientCompanyId' }, { status: 400 });
   if (!body.name) return NextResponse.json({ error: 'missing name' }, { status: 400 });
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     const ctx = await resolveTenantContext(token, body.clientCompanyId, nowUnix());
     assertRoleAllowed(ctx.actorRole, 'parties.write');
     const result = await withTenant(ctx, (tx) =>
-      createParty(tx, ctx, { kind: body.kind!, name: body.name!, regNo: body.regNo ?? null, vatNo: body.vatNo ?? null }),
+      createParty(tx, ctx, { kind: body.kind!, name: body.name!, regNo: body.regNo ?? null, vatNo: body.vatNo ?? null, paymentTermsDays: body.paymentTermsDays ?? null }),
     );
     return NextResponse.json(result, { status: 201 });
   } catch (err) {

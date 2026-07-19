@@ -35,7 +35,7 @@ interface ComparativeBalanceSheet {
   currentPeriodResult: ComparativeLine; totalAssets: ComparativeLine; totalLiabilitiesAndEquity: ComparativeLine;
 }
 
-type Tab = 'pl' | 'bs' | 'trial' | 'gl' | 'apaging';
+type Tab = 'pl' | 'bs' | 'trial' | 'gl' | 'apaging' | 'araging';
 
 function todayIso(): string { return new Date().toISOString().slice(0, 10); }
 function firstOfMonthIso(): string { return todayIso().slice(0, 8) + '01'; }
@@ -88,8 +88,10 @@ function ReportsInner() {
         if (glAccount) url += `&account=${encodeURIComponent(glAccount)}`;
       } else if (tab === 'trial') {
         url = `/api/reports/trial-balance?clientCompanyId=${encodeURIComponent(clientCompanyId)}`;
-      } else {
+      } else if (tab === 'apaging') {
         url = `/api/reports/ap-aging?clientCompanyId=${encodeURIComponent(clientCompanyId)}&asOf=${asOf}`;
+      } else {
+        url = `/api/reports/ar-aging?clientCompanyId=${encodeURIComponent(clientCompanyId)}&asOf=${asOf}`;
       }
       const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) {
@@ -272,6 +274,7 @@ function ReportsInner() {
           <button role="tab" aria-selected={tab === 'trial'} className={tab === 'trial' ? styles.tabActive : styles.tab} onClick={() => setTab('trial')}>{t('reports.tab.trial')}</button>
           <button role="tab" aria-selected={tab === 'gl'} className={tab === 'gl' ? styles.tabActive : styles.tab} onClick={() => setTab('gl')}>{t('reports.tab.gl')}</button>
           <button role="tab" aria-selected={tab === 'apaging'} className={tab === 'apaging' ? styles.tabActive : styles.tab} onClick={() => setTab('apaging')}>{t('reports.tab.apaging')}</button>
+          <button role="tab" aria-selected={tab === 'araging'} className={tab === 'araging' ? styles.tabActive : styles.tab} onClick={() => setTab('araging')}>{t('reports.tab.araging')}</button>
         </div>
 
         {tab !== 'trial' && (
@@ -481,6 +484,19 @@ function ReportsInner() {
               <tr><td className={styles.name}>{t('reports.aging.d90plus')}</td><td className={styles.amount}>{fmtMoney(aging.d90plus)}</td></tr>
             </tbody></table>
             <div className={styles.grandTotal}><span>{t('reports.aging.total')}</span><span className={styles.amount}>{fmtMoney(aging.total)}</span></div>
+          </div>
+        )}
+
+        {!error && !loading && tab === 'araging' && aging && (
+          <div className={styles.statement}>
+            <table className={styles.table}><tbody>
+              <tr><td className={styles.name}>{t('reports.aging.current')}</td><td className={styles.amount}>{fmtMoney(aging.current)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d1_30')}</td><td className={styles.amount}>{fmtMoney(aging.d1_30)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d31_60')}</td><td className={styles.amount}>{fmtMoney(aging.d31_60)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d61_90')}</td><td className={styles.amount}>{fmtMoney(aging.d61_90)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d90plus')}</td><td className={styles.amount}>{fmtMoney(aging.d90plus)}</td></tr>
+            </tbody></table>
+            <div className={styles.grandTotal}><span>{t('reports.aging.totalReceivable')}</span><span className={styles.amount}>{fmtMoney(aging.total)}</span></div>
           </div>
         )}
       </main>

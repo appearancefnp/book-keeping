@@ -5,12 +5,12 @@ import { createAccount } from '../../src/ledger/accounts.js';
 import { openPeriod } from '../../src/ledger/periods.js';
 import { postEntry, getEntry } from '../../src/ledger/posting.js';
 import { importStatement } from '../../src/banking/import.js';
-import { proposeMatches } from '../../src/banking/match.js';
+import { proposeArMatches } from '../../src/banking/match.js';
 import { approveProposal } from '../../src/proposals/lifecycle.js';
-import { getProposal } from '../../src/proposals/proposals.js';
+import { createProposal, getProposal } from '../../src/proposals/proposals.js';
 import { postApprovedBankMatch } from '../../src/banking/confirm-match.js';
-
-const config = { receivablesAccount: '2310', bankAccount: '2620' };
+import { setup, issueOpenReceivable } from '../receivables/helpers.js';
+import { getReceivable } from '../../src/receivables/receivables.js';
 
 beforeAll(async () => { await resetDb(); });
 beforeEach(async () => { await resetDb(); });
@@ -30,8 +30,14 @@ test('approving + confirming a match posts a settlement and reconciles the txn',
     await importStatement(tx, ctx(t), { account: 'LV80', transactions: [
       { bookingDate: '2026-03-10', amountCents: '12100', currency: 'EUR', side: 'credit', reference: 'pmt', counterparty: 'SIA Klients', endToEndId: 'E1' },
     ]});
-    const { proposalIds } = await proposeMatches(tx, ctx(t), config);
-    const pid = proposalIds[0]!;
+    const txnId = (await tx.query('SELECT id FROM bank_transactions LIMIT 1')).rows[0].id as string;
+    const { id: pid } = await createProposal(tx, ctx(t), {
+      type: 'bank_match',
+      payload: { bankTransactionId: txnId, amountCents: '12100', bankAccount: '2620', receivablesAccount: '2310' },
+      rationale: { ruleRef: 'bank-match-amount' },
+      status: 'pending_approval',
+    });
+    await tx.query(`UPDATE bank_transactions SET status='matched' WHERE id=$1 AND client_company_id=$2`, [txnId, ctx(t).clientCompanyId]);
     await approveProposal(tx, ctx(t), pid);
     const { entryId } = await postApprovedBankMatch(tx, ctx(t), pid);
     const p = await getProposal(tx, ctx(t), pid);
@@ -66,7 +72,31 @@ test('refuses to confirm a match that is not approved', async () => {
     await importStatement(tx, ctx(t), { account: 'LV80', transactions: [
       { bookingDate: '2026-03-10', amountCents: '12100', currency: 'EUR', side: 'credit', reference: 'p', counterparty: 'c', endToEndId: 'E1' },
     ]});
-    const { proposalIds } = await proposeMatches(tx, ctx(t), config);
-    return postApprovedBankMatch(tx, ctx(t), proposalIds[0]!); // not approved
+    const txnId = (await tx.query('SELECT id FROM bank_transactions LIMIT 1')).rows[0].id as string;
+    const { id: pid } = await createProposal(tx, ctx(t), {
+      type: 'bank_match',
+      payload: { bankTransactionId: txnId, amountCents: '12100', bankAccount: '2620', receivablesAccount: '2310' },
+      rationale: { ruleRef: 'bank-match-amount' },
+      status: 'pending_approval',
+    });
+    await tx.query(`UPDATE bank_transactions SET status='matched' WHERE id=$1 AND client_company_id=$2`, [txnId, ctx(t).clientCompanyId]);
+    return postApprovedBankMatch(tx, ctx(t), pid); // not approved
   })).rejects.toThrow(/approved/i);
+});
+
+test('confirming a receivable_direct match settles the invoice and reconciles the txn', async () => {
+  const { cid, customerId } = await setup();
+  const { einvoiceId } = await issueOpenReceivable(cid, customerId);
+  const proposalId = await withTenant(cid, async (tx) => {
+    await importStatement(tx, cid, { account: 'LV80', transactions: [
+      { bookingDate: '2026-03-20', amountCents: '12100', currency: 'EUR', side: 'credit', reference: 'INV', counterparty: 'SIA Klients', endToEndId: 'e2e-ar-1' },
+    ]});
+    const { proposalIds } = await proposeArMatches(tx, cid, { receivableAccount: '2310', bankAccount: '2620' });
+    return proposalIds[0]!;
+  });
+  await withTenant(cid, (tx) => approveProposal(tx, cid, proposalId));
+  const { entryId } = await withTenant(cid, (tx) => postApprovedBankMatch(tx, cid, proposalId));
+  expect(entryId).toBeTruthy();
+  const r = await withTenant(cid, (tx) => getReceivable(tx, cid, einvoiceId));
+  expect(r.status).toBe('paid');
 });

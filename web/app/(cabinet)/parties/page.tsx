@@ -9,10 +9,10 @@ import { EmptyState } from '@/app/components/EmptyState';
 import styles from './page.module.css';
 
 type PartyKind = 'customer' | 'vendor' | 'both';
-interface PartyRow { id: string; kind: PartyKind; name: string; regNo: string | null; vatNo: string | null; }
-interface FormState { id: string | null; kind: PartyKind; name: string; regNo: string; vatNo: string; }
+interface PartyRow { id: string; kind: PartyKind; name: string; regNo: string | null; vatNo: string | null; paymentTermsDays: number | null; }
+interface FormState { id: string | null; kind: PartyKind; name: string; regNo: string; vatNo: string; paymentTermsDays: string; }
 
-const EMPTY_FORM: FormState = { id: null, kind: 'customer', name: '', regNo: '', vatNo: '' };
+const EMPTY_FORM: FormState = { id: null, kind: 'customer', name: '', regNo: '', vatNo: '', paymentTermsDays: '' };
 
 function PartiesInner() {
   const searchParams = useSearchParams();
@@ -58,6 +58,7 @@ function PartiesInner() {
       name: form.name.trim(),
       regNo: form.regNo.trim() || null,
       vatNo: form.vatNo.trim() || null,
+      paymentTermsDays: form.paymentTermsDays.trim() ? Number(form.paymentTermsDays.trim()) : null,
     };
     try {
       const res = await fetch(form.id ? `/api/parties/${form.id}` : '/api/parties', {
@@ -113,6 +114,18 @@ function PartiesInner() {
               <span>{t('parties.vatNo')}</span>
               <input value={form.vatNo} onChange={(e) => setForm({ ...form, vatNo: e.target.value })} />
             </label>
+            {(form.kind === 'customer' || form.kind === 'both') && (
+              <label className={styles.field}>
+                <span>{t('parties.paymentTerms')}</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={365}
+                  value={form.paymentTermsDays}
+                  onChange={(e) => setForm({ ...form, paymentTermsDays: e.target.value })}
+                />
+              </label>
+            )}
             {saveError && <p className={styles.formError} role="alert">{saveError}</p>}
             <div className={styles.formActions}>
               <button type="submit" className={styles.primaryBtn} disabled={saving || !form.name.trim()}>
@@ -155,7 +168,14 @@ function PartiesInner() {
                         className={styles.ghostBtn}
                         onClick={() => {
                           setSaveError(null);
-                          setForm({ id: p.id, kind: p.kind, name: p.name, regNo: p.regNo ?? '', vatNo: p.vatNo ?? '' });
+                          setForm({
+                            id: p.id,
+                            kind: p.kind,
+                            name: p.name,
+                            regNo: p.regNo ?? '',
+                            vatNo: p.vatNo ?? '',
+                            paymentTermsDays: p.paymentTermsDays != null ? String(p.paymentTermsDays) : '',
+                          });
                         }}
                       >
                         {t('parties.edit')}
