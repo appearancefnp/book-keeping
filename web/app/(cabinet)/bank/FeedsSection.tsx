@@ -144,7 +144,12 @@ export function FeedsSection({ clientCompanyId }: { clientCompanyId: string }) {
               </button>
             )}
             {(c.status === 'expired' || c.status === 'revoked') && (
-              <button type="button" className={styles.primaryBtn} onClick={openPicker} disabled={busy !== null}>
+              <button
+                type="button"
+                className={styles.primaryBtn}
+                onClick={() => { setChosen(c.institutionId); openPicker(); }}
+                disabled={busy !== null}
+              >
                 {t('bankfeed.reconnect')}
               </button>
             )}
@@ -164,16 +169,16 @@ export function FeedsSection({ clientCompanyId }: { clientCompanyId: string }) {
               {(institutions ?? []).map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
             </select>
           </label>
-          <button type="button" className={styles.primaryBtn} onClick={connect} disabled={!chosen || busy === 'connect'}>
+          <button type="button" className={styles.primaryBtn} onClick={connect} disabled={!chosen || busy !== null}>
             {busy === 'connect' ? t('state.loading') : t('bankfeed.start')}
           </button>
-          <button type="button" className={styles.ghostBtn} onClick={() => setPicking(false)} disabled={busy === 'connect'}>
+          <button type="button" className={styles.ghostBtn} onClick={() => setPicking(false)} disabled={busy !== null}>
             {t('bankfeed.cancel')}
           </button>
         </div>
       ) : (
         <div className={styles.formActions}>
-          <button type="button" className={styles.primaryBtn} onClick={openPicker}>{t('bankfeed.connect')}</button>
+          <button type="button" className={styles.primaryBtn} onClick={openPicker} disabled={busy !== null}>{t('bankfeed.connect')}</button>
         </div>
       )}
     </section>

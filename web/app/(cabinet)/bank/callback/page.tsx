@@ -16,7 +16,12 @@ function CallbackInner() {
   const ran = useRef(false);
 
   useEffect(() => {
-    if (ran.current || !cid || !client) return;
+    if (ran.current) return;
+    if (!cid || !client) {
+      setDetail('missing parameters');
+      setState('fail');
+      return;
+    }
     ran.current = true;
     (async () => {
       try {
