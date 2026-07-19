@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'email, password and code are required' }, { status: 400 });
 
   const ip = clientIp(req);
-  const identifiers = [`email:${email.toLowerCase()}`, `ip:${ip}`];
+  const identifiers = [`email:${email.toLowerCase()}`, ...(ip ? [`ip:${ip}`] : [])];
   const at = nowUnix();
 
   let allowed = false;
@@ -49,7 +49,9 @@ export async function POST(req: Request) {
       try {
         await recordLoginFailure(identifiers, at);
       } catch {
-        // Fail open, same rationale as the checkLoginAllowed guard above.
+        // Recording is best-effort: a limiter-storage failure must not block the
+        // error response. (Unlike checkLoginAllowed above, nothing here fails open —
+        // the next check simply sees one fewer recorded failure.)
       }
     }
     const msg = e instanceof Error ? e.message : 'login failed';
@@ -62,7 +64,7 @@ export async function POST(req: Request) {
 // is client-suppliable there. Behind any OTHER proxy, re-derive this from the
 // proxy's documented behavior before trusting it. The IP identifier is
 // defense-in-depth; the per-email limiter never depends on headers.
-function clientIp(req: Request): string {
+function clientIp(req: Request): string | null {
   const realIp = req.headers.get('x-real-ip');
   if (realIp) return realIp.trim();
   const forwarded = req.headers.get('x-forwarded-for');
@@ -70,5 +72,5 @@ function clientIp(req: Request): string {
     const hops = forwarded.split(',');
     return hops[hops.length - 1]!.trim();
   }
-  return 'unknown';
+  return null;
 }

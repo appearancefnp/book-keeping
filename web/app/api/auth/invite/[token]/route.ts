@@ -35,12 +35,17 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ token: stri
   const at = nowUnix();
   const ids = [`invite-ip:${ipOf(req)}`];
   if (!(await allowed(ids, at))) return NextResponse.json({ error: 'not found' }, { status: 404 });
-  const preview = await previewInvite(token, at);
-  if (!preview) {
-    await recordFailure(ids, at); // token probing burns the same budget
-    return NextResponse.json({ error: 'not found' }, { status: 404 });
+  try {
+    const preview = await previewInvite(token, at);
+    if (!preview) {
+      await recordFailure(ids, at); // token probing burns the same budget
+      return NextResponse.json({ error: 'not found' }, { status: 404 });
+    }
+    return NextResponse.json(preview, { status: 200 });
+  } catch {
+    await recordFailure(ids, at);
+    return NextResponse.json({ error: 'not found' }, { status: 404 }); // generic: invalid = expired = used
   }
-  return NextResponse.json(preview, { status: 200 });
 }
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ token: string }> }) {
