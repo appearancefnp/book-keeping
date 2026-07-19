@@ -1,8 +1,9 @@
 import { Pool, type PoolClient } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
 
-export const adminPool = new Pool({ connectionString: process.env.ADMIN_DATABASE_URL });
-export const appPool = new Pool({ connectionString: process.env.DATABASE_URL });
+const poolConfig = { max: 5, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 30_000 };
+export const adminPool = new Pool({ connectionString: process.env.ADMIN_DATABASE_URL, ...poolConfig });
+export const appPool = new Pool({ connectionString: process.env.DATABASE_URL, ...poolConfig });
 
 /**
  * Runs `fn` inside a transaction on the APP pool with the tenant session var set,

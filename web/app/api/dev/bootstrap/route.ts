@@ -21,7 +21,7 @@ const DEV_EMAIL = 'accountant@demo.lv';
 const DEV_PASSWORD = 'password123';
 
 export async function GET(req: Request) {
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV) {
     return NextResponse.json({ error: 'not available in production' }, { status: 403 });
   }
 
