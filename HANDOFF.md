@@ -360,9 +360,8 @@ quarterly periodicity logic.
   `resolveTenantContext` — no role check. This matches the existing posture
   (tasks/notifications/proposals routes are the same; only `/api/admin/*` is
   role-gated), so it is not a regression, but a client-assigned `employee` could
-  call these directly. Add server-side role checks when tightening authz.
-  **Update 2026-07-18:** the `Operation` matrix (`src/authz/policy.ts`) now also gates
-  proposal approve/reject via `proposals.decide` (firm_admin/accountant/owner), enforced in
+  call these directly. ~~**Add server-side role checks when tightening authz.**~~ **FIXED 2026-07-19** — the `Operation` matrix (`src/authz/policy.ts`) now gates
+  tasks/capture/admin mutations (firm_admin/accountant/owner), enforced in
   the shared `src/api/handlers.ts` so web and mobile surfaces are covered. Migration-number
   collisions are now CI-guarded (`tests/db/migration-numbering.test.ts` — the four historical
   023–026 pairs are grandfathered; new collisions fail).
@@ -370,25 +369,21 @@ quarterly periodicity logic.
   `/session/i ? 401 : 403`. The einvoices POST additionally maps validation/
   posting failures to 400. Other mutating routes (e.g. parties POST on a
   duplicate `UNIQUE(client, kind, reg_no)`) return 403 for what is really a
-  400/409. Fold a shared error→status helper in when hardening.
+  400/409. ~~**Fold a shared error→status helper in when hardening.**~~ **FIXED 2026-07-19** — all routes now use `errorToStatus`.
 - **Hobby-release follow-ups (final branch review, 2026-07-19)** — none blocking,
   triaged post-merge:
-  1. Prune/cap `login_attempts` (attacker-chosen identifiers grow the table
+  1. ~~**Prune/cap `login_attempts`**~~ **FIXED 2026-07-19** (attacker-chosen identifiers grow the table
      unbounded; fold into the session-row cleanup debt).
-  2. `POST /api/admin/users`: friendly duplicate-email message instead of raw
+  2. ~~**`POST /api/admin/users`: friendly duplicate-email message**~~ **FIXED 2026-07-19** instead of raw
      `e.message` pass-through (leaks constraint names; cross-firm email oracle
      for firm_admins).
-  3. Firm-scope `clientCompanyIds` in the admin invite route (currently inert —
+  3. ~~**Firm-scope `clientCompanyIds` in the admin invite route**~~ **FIXED 2026-07-19** (currently inert —
      `resolveTenantContext` re-filters — but cheap defense-in-depth).
-  4. Health/startup signal when `VERCEL_ENV` is set without
-     `BLOB_READ_WRITE_TOKEN` (today the first upload 500s with EROFS).
-  5. Skip or scope the `ip:unknown` limiter identifier off-Vercel (shared
+  4. ~~**Health/startup signal when `VERCEL_ENV` is set without `BLOB_READ_WRITE_TOKEN`**~~ **FIXED 2026-07-19** (today the first upload 500s with EROFS).
+  5. ~~**Skip or scope the `ip:unknown` limiter identifier off-Vercel**~~ **FIXED 2026-07-19** (shared
      lockout bucket for headerless clients).
-  6. Route-level limiter tests (900s boundary, combined identifiers), bootstrap
-     `VERCEL_ENV` guard test, index on `user_invites.user_id`.
-  7. Cosmetics for the next `/simplify` pass: stale "fail open" comment in the
-     login route, hardcoded busy-ellipsis glyph, `admin.onb.error` key reuse,
-     invite-route GET/POST try-catch symmetry.
+  6. ~~**Route-level limiter tests, bootstrap `VERCEL_ENV` guard test, index on `user_invites.user_id`**~~ **FIXED 2026-07-19** (900s boundary, combined identifiers).
+  7. ~~**Cosmetics for the next `/simplify` pass: stale "fail open" comment in the login route, hardcoded busy-ellipsis glyph, `admin.onb.error` key reuse, invite-route GET/POST try-catch symmetry.**~~ **FIXED 2026-07-19**
   Accepted trade-offs (documented, no action): invited-login timing
   side-channel, unrestricted created-role (product decision), invite token in
   URL path (72h/single-use), blob-not-found → 400 mapping (pre-existing
