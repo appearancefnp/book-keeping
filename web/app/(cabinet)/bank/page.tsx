@@ -9,6 +9,7 @@ import { SkeletonCard } from '@/app/components/SkeletonCard';
 import { ErrorState } from '@/app/components/ErrorState';
 import { EmptyState } from '@/app/components/EmptyState';
 import { formatCents } from '@/app/lib/format';
+import { FeedsSection } from './FeedsSection';
 import styles from './page.module.css';
 
 interface BankTransactionRow {
@@ -128,6 +129,8 @@ function BankInner() {
     <div className={styles.page}>
       <main className={styles.main}>
         <h1 className={styles.pageHeading}>{t('bankpage.title')}</h1>
+
+        {clientCompanyId && <FeedsSection clientCompanyId={clientCompanyId} />}
 
         <section className={styles.card} aria-labelledby="upload-heading">
           <h2 id="upload-heading" className={styles.sectionHeading}>{t('bankpage.upload')}</h2>
