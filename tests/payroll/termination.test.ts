@@ -52,8 +52,10 @@ test('termination order approval: sets terminated_on, creates compensation + sev
   const byKind = (k: string) => comps.find((c) => c.kind === k)!;
   // daily avg 6000/126 = 47.62; balance = 10 + 1.67 = 11.67 days -> 555.73
   expect(byKind('other_taxable').amount).toBe('555.73');
-  // monthly avg = 47.62 x (129 window workdays / 6) = 1023.83; 6y tenure -> 2 months = 2047.66
-  expect(byKind('severance_exempt').amount).toBe('2047.66');
+  // monthly avg = 47.62 x (122 window workdays / 6) = 968.27; 6y tenure -> 2 months = 1936.54
+  // (Jan..Jun 2026 window: Jan 1 New Year, Apr 3 Good Friday, Apr 6 Easter Monday,
+  // May 1 Labour Day, May 4 Restoration of Independence, Jun 23 Līgo, Jun 24 Jāņi)
+  expect(byKind('severance_exempt').amount).toBe('1936.54');
 });
 
 test('the final run combines wage + compensation + exempt severance in one item', async () => {
@@ -69,10 +71,12 @@ test('the final run combines wage + compensation + exempt severance in one item'
   const i = (await withTenant(t, (tx) => getRunWithItems(tx, t, runId))).items[0]!;
   expect(i.base).toBe('1000.00');            // worked through 2026-07-31
   expect(i.otherTaxable).toBe('555.73');     // vacation compensation — taxed
-  expect(i.severanceExempt).toBe('2047.66'); // severance — payout only
+  // severance = 968.27/mo x 2 (6y tenure) with Jan..Jun 2026 window holiday-adjusted
+  // (Jan 1, Apr 3 Good Friday, Apr 6 Easter Monday, May 1, May 4, Jun 23 Līgo, Jun 24 Jāņi)
+  expect(i.severanceExempt).toBe('1936.54'); // severance — payout only
   expect(i.gross).toBe('1555.73');           // severance NOT in gross
   const netCents = BigInt(i.net.replace('.', ''));
-  expect(BigInt(i.payout.replace('.', ''))).toBe(netCents + 204766n);
+  expect(BigInt(i.payout.replace('.', ''))).toBe(netCents + 193654n);
 });
 
 test('termination without severance entitlement creates no severance component', async () => {

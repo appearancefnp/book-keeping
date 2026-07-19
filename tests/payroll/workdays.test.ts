@@ -31,3 +31,24 @@ test('calendarDays iterates inclusive ISO dates', () => {
   expect([...calendarDays('2026-07-30', '2026-08-02')]).toEqual(
     ['2026-07-30', '2026-07-31', '2026-08-01', '2026-08-02']);
 });
+
+test('workDaysInMonth subtracts weekday holidays — December 2026', () => {
+  // 23 Mon–Fri days − Dec 24 (Thu), 25 (Fri), 31 (Thu); Dec 26 is a Saturday.
+  expect(workDaysInMonth(2026, 12)).toBe(20);
+});
+
+test('workDaysInMonth subtracts Līgo/Jāņi — June 2026', () => {
+  // 22 Mon–Fri days − Jun 23 (Tue) − Jun 24 (Wed).
+  expect(workDaysInMonth(2026, 6)).toBe(20);
+});
+
+test('workDaysOverlap skips holidays inside the window', () => {
+  // 2026-04-01 (Wed) .. 2026-04-10 (Fri): 8 weekdays − Good Friday (Apr 3) − Easter Monday (Apr 6).
+  expect(workDaysOverlap('2026-04-01', '2026-04-10', 2026, 4)).toBe(6);
+});
+
+test('isWorkDay is false on a weekday holiday and on the observed Monday', () => {
+  expect(isWorkDay('2026-12-25')).toBe(false); // Christmas, Friday
+  expect(isWorkDay('2025-05-05')).toBe(false); // observed May 4 (Sunday → Monday)
+  expect(isWorkDay('2026-12-28')).toBe(true);  // plain Monday
+});

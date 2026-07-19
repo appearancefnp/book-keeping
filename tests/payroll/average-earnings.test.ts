@@ -38,8 +38,10 @@ test('6 full months before the event, from opening history', async () => {
   expect(r.shifted).toBe(false);
   expect(r.totalWorkedDays).toBe(125);
   expect(r.monthsUsed).toHaveLength(6);
-  // monthly average = daily x (calendar workdays in window / 6); Jan..Jun 2026 = 22+20+22+22+21+22 = 129 workdays
-  expect(r.monthlyCents).toBe(108360n); // divRound(5040 * 129, 6) = 650160/6
+  // monthly average = daily x (calendar workdays in window / 6); Jan..Jun 2026 = 21+20+22+20+19+20 = 122
+  // workdays (Jan 1 New Year, Apr 3 Good Friday, Apr 6 Easter Monday, May 1 Labour Day,
+  // May 4 Restoration of Independence, Jun 23 Līgo, Jun 24 Jāņi all subtracted)
+  expect(r.monthlyCents).toBe(102480n); // divRound(5040 * 122, 6) = 614880/6
 });
 
 test('fewer than 6 months since hire uses the actual period (doc 3.2 case 1)', async () => {

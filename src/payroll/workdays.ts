@@ -1,8 +1,9 @@
 /**
- * Workday calendar, Mon-Fri. LR public holidays are NOT yet subtracted — same
- * documented deferral as addWorkingDays() in src/einvoice/vid.ts (HANDOFF #2).
+ * Workday calendar: Mon–Fri excluding LR public holidays (src/calendar/holidays.ts).
  * All dates are ISO 'YYYY-MM-DD' strings, handled in UTC.
  */
+
+import { isLatvianHoliday } from '../calendar/holidays.js';
 
 const DAY_MS = 86_400_000;
 
@@ -15,7 +16,7 @@ function toIso(ms: number): string {
 
 export function isWorkDay(iso: string): boolean {
   const dow = new Date(toUtc(iso)).getUTCDay();
-  return dow !== 0 && dow !== 6;
+  return dow !== 0 && dow !== 6 && !isLatvianHoliday(iso);
 }
 
 export function lastDayOfMonth(year: number, month: number): string {
