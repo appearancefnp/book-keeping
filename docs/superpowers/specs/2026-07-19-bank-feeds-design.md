@@ -124,8 +124,9 @@ Normalization (`FeedTxn` → `BankTxn`): amount decimal string → integer cents
    fetch + import succeeded; `appendAudit` with imported/skipped counts per
    account.
 5. A per-account failure records the message in `last_error` and continues with
-   the remaining accounts; success clears `last_error`. Progress already
-   committed (earlier accounts, cursor advances) is never rolled back.
+   the remaining accounts; success clears `last_error`. Provider-side failures
+   never roll back sibling accounts' progress; a database-level failure aborts
+   the whole sync atomically (callers record it and retry next run).
 
 **Dedup.** Rides the existing unique key
 `(client_company_id, account, end_to_end_id, amount_cents, booking_date)` with

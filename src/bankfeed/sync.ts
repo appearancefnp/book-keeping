@@ -74,6 +74,9 @@ export async function syncConnection(
         [todayIso, a.id, ctx.clientCompanyId]);
       results.push({ iban: a.iban as string, imported: r.imported, skipped: r.skipped, error: null });
     } catch (err) {
+      // A database error has poisoned the transaction — no further queries can
+      // succeed, so fail the whole sync atomically (pg errors carry a SQLSTATE code).
+      if (err && typeof err === 'object' && 'code' in err) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       lastError = lastError || `${a.iban}: ${msg}`;
       results.push({ iban: a.iban as string, imported: 0, skipped: 0, error: msg });

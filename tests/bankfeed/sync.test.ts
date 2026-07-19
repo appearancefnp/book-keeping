@@ -123,3 +123,16 @@ test('per-account failure records last_error, sibling account still imports, suc
   conn = await withTenant(ctx(t), (tx) => getConnection(tx, ctx(t), id));
   expect(conn.lastError).toBe('');
 });
+
+test('database-level failure (malformed booking date) fails the whole sync atomically', async () => {
+  const t = await makeFirmAndClient();
+  const p = new StubBankFeedProvider();
+  const id = await linkedConnection(t, p);
+  p.transactionsByAccount.set('acc-1', [txn({ bookingDate: 'not-a-date' })]);
+  await expect(withTenant(ctx(t), (tx) => syncConnection(tx, ctx(t), p, id, TODAY))).rejects.toThrow();
+  // whole sync rolled back: cursor never advanced, no rows imported
+  const conn = await withTenant(ctx(t), (tx) => getConnection(tx, ctx(t), id));
+  expect(conn.accounts[0]!.lastSyncedDate).toBeNull();
+  const n = await withTenant(ctx(t), async (tx) => (await tx.query('SELECT count(*)::int AS n FROM bank_transactions')).rows[0].n);
+  expect(n).toBe(0);
+});
