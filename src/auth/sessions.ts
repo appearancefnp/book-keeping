@@ -13,6 +13,8 @@ export async function login(email: string, password: string, totpCode: string, a
 
   const token = randomBytes(32).toString('hex');
   const expiresAt = new Date((atUnixSeconds + SESSION_TTL_SECONDS) * 1000).toISOString();
+  // Opportunistic sweep: expired rows accumulate otherwise (12h TTL, no cron by design).
+  await appPool.query('DELETE FROM sessions WHERE expires_at < now()');
   await appPool.query('INSERT INTO sessions(token, user_id, expires_at) VALUES ($1,$2,$3)', [token, user.id, expiresAt]);
   return { sessionToken: token };
 }

@@ -31,6 +31,13 @@ export async function recordLoginFailure(identifiers: string[], atUnixSeconds: n
       [id, nowIso, atUnixSeconds, WINDOW_SECONDS],
     );
   }
+  // Opportunistic prune: identifiers that never succeed would otherwise grow the
+  // table unbounded (attacker-chosen values). 24h keeps a short forensic window;
+  // the limiter itself only reads the last WINDOW_SECONDS.
+  await appPool.query(
+    `DELETE FROM login_attempts WHERE EXTRACT(EPOCH FROM window_start) < $1::bigint - 86400`,
+    [atUnixSeconds],
+  );
 }
 
 export async function clearLoginFailures(identifiers: string[]): Promise<void> {
