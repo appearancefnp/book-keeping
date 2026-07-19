@@ -30,8 +30,9 @@ gating for the remaining ungated mutations (G1), full adoption of the shared
   clients; no index on `user_invites(user_id)`; missing tests (limiter 900s
   boundary, combined identifiers, bootstrap `VERCEL_ENV` guard); cosmetics
   (hardcoded busy-ellipsis glyph, `admin.onb.error` key reuse, invite
-  GET/POST try-catch asymmetry). The stale "fail open" comment is already
-  gone — dropped from scope.
+  GET/POST try-catch asymmetry, and the misleading "Fail open" comment at
+  `web/app/api/auth/login/route.ts:52` — it cites the fail-CLOSED guard
+  above as its rationale; reword to say recording is best-effort).
 
 ## Decisions (made during brainstorming)
 
