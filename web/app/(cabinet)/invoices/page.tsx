@@ -169,7 +169,7 @@ function InvoicesInner() {
                     <td>{r.direction === 'outbound' && r.status ? <PaymentStatusBadge status={r.status} /> : '—'}</td>
                     <td>{r.direction === 'outbound' && r.status && r.dueDate ? fmtDate(r.dueDate) : '—'}</td>
                     <td className={styles.colAmount}>
-                      {r.direction === 'outbound' && r.status ? (formatCents(r.outstandingCents ?? '0', r.currency) ?? '—') : '—'}
+                      {r.direction === 'outbound' && r.status && r.status !== 'void' ? (formatCents(r.outstandingCents ?? '0', r.currency) ?? '—') : '—'}
                     </td>
                     <td>
                       {r.direction === 'outbound' && clientCompanyId ? (

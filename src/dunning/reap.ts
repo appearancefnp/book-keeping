@@ -10,7 +10,7 @@ import type { PoolClient } from 'pg';
 export async function reapDunning(tx: PoolClient, args: { now: Date }): Promise<{ seeded: number }> {
   const today = args.now.toISOString().slice(0, 10);
   // NOTE: this seeds only clients with an EXPLICIT dunning_policy row where enabled = true — the
-  // same scope as backfill 035 and the policy-enable re-seed. getDunningPolicy() defaults a
+  // same scope as backfill 040 and the policy-enable re-seed. getDunningPolicy() defaults a
   // missing row to enabled:true, but that default serves the manual "run now" path only; automated
   // dunning (this reaper + the daily chain) requires an explicit enabled row, which the enable flow
   // writes. A client that never configures dunning therefore has no automated chain and is not

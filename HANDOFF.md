@@ -100,7 +100,11 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > `docs/superpowers/handoffs/2026-07-14-c-infra-shipped-next-c-recurring.md` and
 > `docs/superpowers/handoffs/2026-07-14-slice-c-recurring-invoices.md`), **slice D**
 > (quotes→invoice, customer statements), and the per-client account-mapping settings screen
-> debt (unchanged, see §M2 follow-ups above).
+> debt (unchanged, see §M2 follow-ups above). Known follow-up (final-review, 2026-07-20):
+> `/api/cron/jobs-drain` drains at most 20 jobs per daily tick (`drainOnce` called once,
+> `limit: 20`) — fine at hobby scale, but loop reap+drain under a time budget before
+> C-recurring adds a second daily job type to the queue; the standalone `npm run worker` is
+> unaffected.
 >
 > **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`,
 > since merged to `main`; full backend suite **333/333**, root+web typecheck clean, web

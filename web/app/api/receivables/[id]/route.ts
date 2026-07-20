@@ -8,6 +8,7 @@ import { settleReceivable } from '@domain/receivables/settlement.js';
 import { voidReceivable } from '@domain/receivables/receivables.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
+import { isValidIsoDate } from '@/app/lib/date';
 
 // Default LV chart-of-accounts codes; override per deployment via env.
 const RECEIVABLE_ACCOUNT = process.env.EINVOICE_RECEIVABLE_ACCOUNT ?? '2310';
@@ -25,6 +26,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     paidDate?: string;
   };
   if (!body.clientCompanyId) return NextResponse.json({ error: 'missing clientCompanyId' }, { status: 400 });
+  if (body.action === 'settle' && body.paidDate && !isValidIsoDate(body.paidDate)) {
+    return NextResponse.json({ error: 'paidDate must be a valid YYYY-MM-DD date' }, { status: 400 });
+  }
 
   try {
     const ctx = await resolveTenantContext(token, body.clientCompanyId, nowUnix());
