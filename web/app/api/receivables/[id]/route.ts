@@ -28,7 +28,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
   try {
     const ctx = await resolveTenantContext(token, body.clientCompanyId, nowUnix());
-    assertRoleAllowed(ctx.actorRole, 'einvoice.issue');
+    assertRoleAllowed(ctx.actorRole, 'receivables.settle');
     const result = await withTenant(ctx, async (tx) => {
       if (body.action === 'void') {
         await voidReceivable(tx, ctx, id);

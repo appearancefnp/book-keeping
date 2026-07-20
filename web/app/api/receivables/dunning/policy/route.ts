@@ -39,7 +39,7 @@ export async function PUT(req: NextRequest) {
   if (!body.policy || !body.stages) return NextResponse.json({ error: 'missing policy or stages' }, { status: 400 });
   try {
     const ctx = await resolveTenantContext(token, body.clientCompanyId, nowUnix());
-    assertRoleAllowed(ctx.actorRole, 'einvoice.issue');
+    assertRoleAllowed(ctx.actorRole, 'dunning.write');
     await withTenant(ctx, async (tx) => {
       await setDunningPolicy(tx, ctx, body.policy!);
       await setStages(tx, ctx, body.stages!);

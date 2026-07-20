@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   if (!isValidIsoDate(asOf)) return NextResponse.json({ error: 'asOf must be a valid YYYY-MM-DD date' }, { status: 400 });
   try {
     const ctx = await resolveTenantContext(token, body.clientCompanyId, nowUnix());
-    assertRoleAllowed(ctx.actorRole, 'einvoice.issue');
+    assertRoleAllowed(ctx.actorRole, 'dunning.run');
     const summary = await withTenant(ctx, (tx) => runDunning(tx, ctx, { asOf }));
     return NextResponse.json(summary, { status: 200 });
   } catch (err) {

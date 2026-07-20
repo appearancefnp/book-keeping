@@ -23,7 +23,10 @@ export type Operation =
   | 'documents.capture' // photograph/upload a document for AI intake
   | 'clients.write' // admin: create client companies
   | 'tariffs.write' // admin: manage tariffs
-  | 'templates.write'; // admin: manage onboarding templates
+  | 'templates.write' // admin: manage onboarding templates
+  | 'receivables.settle' // settle or void an AR receivable
+  | 'dunning.write' // edit the dunning policy
+  | 'dunning.run'; // trigger a dunning run
 
 /**
  * Which roles may perform each mutating operation.
@@ -50,6 +53,9 @@ const OPERATION_ROLES: Record<Operation, readonly UserRole[]> = {
   'clients.write': ['firm_admin'],
   'tariffs.write': ['firm_admin'],
   'templates.write': ['firm_admin'],
+  'receivables.settle': ['firm_admin', 'accountant'],
+  'dunning.write': ['firm_admin', 'accountant'],
+  'dunning.run': ['firm_admin', 'accountant'],
 };
 
 /** True if `role` is permitted to perform `op`. Unrecognised roles are denied. */
