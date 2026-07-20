@@ -8,7 +8,7 @@ const PACKS: Record<ExportLang, Record<keyof typeof EN, string>> = { en: EN, lv:
 export function reportLabels(lang: ExportLang): ReportLabels & { print: string } {
   const m = PACKS[lang] ?? PACKS.lv;
   return {
-    pl: m['reports.tab.pl'], bs: m['reports.tab.bs'], gl: m['reports.tab.gl'], trial: m['reports.tab.trial'], apAging: m['reports.tab.apaging'],
+    pl: m['reports.tab.pl'], bs: m['reports.tab.bs'], gl: m['reports.tab.gl'], trial: m['reports.tab.trial'], apAging: m['reports.tab.apaging'], arAging: m['reports.tab.araging'],
     period: m['reports.from'], asOf: m['reports.asOf'], comparisonPeriod: m['reports.compareTo'], client: m['top.client'], generated: m['export.generated'],
     income: m['reports.income'], expense: m['reports.expense'], assets: m['reports.assets'], liabilities: m['reports.liabilities'], equity: m['reports.equity'],
     netProfit: m['reports.netProfit'], currentResult: m['reports.currentResult'], totalAssets: m['reports.totalAssets'], totalLiabEquity: m['reports.totalLiabEquity'],

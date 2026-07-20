@@ -4,7 +4,9 @@ import { withTenant } from '../../src/db/pool.js';
 import { randomUUID } from 'node:crypto';
 import { createAccount } from '../../src/ledger/accounts.js';
 import { openPeriod } from '../../src/ledger/periods.js';
-import { postEntry } from '../../src/ledger/posting.js';
+import { createParty } from '../../src/parties/parties.js';
+import { sendInvoice } from '../../src/einvoice/outbound.js';
+import { StubAccessPoint } from '../../src/einvoice/access-point.js';
 import { StubBankFeedProvider } from '../../src/bankfeed/stub.js';
 import { createConnection, finalizeConnection, getConnection } from '../../src/bankfeed/connections.js';
 import { syncConnection, isoAddDays, FIRST_SYNC_DAYS, OVERLAP_DAYS } from '../../src/bankfeed/sync.js';
@@ -65,23 +67,35 @@ test('re-sync with overlap imports nothing new', async () => {
 });
 
 test('feed transactions produce match proposals (credit → receivable)', async () => {
-  // Mirror tests/banking/match.test.ts: post a 121.00 receivable on 2310, then sync a 121.00 credit.
-  // Copy the ledger-seeding helper from that file verbatim.
+  // Mirror tests/banking/match.test.ts: proposeArMatches (retiring the GL-level proposeMatches)
+  // matches unmatched bank credits against OPEN INVOICES (einvoices), not raw GL account balance —
+  // so the fixture must issue a real open receivable via sendInvoice, not a bare postEntry.
   const t = await makeFirmAndClient();
   const p = new StubBankFeedProvider();
   const id = await linkedConnection(t, p);
   p.transactionsByAccount.set('acc-1', [txn({ amount: '121.00' })]);
-  await withTenant(ctx(t), async (tx) => {
+  const customerId = await withTenant(ctx(t), async (tx) => {
     await createAccount(tx, ctx(t), { code: '2310', name: 'Debtors', type: 'asset' });
     await createAccount(tx, ctx(t), { code: '6110', name: 'Sales', type: 'income' });
+    await createAccount(tx, ctx(t), { code: '5721', name: 'Output VAT', type: 'liability' });
     await createAccount(tx, ctx(t), { code: '2620', name: 'Bank', type: 'asset' });
     await openPeriod(tx, ctx(t), { year: 2026, month: 7 });
-    // Credit sale creating a 121.00 receivable
-    await postEntry(tx, ctx(t), { date: '2026-07-05', memo: 'Credit sale', currency: 'EUR', lines: [
-      { accountCode: '2310', debit: '121.00', credit: '0' },
-      { accountCode: '6110', debit: '0', credit: '121.00' },
-    ]});
+    const { id: partyId } = await createParty(tx, ctx(t), { kind: 'customer', name: 'SIA Klients' });
+    return partyId;
   });
+  // Open receivable of 121.00 (net 100.00 + VAT 21.00) — matches the 121.00 feed credit above.
+  await withTenant(ctx(t), (tx) => sendInvoice(tx, ctx(t), {
+    invoice: {
+      invoiceNumber: 'INV-2026-100', issueDate: '2026-07-05', currency: 'EUR',
+      supplier: { name: 'SIA Pārdevējs', regNo: '40100000000', vatNo: 'LV40100000000' },
+      customer: { name: 'SIA Klients', regNo: '40200000000', vatNo: 'LV40200000000' },
+      lines: [{ description: 'Prece', net: '100.00', vatRate: 21, vat: '21.00' }],
+      netTotal: '100.00', vatTotal: '21.00', grandTotal: '121.00',
+    },
+    recipientPeppolId: '0088:test', ap: new StubAccessPoint(),
+    receivableAccount: '2310', salesAccount: '6110', vatAccount: '5721',
+    customerPartyId: customerId, dueDate: '2026-07-19',
+  }));
   const r = await withTenant(ctx(t), (tx) => syncConnection(tx, ctx(t), p, id, TODAY));
   expect(r.proposals).toBeGreaterThanOrEqual(1);
 });

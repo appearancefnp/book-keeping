@@ -182,16 +182,25 @@ npm run migrate
    |---|---|
    | `DATABASE_URL` | Neon **pooled** string + `?sslmode=require` |
    | `ADMIN_DATABASE_URL` | Neon **direct** string + `?sslmode=require` |
+   | `WORKER_DATABASE_URL` | Neon **pooled** string + `?sslmode=require`, connecting as `bookkeeping_worker` (role created by migration `039`). Required at runtime by `GET /api/cron/jobs-drain` (`src/db/pool.ts`'s `workerPool`) — the route 500s without it. |
+   | `SUPERVISOR_DATABASE_URL` | Neon **pooled** string + `?sslmode=require`, connecting as `bookkeeping_supervisor` (role created by migration `041`). Also required by `GET /api/cron/jobs-drain` (`supervisorPool`) for the reap step. |
    | `BLOB_READ_WRITE_TOKEN` | from the Blob store (auto-set if linked) — enables `VercelBlobStore` (`src/blob/factory.ts` picks it over `LocalBlobStore` whenever this var is present) |
    | `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` | real AI extraction/assistant. Gemini's free tier is **not zero-retention** — don't feed real client documents through it until you're on a paid/zero-retention tier or have switched to `ANTHROPIC_API_KEY` (it takes precedence when both are set). Ollama is local-only; it does not run on Vercel. |
    | `GOCARDLESS_SECRET_ID` / `GOCARDLESS_SECRET_KEY` | real GoCardless Bank Account Data provider for `/bank` feeds; leave unset to keep the keyless stub provider (auto-links a fake account, fine for a demo deployment) |
-   | `CRON_SECRET` | required once `web/vercel.json`'s cron is live. The operator chooses a value and sets it as a project environment variable in Vercel; Vercel automatically attaches it as `Authorization: Bearer <CRON_SECRET>` on cron-triggered requests to `GET /api/cron/bank-sync`. Unset ⇒ cron requests fail 401. |
+   | `CRON_SECRET` | required once `web/vercel.json`'s crons are live. The operator chooses a value and sets it as a project environment variable in Vercel; Vercel automatically attaches it as `Authorization: Bearer <CRON_SECRET>` on cron-triggered requests to `GET /api/cron/bank-sync` and `GET /api/cron/jobs-drain` (both checked via the shared `cronAuthorized` helper, `web/app/lib/cron-auth.ts`, timing-safe). Unset ⇒ cron requests fail 401. |
 
    Full var reference: `.env.example` (repo root) — it documents the Neon pooled/direct split and
    the Blob/Gemini notes inline; don't duplicate it here.
 
-   The daily bank-sync cron (`web/vercel.json`, `0 5 * * *` UTC) requires no setup beyond the repo
-   containing the file — Vercel registers it from the deployed project automatically.
+   Two crons run daily (`web/vercel.json`, both UTC) and need no setup beyond the repo containing
+   the file — Vercel registers them from the deployed project automatically:
+   - `0 5 * * *` — bank-sync (`/api/cron/bank-sync`)
+   - `0 6 * * *` — jobs-drain (`/api/cron/jobs-drain`; after bank-sync so the day's payments settle
+     receivables before dunning runs). This is the Vercel entrypoint for the job queue that
+     `src/jobs/worker.ts` otherwise drains via a standalone `npm run worker` loop — self-hosted
+     (non-Vercel) deployments that don't want a cron-triggered HTTP endpoint can run that loop
+     instead and skip `WORKER_DATABASE_URL`/`SUPERVISOR_DATABASE_URL` provisioning here (the worker
+     process picks up the same env vars from its own environment).
 4. Deploy. `/api/dev/bootstrap` is dead in this environment on purpose — it self-guards on
    `NODE_ENV === 'production' || process.env.VERCEL_ENV` (`web/app/api/dev/bootstrap/route.ts`),
    and Vercel always sets `VERCEL_ENV`, so it 403s on every Vercel deployment, preview or

@@ -35,7 +35,7 @@ interface ComparativeBalanceSheet {
   currentPeriodResult: ComparativeLine; totalAssets: ComparativeLine; totalLiabilitiesAndEquity: ComparativeLine;
 }
 
-type Tab = 'pl' | 'bs' | 'trial' | 'gl' | 'apaging';
+type Tab = 'pl' | 'bs' | 'trial' | 'gl' | 'apaging' | 'araging';
 
 function todayIso(): string { return new Date().toISOString().slice(0, 10); }
 function firstOfMonthIso(): string { return todayIso().slice(0, 8) + '01'; }
@@ -72,6 +72,45 @@ function ReportsInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [dunPolicy, setDunPolicy] = useState<{ enabled: boolean; lateFeeAnnualBps: number; lateFeeFlatCents: string } | null>(null);
+  const [dunStages, setDunStages] = useState<{ level: number; daysOverdue: number }[]>([]);
+  const [dunMsg, setDunMsg] = useState<string | null>(null);
+  const [dunFlatDraft, setDunFlatDraft] = useState('');
+
+  const loadDunning = useCallback(async (id: string) => {
+    const res = await fetch(`/api/receivables/dunning/policy?clientCompanyId=${encodeURIComponent(id)}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = (await res.json()) as { policy: typeof dunPolicy; stages: typeof dunStages };
+    setDunPolicy(data.policy);
+    setDunStages(data.stages);
+    setDunFlatDraft(data.policy ? (Number(data.policy.lateFeeFlatCents) / 100).toFixed(2) : '');
+  }, []);
+
+  const saveDunning = useCallback(async () => {
+    if (!clientCompanyId || !dunPolicy) return;
+    const parsed = Number(dunFlatDraft.trim().replace(',', '.'));
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setDunMsg(t('dunning.invalidFlat'));
+      return;
+    }
+    const policy = { ...dunPolicy, lateFeeFlatCents: String(Math.round(parsed * 100)) };
+    const res = await fetch(`/api/receivables/dunning/policy`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientCompanyId, policy, stages: dunStages }),
+    });
+    setDunMsg(res.ok ? t('dunning.saved') : ((await res.json().catch(() => ({}))) as { error?: string }).error ?? t('state.error'));
+  }, [clientCompanyId, dunPolicy, dunStages, dunFlatDraft, t]);
+
+  const runDunningNow = useCallback(async () => {
+    if (!clientCompanyId) return;
+    const res = await fetch(`/api/receivables/dunning/run`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientCompanyId, asOf }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { prompted?: number; error?: string };
+    setDunMsg(res.ok ? `${t('dunning.ranSummary')} ${data.prompted ?? 0}` : data.error ?? t('state.error'));
+  }, [clientCompanyId, asOf, t]);
+
   const load = useCallback(async () => {
     if (!clientCompanyId) return;
     setLoading(true); setError(null);
@@ -88,8 +127,10 @@ function ReportsInner() {
         if (glAccount) url += `&account=${encodeURIComponent(glAccount)}`;
       } else if (tab === 'trial') {
         url = `/api/reports/trial-balance?clientCompanyId=${encodeURIComponent(clientCompanyId)}`;
-      } else {
+      } else if (tab === 'apaging') {
         url = `/api/reports/ap-aging?clientCompanyId=${encodeURIComponent(clientCompanyId)}&asOf=${asOf}`;
+      } else {
+        url = `/api/reports/ar-aging?clientCompanyId=${encodeURIComponent(clientCompanyId)}&asOf=${asOf}`;
       }
       const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) {
@@ -141,6 +182,10 @@ function ReportsInner() {
     return () => { cancelled = true; };
   }, [clientCompanyId, tab, trial]);
 
+  useEffect(() => {
+    if (tab === 'araging' && clientCompanyId) loadDunning(clientCompanyId);
+  }, [tab, clientCompanyId, loadDunning]);
+
   const setPreset = (preset: 'month' | 'quarter' | 'year') => {
     const now = new Date();
     const y = now.getFullYear();
@@ -162,7 +207,7 @@ function ReportsInner() {
   const exportUrl = useCallback((format: 'csv' | 'xlsx' | 'pdf'): string => {
     const p = new URLSearchParams({ clientCompanyId: clientCompanyId ?? '', report: tab, format, lang });
     if (tab === 'pl' || tab === 'gl') { p.set('from', from); p.set('to', to); }
-    if (tab === 'bs' || tab === 'trial' || tab === 'apaging') p.set('asOf', asOf);
+    if (tab === 'bs' || tab === 'trial' || tab === 'apaging' || tab === 'araging') p.set('asOf', asOf);
     if (tab === 'pl' && compareFrom && compareTo) { p.set('compareFrom', compareFrom); p.set('compareTo', compareTo); }
     if (tab === 'bs' && compareAsOf) p.set('compareAsOf', compareAsOf);
     if (tab === 'gl' && glAccount) p.set('account', glAccount);
@@ -272,6 +317,7 @@ function ReportsInner() {
           <button role="tab" aria-selected={tab === 'trial'} className={tab === 'trial' ? styles.tabActive : styles.tab} onClick={() => setTab('trial')}>{t('reports.tab.trial')}</button>
           <button role="tab" aria-selected={tab === 'gl'} className={tab === 'gl' ? styles.tabActive : styles.tab} onClick={() => setTab('gl')}>{t('reports.tab.gl')}</button>
           <button role="tab" aria-selected={tab === 'apaging'} className={tab === 'apaging' ? styles.tabActive : styles.tab} onClick={() => setTab('apaging')}>{t('reports.tab.apaging')}</button>
+          <button role="tab" aria-selected={tab === 'araging'} className={tab === 'araging' ? styles.tabActive : styles.tab} onClick={() => setTab('araging')}>{t('reports.tab.araging')}</button>
         </div>
 
         {tab !== 'trial' && (
@@ -321,7 +367,8 @@ function ReportsInner() {
           (tab === 'bs' && (bs || bsCmp)) ||
           (tab === 'trial' && trial) ||
           (tab === 'gl' && gl) ||
-          (tab === 'apaging' && aging)
+          (tab === 'apaging' && aging) ||
+          (tab === 'araging' && aging)
         ) && exportBar}
 
         {!error && !loading && tab === 'pl' && pl && (
@@ -481,6 +528,57 @@ function ReportsInner() {
               <tr><td className={styles.name}>{t('reports.aging.d90plus')}</td><td className={styles.amount}>{fmtMoney(aging.d90plus)}</td></tr>
             </tbody></table>
             <div className={styles.grandTotal}><span>{t('reports.aging.total')}</span><span className={styles.amount}>{fmtMoney(aging.total)}</span></div>
+          </div>
+        )}
+
+        {!error && !loading && tab === 'araging' && aging && (
+          <div className={styles.statement}>
+            <table className={styles.table}><tbody>
+              <tr><td className={styles.name}>{t('reports.aging.current')}</td><td className={styles.amount}>{fmtMoney(aging.current)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d1_30')}</td><td className={styles.amount}>{fmtMoney(aging.d1_30)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d31_60')}</td><td className={styles.amount}>{fmtMoney(aging.d31_60)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d61_90')}</td><td className={styles.amount}>{fmtMoney(aging.d61_90)}</td></tr>
+              <tr><td className={styles.name}>{t('reports.aging.d90plus')}</td><td className={styles.amount}>{fmtMoney(aging.d90plus)}</td></tr>
+            </tbody></table>
+            <div className={styles.grandTotal}><span>{t('reports.aging.totalReceivable')}</span><span className={styles.amount}>{fmtMoney(aging.total)}</span></div>
+
+            {dunPolicy && (
+              <section className={styles.dunning}>
+                <h3>{t('dunning.heading')}</h3>
+                <label>
+                  <input type="checkbox" checked={dunPolicy.enabled}
+                    onChange={(e) => setDunPolicy({ ...dunPolicy, enabled: e.target.checked })} />
+                  {t('dunning.enabled')}
+                </label>
+                <label>{t('dunning.annualBps')}
+                  <input type="number" min={0} value={dunPolicy.lateFeeAnnualBps}
+                    onChange={(e) => setDunPolicy({ ...dunPolicy, lateFeeAnnualBps: Number(e.target.value) })} />
+                </label>
+                <label>{t('dunning.flat')}
+                  <input type="text" inputMode="decimal"
+                    value={dunFlatDraft}
+                    onChange={(e) => setDunFlatDraft(e.target.value)} />
+                </label>
+                <fieldset>
+                  <legend>{t('dunning.stages')}</legend>
+                  {dunStages.map((s, i) => (
+                    <div key={s.level} className={styles.stageRow}>
+                      <span>L{s.level}</span>
+                      <input type="number" min={0} value={s.daysOverdue}
+                        onChange={(e) => setDunStages(dunStages.map((x, j) => j === i ? { ...x, daysOverdue: Number(e.target.value) } : x))} />
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setDunStages([...dunStages, { level: (dunStages.at(-1)?.level ?? 0) + 1, daysOverdue: (dunStages.at(-1)?.daysOverdue ?? 0) + 15 }])}>
+                    {t('dunning.addStage')}
+                  </button>
+                </fieldset>
+                <div className={styles.dunningActions}>
+                  <button type="button" onClick={saveDunning}>{t('dunning.save')}</button>
+                  <button type="button" className={styles.primaryBtn} onClick={runDunningNow}>{t('dunning.run')}</button>
+                </div>
+                {dunMsg && <p className={styles.dunMsg}>{dunMsg}</p>}
+              </section>
+            )}
           </div>
         )}
       </main>

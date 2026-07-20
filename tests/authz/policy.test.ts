@@ -23,6 +23,9 @@ const MATRIX: Record<Operation, UserRole[]> = {
   'clients.write': ['firm_admin'],
   'tariffs.write': ['firm_admin'],
   'templates.write': ['firm_admin'],
+  'receivables.settle': ['firm_admin', 'accountant'],
+  'dunning.write': ['firm_admin', 'accountant'],
+  'dunning.run': ['firm_admin', 'accountant'],
 };
 
 describe('authz policy — role matrix', () => {
@@ -74,5 +77,14 @@ test('admin write ops are firm_admin only', () => {
     for (const role of ['accountant', 'owner', 'employee', 'nonsense']) {
       expect(isRoleAllowed(role, op)).toBe(false);
     }
+  }
+});
+
+test('receivables settle and dunning are firm-side only', () => {
+  for (const op of ['receivables.settle', 'dunning.write', 'dunning.run'] as const) {
+    expect(isRoleAllowed('firm_admin', op)).toBe(true);
+    expect(isRoleAllowed('accountant', op)).toBe(true);
+    expect(isRoleAllowed('owner', op)).toBe(false);
+    expect(isRoleAllowed('employee', op)).toBe(false);
   }
 });

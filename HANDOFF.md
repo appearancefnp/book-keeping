@@ -55,22 +55,59 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > hard-coded LR chart account constants in `src/bankfeed/sync.ts` (`2310`/`5310`/`2620`/`2699`)
 > extend the existing "account-mapping is hard-coded" debt (§M2 follow-ups below) rather than
 > resolving it — still needs the same per-client account-mapping settings screen.
-> Next unblocked in the market-gaps sequence: M4 (AR lifecycle — being handled separately);
-> report export (M14 follow-on). M14 data-depth is done.
+> Next unblocked in the market-gaps sequence: M4 (AR lifecycle) merged 2026-07-20 (see entry
+> below); report export (M14 follow-on). M14 data-depth is done.
 > **Pre-cutover follow-ups (final branch review, 2026-07-19):**
 > 1. Run `scripts/bankfeed-sandbox.ts` against the live GoCardless sandbox before enabling
 >    real keys (acceptance was keyless/stub).
 > 2. A 429 on the account-details call fails the whole sync at connection level (now
 >    mitigated by per-requisition caching; residual on first sync).
-> 3. Cosmetics that ride: non-timing-safe cron secret compare, no confirmation on connection
->    Remove, misleading success toast when a manual sync finds the consent expired, no
->    maxDuration on the cron route, raw provider error text untranslated in `last_error`.
+> 3. Cosmetics that ride: no confirmation on connection Remove, misleading success toast when
+>    a manual sync finds the consent expired, raw provider error text untranslated in
+>    `last_error`.
 > 4. With GoCardless keys unset in production the stub will "connect" a demo bank and import
 >    demo transactions into real books — the real-key cutover must remove stub-imported rows
 >    via the normal reversal flow.
 >
-> **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`
-> (not yet merged to `main`); full backend suite **333/333**, root+web typecheck clean, web
+> **M4 (AR lifecycle) + M5 (aged AR/AP) — merged to `main` 2026-07-20.** Slices A (AR
+> money-in loop, shipped 2026-07-13), A-UI (settle/void drawer + payment columns, shipped
+> 2026-07-14), and B (dunning + informational late fees, shipped 2026-07-14) landed together
+> with the job-queue infra the M4 workstream built as "C-infra": a durable Postgres `jobs`
+> table + `bookkeeping_worker`/`bookkeeping_supervisor` login roles + handler registry +
+> `drainOnce` + a chain reaper (`src/jobs/`), first consumed by `dunning_run`'s
+> self-perpetuating daily chain. Migrations renumbered on merge: receivables 032→**037**,
+> dunning **038**, jobs **039**, dunning-jobs-backfill **040**, supervisor-role **041**; new
+> **042** (`migrations/042_credit_note_applications.sql`) is an integration reconciliation, not
+> in the original slice plans. Reconciliations done during integration, beyond what the slice
+> plans scoped:
+> - Referenced AR credit notes now **apply against their invoice**
+>   (`src/receivables/apply-credit-note.ts`: `invoice_payments` row, method `'credit_note'`,
+>   capped at outstanding) so dunning stops chasing credited invoices.
+> - Unapplied credit-note remainders **net into `arAging`** by issue-date age
+>   (`src/receivables/aging.ts`), keeping the report GL-tied.
+> - `main`'s bankfeed sync now calls the branch's invoice-linked AR matcher
+>   `proposeArMatches`; the GL-level `proposeMatches` is retired.
+> - Firm-side authz operations `receivables.settle` / `dunning.write` / `dunning.run`
+>   (`src/authz/policy.ts`) — settlement and dunning are accountant/firm_admin actions, not
+>   client-facing.
+> - `GET /api/cron/jobs-drain` is a new Vercel cron (06:00 daily, after bank-sync 05:00,
+>   `web/vercel.json`) draining the job queue in production; cron-secret comparison is now
+>   **timing-safe on both cron routes** (closes pre-cutover item 3's first cosmetic above).
+> - AR-aging export parity — CSV/Excel/PDF for the `/reports` AR-aging tab, matching the
+>   other six report tabs (`src/reports/tabular.ts` + `GET /api/reports/export`).
+> Full suite: **559 tests**. Still open: **C-recurring** (recurring/subscription invoices —
+> the job-queue scheduler gate is now resolved; see
+> `docs/superpowers/handoffs/2026-07-14-c-infra-shipped-next-c-recurring.md` and
+> `docs/superpowers/handoffs/2026-07-14-slice-c-recurring-invoices.md`), **slice D**
+> (quotes→invoice, customer statements), and the per-client account-mapping settings screen
+> debt (unchanged, see §M2 follow-ups above). Known follow-up (final-review, 2026-07-20):
+> `/api/cron/jobs-drain` drains at most 20 jobs per daily tick (`drainOnce` called once,
+> `limit: 20`) — fine at hobby scale, but loop reap+drain under a time budget before
+> C-recurring adds a second daily job type to the queue; the standalone `npm run worker` is
+> unaffected.
+>
+> **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`,
+> since merged to `main`; full backend suite **333/333**, root+web typecheck clean, web
 > build clean. Per-task reviews all passed; a **final whole-branch review (workflow, high
 > effort) was run** and surfaced 10 findings — the **5 correctness bugs were fixed** on-branch
 > and re-reviewed:

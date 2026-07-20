@@ -1,14 +1,15 @@
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
 import { NextRequest, NextResponse } from 'next/server';
 import { syncAllClients } from '@domain/bankfeed/cron.js';
 import { makeBankFeedProvider } from '@domain/bankfeed/factory.js';
+import { cronAuthorized } from '@/app/lib/cron-auth';
 
 /** Vercel cron entrypoint. Fail closed: no CRON_SECRET configured → always 401. */
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
+  if (!cronAuthorized(req.headers.get('authorization'))) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   try {

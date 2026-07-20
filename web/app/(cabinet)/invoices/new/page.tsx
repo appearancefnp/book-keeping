@@ -150,7 +150,13 @@ function ComposerInner() {
       const payload =
         docType === 'credit_note'
           ? { clientCompanyId, creditNote: invoice, recipientPeppolId: peppolId.trim() }
-          : { clientCompanyId, invoice, recipientPeppolId: peppolId.trim() };
+          : {
+              clientCompanyId,
+              invoice,
+              recipientPeppolId: peppolId.trim(),
+              customerPartyId: customer.id,
+              ...(dueDate.trim() && { dueDate: dueDate.trim() }),
+            };
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
