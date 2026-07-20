@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest';
-import { resetDb, closeDb } from '../helpers/db.js';
+import { resetDb, closeDb, makeFirmAndClient, ctx } from '../helpers/db.js';
 import { withTenant } from '../../src/db/pool.js';
+import { createEmployee } from '../../src/payroll/employees.js';
 import { setup } from './helpers.js';
 import { saveClaim, getClaim, listClaims, deleteDraft, mileageNetCents } from '../../src/expenses/claims.js';
 import { setMileageRate } from '../../src/expenses/settings.js';
@@ -179,4 +180,35 @@ test('deleteDraft removes claim + lines; refuses non-drafts', async () => {
   ));
   await expect(withTenant(f.accountantCtx, (tx) => deleteDraft(tx, f.accountantCtx, claimId2)))
     .rejects.toThrow(/only draft claims can be deleted/i);
+});
+
+test('saveClaim update rejects a client-side actor hijacking another employee\'s draft', async () => {
+  const f = await setup();
+  const { claimId: bClaimId } = await withTenant(f.accountantCtx, (tx) => saveClaim(tx, f.accountantCtx, {
+    employeeId: f.employeeBId, description: "B's claim", lines: [RECEIPT_LINE],
+  }));
+
+  // Employee A tries to "adopt" B's draft by passing their own employeeId in the update.
+  await expect(withTenant(f.employeeACtx, (tx) => saveClaim(tx, f.employeeACtx, {
+    claimId: bClaimId, employeeId: f.employeeAId, description: 'Hijacked', lines: [RECEIPT_LINE],
+  }))).rejects.toThrow(/forbidden/i);
+
+  const stillB = await withTenant(f.accountantCtx, (tx) => getClaim(tx, f.accountantCtx, bClaimId));
+  expect(stillB.employeeId).toBe(f.employeeBId);
+  expect(stillB.description).toBe("B's claim");
+});
+
+test('saveClaim rejects a firm-role employeeId belonging to a different client company', async () => {
+  const f = await setup();
+  const other = await makeFirmAndClient('SIA Other');
+  const otherCtx = ctx(other);
+  const { id: otherEmployeeId } = await withTenant(otherCtx, (tx) => createEmployee(tx, otherCtx, {
+    firstName: 'Citāds', lastName: 'Cits', personalCode: '040490-45678', position: 'Ārējais',
+    contractNo: 'DL-X', contractDate: '2026-01-02', contractType: 'indefinite', wageType: 'monthly',
+    wage: '900.00', hiredOn: '2026-01-02', openingBalanceDate: '2026-01-02',
+  }));
+
+  await expect(withTenant(f.accountantCtx, (tx) => saveClaim(tx, f.accountantCtx, {
+    employeeId: otherEmployeeId, description: 'Cross-tenant', lines: [RECEIPT_LINE],
+  }))).rejects.toThrow(/not found|forbidden/i);
 });

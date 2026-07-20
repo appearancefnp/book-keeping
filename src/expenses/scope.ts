@@ -30,6 +30,14 @@ export async function resolveClaimEmployee(
 ): Promise<string> {
   if (!CLIENT_SIDE_ROLES.has(ctx.actorRole)) {
     if (!requestedEmployeeId) throw new Error('employeeId is required');
+    // FK validation alone doesn't enforce tenancy (it only checks employees.id exists, not
+    // which client it belongs to), so an employee id from another client_company_id would
+    // otherwise slip through here. Confirm it's actually in this client.
+    const res = await tx.query(
+      `SELECT id FROM employees WHERE id = $1 AND client_company_id = $2`,
+      [requestedEmployeeId, ctx.clientCompanyId],
+    );
+    if (!res.rowCount) throw new Error(`Employee not found: ${requestedEmployeeId}`);
     return requestedEmployeeId;
   }
   const own = await ownEmployeeId(tx, ctx);

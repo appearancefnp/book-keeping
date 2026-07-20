@@ -113,11 +113,18 @@ export async function saveClaim(
     if (!res.rowCount) throw new Error(`Claim not found: ${p.claimId}`);
     existing = res.rows[0];
     if (existing!.status !== 'draft') throw new Error(`Only draft claims can be edited (status=${existing!.status})`);
+    // Scope-check the EXISTING owner first: a client-side actor (employee/owner) must own this
+    // claim already, regardless of what employeeId they pass in the update payload. Without
+    // this, a requested employeeId equal to the actor's own would let them "adopt" someone
+    // else's draft (resolveClaimEmployee below only validates the *target*, not the current owner).
+    await resolveClaimEmployee(tx, ctx, existing!.employeeId);
   }
 
   const employeeId = await resolveClaimEmployee(tx, ctx, p.employeeId ?? existing?.employeeId ?? null);
-  const settings = await getExpenseSettings(tx, ctx);
-  const mileageRateCents = BigInt(settings.mileageRateCentsPerKm);
+  const hasMileageLine = p.lines.some((l) => l.kind === 'mileage');
+  const mileageRateCents = hasMileageLine
+    ? BigInt((await getExpenseSettings(tx, ctx)).mileageRateCentsPerKm)
+    : 0n; // unused when there's no mileage line to price
 
   const lines = p.lines.map((l) => computeLine(l, mileageRateCents));
   const totalNetCents = lines.reduce((a, l) => a + l.netCents, 0n);
