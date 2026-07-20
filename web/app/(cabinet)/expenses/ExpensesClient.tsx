@@ -14,6 +14,12 @@ import type { ToastKind } from '@/app/components/Toast';
 import styles from './page.module.css';
 
 const FIRM_ROLES = new Set(['accountant', 'firm_admin']);
+// Read-display scope: owner sees every employee's claim too (canSeeAllClaims in
+// src/expenses/scope.ts includes 'owner'), but owner is NOT a firm-side write actor — it
+// stays self-scoped for create/submit and gets none of the reimburse/settle/mileage-rate
+// controls. Kept separate from FIRM_ROLES so "who can see the employee column" and "who gets
+// the action controls" can't accidentally collapse back into the same check.
+const CAN_SEE_ALL = new Set(['accountant', 'firm_admin', 'owner']);
 
 interface ClaimRow {
   id: string; employeeId: string; employeeName: string; status: string; description: string; currency: string;
@@ -88,6 +94,7 @@ const STATUS_CLASS: Record<string, string | undefined> = {
 
 function ExpensesInner({ role }: { role: string }) {
   const isFirm = FIRM_ROLES.has(role);
+  const canSeeAll = CAN_SEE_ALL.has(role);
   const searchParams = useSearchParams();
   const client = searchParams.get('client');
   const { t, lang } = useMessages();
@@ -427,7 +434,7 @@ function ExpensesInner({ role }: { role: string }) {
               <thead>
                 <tr>
                   {isFirm && <th scope="col" />}
-                  {isFirm && <th scope="col">{t('exp.col.employee')}</th>}
+                  {canSeeAll && <th scope="col">{t('exp.col.employee')}</th>}
                   <th scope="col">{t('exp.col.description')}</th>
                   <th scope="col">{t('exp.col.date')}</th>
                   <th scope="col" className={styles.colAmount}>{t('exp.col.total')}</th>
@@ -445,7 +452,7 @@ function ExpensesInner({ role }: { role: string }) {
                         )}
                       </td>
                     )}
-                    {isFirm && <td>{r.employeeName}</td>}
+                    {canSeeAll && <td>{r.employeeName}</td>}
                     <td>{r.description}</td>
                     <td>{fmtDate(r.createdAt)}</td>
                     <td className={styles.colAmount}>{formatCents(r.totalCents, r.currency) ?? '—'}</td>
