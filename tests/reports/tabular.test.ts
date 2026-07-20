@@ -1,12 +1,12 @@
 import { expect, test } from 'vitest';
 import {
   profitAndLossTable, comparativeProfitAndLossTable, balanceSheetTable, comparativeBalanceSheetTable,
-  generalLedgerTable, trialBalanceTable, apAgingTable, type ReportLabels,
+  generalLedgerTable, trialBalanceTable, apAgingTable, arAgingTable, type ReportLabels,
 } from '../../src/reports/tabular.js';
 
 // Minimal English fixture labels (the web route supplies real translations).
 const L: ReportLabels = {
-  pl: 'Profit & Loss', bs: 'Balance Sheet', gl: 'General Ledger', trial: 'Trial Balance', apAging: 'Aged Payables',
+  pl: 'Profit & Loss', bs: 'Balance Sheet', gl: 'General Ledger', trial: 'Trial Balance', apAging: 'Aged Payables', arAging: 'Aged Receivables',
   period: 'Period', asOf: 'As of', comparisonPeriod: 'Comparison', client: 'Client', generated: 'Generated',
   income: 'Income', expense: 'Expenses', assets: 'Assets', liabilities: 'Liabilities', equity: 'Equity',
   netProfit: 'Net profit', currentResult: 'Current-period result', totalAssets: 'Total assets', totalLiabEquity: 'Total liabilities & equity',
@@ -74,6 +74,16 @@ test('trialBalanceTable and apAgingTable produce expected columns', () => {
     { asOf: '2026-06-15', current: '60.00', d1_30: '0.00', d31_60: '0.00', d61_90: '0.00', d90plus: '0.00', total: '60.00' }, L);
   expect(aging.columns.map((c) => c.key)).toEqual(['current', 'd1_30', 'd31_60', 'd61_90', 'd90plus', 'total']);
   expect(aging.rows[0]!.cells).toEqual(['60.00', '0.00', '0.00', '0.00', '0.00', '60.00']);
+});
+
+test('arAgingTable produces the same columns/layout as apAgingTable, buckets can be negative', () => {
+  const aging = arAgingTable(
+    { asOf: '2026-06-15', current: '60.00', d1_30: '0.00', d31_60: '-10.00', d61_90: '0.00', d90plus: '0.00', total: '50.00' }, L);
+  expect(aging.title).toBe('Aged Receivables');
+  expect(aging.meta).toEqual([{ label: 'As of', value: '2026-06-15' }]);
+  expect(aging.columns.map((c) => c.key)).toEqual(['current', 'd1_30', 'd31_60', 'd61_90', 'd90plus', 'total']);
+  expect(aging.rows[0]!.cells).toEqual(['60.00', '0.00', '-10.00', '0.00', '0.00', '50.00']);
+  expect(aging.rows[0]!.kind).toBe('data');
 });
 
 // Labels whose text deliberately DIFFERS from the upstream English `name` strings baked into

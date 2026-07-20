@@ -4,6 +4,7 @@ import type { ComparativeProfitAndLoss, ComparativeBalanceSheet, ComparativeSect
 import type { GeneralLedger } from './general-ledger.js';
 import type { DatedBalanceRow } from '../ledger/balances.js';
 import type { ApAging } from '../payables/aging.js';
+import type { ArAging } from '../receivables/aging.js';
 
 export type CellKind = 'data' | 'subtotal' | 'section' | 'opening' | 'closing';
 export interface ReportColumn { key: string; label: string; align: 'left' | 'right' }
@@ -11,7 +12,7 @@ export interface ReportRow { cells: string[]; kind: CellKind }
 export interface ReportTable { title: string; meta: { label: string; value: string }[]; columns: ReportColumn[]; rows: ReportRow[] }
 
 export interface ReportLabels {
-  pl: string; bs: string; gl: string; trial: string; apAging: string;
+  pl: string; bs: string; gl: string; trial: string; apAging: string; arAging: string;
   period: string; asOf: string; comparisonPeriod: string; client: string; generated: string;
   income: string; expense: string; assets: string; liabilities: string; equity: string;
   netProfit: string; currentResult: string; totalAssets: string; totalLiabEquity: string;
@@ -161,6 +162,23 @@ export function trialBalanceTable(rows: DatedBalanceRow[], labels: ReportLabels,
 export function apAgingTable(aging: ApAging, labels: ReportLabels): ReportTable {
   return {
     title: labels.apAging,
+    meta: [{ label: labels.asOf, value: aging.asOf }],
+    columns: [
+      { key: 'current', label: labels.bucketCurrent, align: 'right' },
+      { key: 'd1_30', label: labels.d1_30, align: 'right' },
+      { key: 'd31_60', label: labels.d31_60, align: 'right' },
+      { key: 'd61_90', label: labels.d61_90, align: 'right' },
+      { key: 'd90plus', label: labels.d90plus, align: 'right' },
+      { key: 'total', label: labels.total, align: 'right' },
+    ],
+    rows: [{ cells: [aging.current, aging.d1_30, aging.d31_60, aging.d61_90, aging.d90plus, aging.total], kind: 'data' }],
+  };
+}
+
+// ---- AR aging ----
+export function arAgingTable(aging: ArAging, labels: ReportLabels): ReportTable {
+  return {
+    title: labels.arAging,
     meta: [{ label: labels.asOf, value: aging.asOf }],
     columns: [
       { key: 'current', label: labels.bucketCurrent, align: 'right' },

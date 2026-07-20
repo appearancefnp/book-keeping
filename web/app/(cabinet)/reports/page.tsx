@@ -207,7 +207,7 @@ function ReportsInner() {
   const exportUrl = useCallback((format: 'csv' | 'xlsx' | 'pdf'): string => {
     const p = new URLSearchParams({ clientCompanyId: clientCompanyId ?? '', report: tab, format, lang });
     if (tab === 'pl' || tab === 'gl') { p.set('from', from); p.set('to', to); }
-    if (tab === 'bs' || tab === 'trial' || tab === 'apaging') p.set('asOf', asOf);
+    if (tab === 'bs' || tab === 'trial' || tab === 'apaging' || tab === 'araging') p.set('asOf', asOf);
     if (tab === 'pl' && compareFrom && compareTo) { p.set('compareFrom', compareFrom); p.set('compareTo', compareTo); }
     if (tab === 'bs' && compareAsOf) p.set('compareAsOf', compareAsOf);
     if (tab === 'gl' && glAccount) p.set('account', glAccount);
@@ -367,7 +367,8 @@ function ReportsInner() {
           (tab === 'bs' && (bs || bsCmp)) ||
           (tab === 'trial' && trial) ||
           (tab === 'gl' && gl) ||
-          (tab === 'apaging' && aging)
+          (tab === 'apaging' && aging) ||
+          (tab === 'araging' && aging)
         ) && exportBar}
 
         {!error && !loading && tab === 'pl' && pl && (

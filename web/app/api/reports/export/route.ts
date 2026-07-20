@@ -10,9 +10,10 @@ import { comparativeProfitAndLoss, comparativeBalanceSheet } from '@domain/repor
 import { generalLedger } from '@domain/reports/general-ledger.js';
 import { accountBalances } from '@domain/ledger/balances.js';
 import { apAging } from '@domain/payables/aging.js';
+import { arAging } from '@domain/receivables/aging.js';
 import {
   profitAndLossTable, comparativeProfitAndLossTable, balanceSheetTable, comparativeBalanceSheetTable,
-  generalLedgerTable, trialBalanceTable, apAgingTable, type ReportTable,
+  generalLedgerTable, trialBalanceTable, apAgingTable, arAgingTable, type ReportTable,
 } from '@domain/reports/tabular.js';
 import { tableToCsv } from '@domain/reports/csv.js';
 import { reportDocumentHtml } from '@domain/reports/report-html.js';
@@ -22,7 +23,7 @@ import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { isValidIsoDate } from '@/app/lib/date';
 import { errorToStatus } from '@/app/lib/authz';
 
-const REPORTS = ['pl', 'bs', 'gl', 'trial', 'apaging'] as const;
+const REPORTS = ['pl', 'bs', 'gl', 'trial', 'apaging', 'araging'] as const;
 const FORMATS = ['csv', 'xlsx', 'pdf'] as const;
 type ReportKind = (typeof REPORTS)[number];
 type Format = (typeof FORMATS)[number];
@@ -78,10 +79,12 @@ export async function GET(req: NextRequest) {
           return trialBalanceTable(await accountBalances(tx, ctx, {}), L, asOf);
         case 'apaging':
           return apAgingTable(await apAging(tx, ctx, { asOf }), L);
+        case 'araging':
+          return arAgingTable(await arAging(tx, ctx, { asOf }), L);
       }
     });
 
-    const stamp = report === 'bs' || report === 'apaging' || report === 'trial' ? asOf : `${from}_${to}`;
+    const stamp = report === 'bs' || report === 'apaging' || report === 'araging' || report === 'trial' ? asOf : `${from}_${to}`;
     if (format === 'pdf') {
       const html = reportDocumentHtml(table, { printLabel: L.print });
       return new NextResponse(html, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
