@@ -12,10 +12,13 @@ export interface EmployeeRow {
   wageType: WageType; wage: string;
   hiredOn: string; terminatedOn: string | null;
   openingVacationDays: string; openingBalanceDate: string;
+  userId: string | null; iban: string | null;
 }
 
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const moneyStr = z.string().regex(/^\d+(\.\d{1,2})?$/);
+const uuidStr = z.string().uuid();
+const ibanStr = z.string().trim().min(1);
 
 const newEmployeeSchema = z.object({
   firstName: z.string().min(1), lastName: z.string().min(1),
@@ -28,6 +31,9 @@ const newEmployeeSchema = z.object({
   hiredOn: dateStr,
   openingVacationDays: z.string().regex(/^-?\d+(\.\d{1,2})?$/).default('0'),
   openingBalanceDate: dateStr,
+  // Self-service link + payout target (M6 expense claims). Both optional/nullable.
+  userId: uuidStr.nullable().optional(),
+  iban: ibanStr.nullable().optional(),
 });
 export type NewEmployee = z.input<typeof newEmployeeSchema>;
 
@@ -38,21 +44,24 @@ const SELECT_COLS = `id, first_name AS "firstName", last_name AS "lastName",
   to_char(hired_on,'YYYY-MM-DD') AS "hiredOn",
   to_char(terminated_on,'YYYY-MM-DD') AS "terminatedOn",
   opening_vacation_days::text AS "openingVacationDays",
-  to_char(opening_balance_date,'YYYY-MM-DD') AS "openingBalanceDate"`;
+  to_char(opening_balance_date,'YYYY-MM-DD') AS "openingBalanceDate",
+  user_id AS "userId", iban`;
 
 export async function createEmployee(tx: PoolClient, ctx: TenantContext, input: NewEmployee): Promise<{ id: string }> {
   const e = newEmployeeSchema.parse(input);
+  const userId = e.userId ?? null;
+  const iban = e.iban ?? null;
   const res = await tx.query(
     `INSERT INTO employees(client_company_id, first_name, last_name, personal_code, position,
        contract_no, contract_date, contract_type, wage_type, wage, hired_on,
-       opening_vacation_days, opening_balance_date)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
+       opening_vacation_days, opening_balance_date, user_id, iban)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
     [ctx.clientCompanyId, e.firstName, e.lastName, e.personalCode, e.position,
      e.contractNo, e.contractDate, e.contractType, e.wageType, e.wage, e.hiredOn,
-     e.openingVacationDays, e.openingBalanceDate],
+     e.openingVacationDays, e.openingBalanceDate, userId, iban],
   );
   const id = res.rows[0].id as string;
-  await appendAudit(tx, ctx, { action: 'create', entityType: 'employee', entityId: id, before: null, after: e });
+  await appendAudit(tx, ctx, { action: 'create', entityType: 'employee', entityId: id, before: null, after: { ...e, userId, iban } });
   return { id };
 }
 
@@ -89,17 +98,19 @@ export async function activeEmployeesFor(tx: PoolClient, ctx: TenantContext, yea
 
 export async function updateEmployee(
   tx: PoolClient, ctx: TenantContext, id: string,
-  patch: { wage?: string; position?: string; terminatedOn?: string | null },
+  patch: { wage?: string; position?: string; terminatedOn?: string | null; userId?: string | null; iban?: string | null },
 ): Promise<void> {
   const before = await getEmployee(tx, ctx, id);
   const merged = {
     wage: patch.wage !== undefined ? moneyStr.parse(patch.wage) : before.wage,
     position: patch.position ?? before.position,
     terminatedOn: patch.terminatedOn !== undefined ? patch.terminatedOn : before.terminatedOn,
+    userId: patch.userId !== undefined ? (patch.userId === null ? null : uuidStr.parse(patch.userId)) : before.userId,
+    iban: patch.iban !== undefined ? (patch.iban === null ? null : ibanStr.parse(patch.iban)) : before.iban,
   };
   await tx.query(
-    `UPDATE employees SET wage=$1, position=$2, terminated_on=$3 WHERE id=$4 AND client_company_id=$5`,
-    [merged.wage, merged.position, merged.terminatedOn, id, ctx.clientCompanyId],
+    `UPDATE employees SET wage=$1, position=$2, terminated_on=$3, user_id=$4, iban=$5 WHERE id=$6 AND client_company_id=$7`,
+    [merged.wage, merged.position, merged.terminatedOn, merged.userId, merged.iban, id, ctx.clientCompanyId],
   );
   await appendAudit(tx, ctx, { action: 'update', entityType: 'employee', entityId: id, before, after: merged });
 }

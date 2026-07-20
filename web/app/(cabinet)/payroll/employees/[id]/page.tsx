@@ -13,7 +13,9 @@ import styles from '../../payroll.module.css';
 interface EmployeeRow {
   id: string; firstName: string; lastName: string; personalCode: string; position: string;
   wageType: 'monthly' | 'hourly'; wage: string; hiredOn: string; terminatedOn: string | null;
+  userId: string | null; iban: string | null;
 }
+interface UserOption { id: string; email: string; role: string; }
 type MoneyKind = 'bonus' | 'other_taxable' | 'deduction';
 type AbsenceType = 'vacation' | 'sick_a' | 'sick_b' | 'unpaid' | 'other';
 
@@ -32,8 +34,10 @@ function DetailInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [users, setUsers] = useState<UserOption[]>([]);
 
   const [wage, setWage] = useState(''); const [position, setPosition] = useState('');
+  const [userId, setUserId] = useState(''); const [iban, setIban] = useState('');
   const now = new Date();
   const [period, setPeriod] = useState(`${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`);
   const [bookActive, setBookActive] = useState(true);
@@ -51,10 +55,19 @@ function DetailInner() {
       const found = ((await res.json()).employees as EmployeeRow[]).find((e) => e.id === id) ?? null;
       if (!found) throw new Error('Employee not found');
       setEmp(found); setWage(found.wage); setPosition(found.position);
+      setUserId(found.userId ?? ''); setIban(found.iban ?? '');
     } catch (err) { setError((err as Error).message); } finally { setLoading(false); }
   }, [id]);
 
   useEffect(() => { if (client) load(client); }, [client, load]);
+
+  useEffect(() => {
+    // Client-side roles only (employee, owner) are eligible to be linked to an employee record.
+    fetch('/api/admin/users', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : { users: [] }))
+      .then((data) => setUsers(((data.users ?? []) as UserOption[]).filter((u) => u.role === 'employee' || u.role === 'owner')))
+      .catch(() => setUsers([]));
+  }, []);
 
   async function run(fn: () => Promise<Response>, okMsg: string) {
     if (!client) return;
@@ -87,13 +100,20 @@ function DetailInner() {
             <section className={styles.section}>
               <h2 className={styles.sectionTitle}>{t('pay.emp.edit')}</h2>
               <form className={styles.form} onSubmit={(e) => { e.preventDefault(); run(
-                () => fetch(`/api/payroll/employees/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientCompanyId: client, wage, position }) }),
+                () => fetch(`/api/payroll/employees/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientCompanyId: client, wage, position, userId: userId || null, iban: iban.trim() || null }) }),
                 t('pay.emp.save'));
               }}>
                 <label className={styles.field}><span>{t('pay.emp.wage')}</span>
                   <input value={wage} onChange={(e) => setWage(e.target.value)} /></label>
                 <label className={styles.field}><span>{t('pay.emp.position')}</span>
                   <input value={position} onChange={(e) => setPosition(e.target.value)} /></label>
+                <label className={styles.field}><span>{t('pay.emp.userLink')}</span>
+                  <select value={userId} onChange={(e) => setUserId(e.target.value)}>
+                    <option value="">{t('pay.emp.userLink.none')}</option>
+                    {users.map((u) => <option key={u.id} value={u.id}>{u.email}</option>)}
+                  </select></label>
+                <label className={styles.field}><span>{t('pay.emp.iban')}</span>
+                  <input value={iban} onChange={(e) => setIban(e.target.value)} /></label>
                 <div className={styles.formActions}><button className={styles.primaryBtn} type="submit">{t('pay.emp.save')}</button></div>
               </form>
             </section>
