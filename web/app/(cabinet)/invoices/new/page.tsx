@@ -230,7 +230,7 @@ function ComposerInner() {
                   <input value={peppolId} onChange={(e) => setPeppolId(e.target.value)} required />
                 </label>
                 <label className={styles.field}>
-                  <span>{t('invoices.dueDate')}</span>
+                  <span>{t('inv.dueDate')}</span>
                   <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
                 </label>
                 <label className={styles.field}>
