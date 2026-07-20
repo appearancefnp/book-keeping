@@ -71,6 +71,10 @@ interface ClaimPayeeRow {
 /**
  * Build a pain.001 SEPA credit-transfer batch for the given approved claims, one payment per
  * claim to the employee's IBAN. Throws (naming the employees) if any lacks an IBAN.
+ * Generates a payment order but records no "reimbursement initiated" state, so this can be
+ * called more than once for the same claims; a double-pay is caught downstream because
+ * expense_direct bank-matching dedups per bank transaction, so only one debit can settle a
+ * given claim. (When real bank sends land, add an order-generated marker.)
  */
 export async function buildReimbursementOrder(
   tx: PoolClient, ctx: TenantContext, claimIds: string[],
@@ -83,6 +87,9 @@ export async function buildReimbursementOrder(
     [ctx.clientCompanyId, claimIds],
   );
   const rows = res.rows as ClaimPayeeRow[];
+  // NOTE: duplicate claimIds in the input undercount here (ANY() dedups matches against
+  // distinct rows), which can produce a confusing empty missing-list error below; dedupe
+  // the input or count distinct occurrences if this path gets hardened.
   if (rows.length !== claimIds.length) {
     const found = new Set(rows.map((r) => r.id));
     const missing = claimIds.filter((id) => !found.has(id));

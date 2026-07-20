@@ -67,6 +67,10 @@ export interface ExpenseMatchConfig { bankAccount: string; settlementAccount: st
  * branch: dedup guarded within one import (claimed Set) and across imports (NOT EXISTS
  * against unresolved bank_match proposals referencing the same claimId). Amount-only
  * matching is an accepted MVP limitation (no reference/fuzzy matching yet).
+ * AP matching runs before this in both callers (web/app/api/bank/import/route.ts,
+ * src/bankfeed/sync.ts), so a debit equal to both an open bill's outstanding and an approved
+ * claim's gross is proposed as the bill settlement first; safe because all matches are
+ * pending_approval (human-adjudicated), never auto-posted.
  */
 export async function proposeExpenseMatches(
   tx: PoolClient, ctx: TenantContext, config: ExpenseMatchConfig,

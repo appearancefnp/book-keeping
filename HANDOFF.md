@@ -143,6 +143,15 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > silently dropped: reimbursement via a payroll component (payout through the next payslip
 > instead of a standalone bank transfer), multi-currency claims, per-diem/business-trip
 > daily-allowance orders, and approval spending limits.
+> M6 known debt, also documented rather than silently dropped:
+> - Owner segregation-of-duties: the owner role is in `proposals.decide`, so an owner can
+>   submit *and* approve their own expense claim — but cannot self-pay, since
+>   `expenses.reimburse` is firm-only. Revisit dropping owner from expense-claim approval
+>   if an auditor objects.
+> - `buildReimbursementOrder` records no "reimbursement initiated" state, so the same
+>   pain.001 payment order can be generated twice; a double-pay is caught today by
+>   `expense_direct` bank-match dedup (only one debit can settle a claim) — add an
+>   order-generated marker once real bank sends land.
 >
 > **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`,
 > since merged to `main`; full backend suite **333/333**, root+web typecheck clean, web
