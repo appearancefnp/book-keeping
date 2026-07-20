@@ -45,6 +45,13 @@ export async function postApprovedPosting(
     [entryId, proposalId, ctx.clientCompanyId],
   );
 
+  // Link + approve an expense claim, if this posting proposal originated from one.
+  await tx.query(
+    `UPDATE expense_claims SET journal_entry_id = $1, status = 'approved'
+     WHERE posting_proposal_id = $2 AND client_company_id = $3 AND status = 'submitted'`,
+    [entryId, proposalId, ctx.clientCompanyId],
+  );
+
   await appendAudit(tx, ctx, {
     action: 'posted', entityType: 'proposal', entityId: proposalId,
     before: { status: 'approved' }, after: { status: 'posted', entryId },

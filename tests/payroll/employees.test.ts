@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest';
 import { resetDb, closeDb, makeFirmAndClient, ctx } from '../helpers/db.js';
 import { withTenant } from '../../src/db/pool.js';
+import { createUser } from '../../src/auth/users.js';
 import {
   createEmployee, getEmployee, listEmployees, updateEmployee,
   setMonthlyTaxStatus, taxStatusFor, importOpeningHistory,
@@ -38,6 +39,35 @@ test('rejects duplicate personal code in the same company', async () => {
   await withTenant(t, (tx) => createEmployee(tx, t, EMP));
   await expect(withTenant(t, (tx) => createEmployee(tx, t, { ...EMP, contractNo: 'DL-2' })))
     .rejects.toThrow(/duplicate key/i);
+});
+
+test('userId + iban: set on create, read back, dup-link rejected, clear + relink works', async () => {
+  const t = ctx(await makeFirmAndClient());
+  const userA = await createUser({ firmId: t.firmId, email: 'a@t.lv', password: 'password123', role: 'employee' });
+  const userB = await createUser({ firmId: t.firmId, email: 'b@t.lv', password: 'password123', role: 'employee' });
+
+  const { id } = await withTenant(t, (tx) => createEmployee(tx, t, {
+    ...EMP, userId: userA.id, iban: 'LV80BANK0000435195001',
+  }));
+  const e = await withTenant(t, (tx) => getEmployee(tx, t, id));
+  expect(e.userId).toBe(userA.id);
+  expect(e.iban).toBe('LV80BANK0000435195001');
+
+  // Linking a second employee of the same client to the same user violates the partial unique index.
+  await expect(withTenant(t, (tx) => createEmployee(tx, t, {
+    ...EMP, contractNo: 'DL-2', personalCode: '020290-54321', userId: userA.id,
+  }))).rejects.toThrow(/duplicate key/i);
+
+  // Clearing the link works.
+  await withTenant(t, (tx) => updateEmployee(tx, t, id, { userId: null }));
+  const e2 = await withTenant(t, (tx) => getEmployee(tx, t, id));
+  expect(e2.userId).toBeNull();
+
+  // Relinking to a different user + updating IBAN (trimmed) via update.
+  await withTenant(t, (tx) => updateEmployee(tx, t, id, { userId: userB.id, iban: '  LV99BANK0000000001  ' }));
+  const e3 = await withTenant(t, (tx) => getEmployee(tx, t, id));
+  expect(e3.userId).toBe(userB.id);
+  expect(e3.iban).toBe('LV99BANK0000000001');
 });
 
 test('monthly tax status: upsert, exact hit, stale fallback, missing', async () => {

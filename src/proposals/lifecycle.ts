@@ -47,4 +47,12 @@ export async function rejectProposal(tx: PoolClient, ctx: TenantContext, id: str
       );
     }
   }
+  // A rejected claim proposal sends the claim back to draft for correction.
+  if (prop.type === 'posting') {
+    await tx.query(
+      `UPDATE expense_claims SET status = 'draft', posting_proposal_id = NULL
+       WHERE posting_proposal_id = $1 AND client_company_id = $2 AND status = 'submitted'`,
+      [id, ctx.clientCompanyId],
+    );
+  }
 }

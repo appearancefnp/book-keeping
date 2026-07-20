@@ -16,7 +16,8 @@ export type NavIconName =
   | 'payroll'
   | 'settings'
   | 'reports'
-  | 'bills';
+  | 'bills'
+  | 'expenses';
 
 const PATHS: Record<NavIconName, React.ReactNode> = {
   // Checklist / approval queue
@@ -128,6 +129,15 @@ const PATHS: Record<NavIconName, React.ReactNode> = {
       <path d="M3.5 12v3.25c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25V12" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M3.5 12h3.75l1.25 2h2.5l1.25-2h3.75" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M10 3.25v7.5M7 8l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+    </>
+  ),
+  // Expense claims — a receipt (curled bottom edge) with a coin, mirrors payroll's payslip+coin idiom
+  expenses: (
+    <>
+      <path d="M5.5 2.75h9v13.3l-1.4-1-1.4 1-1.4-1-1.4 1-1.4-1-1.4 1-1.4-1z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7.25 6h5.5M7.25 8.5h3.5" strokeLinecap="round" />
+      <circle cx="14" cy="13" r="2.75" fill="var(--surface, #fff)" />
+      <path d="M14 11.9v2.2M13.1 13h1.8" strokeLinecap="round" />
     </>
   ),
 };

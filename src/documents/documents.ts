@@ -3,7 +3,7 @@ import type { PoolClient } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
 import { appendAudit } from '../audit/audit.js';
 
-export type DocumentSource = 'mobile' | 'web' | 'email' | 'peppol';
+export type DocumentSource = 'mobile' | 'web' | 'email' | 'peppol' | 'expense';
 export type DocumentStatus = 'received' | 'extracting' | 'extracted' | 'needs_review' | 'posted' | 'rejected';
 export interface DocumentRow {
   id: string; source: DocumentSource; storageKey: string; mime: string; status: DocumentStatus;
@@ -12,7 +12,7 @@ export interface DocumentRow {
 
 const STATUSES = ['received', 'extracting', 'extracted', 'needs_review', 'posted', 'rejected'] as const;
 const newDocSchema = z.object({
-  source: z.enum(['mobile', 'web', 'email', 'peppol']),
+  source: z.enum(['mobile', 'web', 'email', 'peppol', 'expense']),
   storageKey: z.string().min(1),
   mime: z.string().min(1),
   uploadedBy: z.string().min(1),

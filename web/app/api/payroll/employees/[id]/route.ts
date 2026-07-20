@@ -14,6 +14,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const { id } = await ctx.params;
   const body = (await req.json().catch(() => ({}))) as {
     clientCompanyId?: string; wage?: string; position?: string; terminatedOn?: string | null;
+    userId?: string | null; iban?: string | null;
   };
   if (!body.clientCompanyId) return NextResponse.json({ error: 'missing clientCompanyId' }, { status: 400 });
   try {
@@ -23,6 +24,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       ...(body.wage !== undefined && { wage: body.wage }),
       ...(body.position !== undefined && { position: body.position }),
       ...(body.terminatedOn !== undefined && { terminatedOn: body.terminatedOn }),
+      ...(body.userId !== undefined && { userId: body.userId }),
+      ...(body.iban !== undefined && { iban: body.iban }),
     }));
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err) {

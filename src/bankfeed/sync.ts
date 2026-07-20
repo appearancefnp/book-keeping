@@ -4,7 +4,7 @@ import type { TenantContext } from '../tenancy/context.js';
 import type { BankFeedProvider } from './provider.js';
 import type { BankStatement } from '../banking/camt-parser.js';
 import { importStatement } from '../banking/import.js';
-import { proposeArMatches, proposeApMatches } from '../banking/match.js';
+import { proposeArMatches, proposeApMatches, proposeExpenseMatches } from '../banking/match.js';
 import { feedTxnToBankTxn } from './normalize.js';
 import { appendAudit } from '../audit/audit.js';
 
@@ -12,6 +12,7 @@ import { appendAudit } from '../audit/audit.js';
 // (documented account-mapping debt — see HANDOFF.md).
 const AR_MATCH = { receivableAccount: '2310', bankAccount: '2620' };
 const AP_MATCH = { payablesAccount: '5310', bankAccount: '2620', bankClearingAccount: '2699' };
+const EXPENSE_MATCH = { bankAccount: '2620', settlementAccount: '5610' };
 
 export const FIRST_SYNC_DAYS = 90; // GoCardless EUA default history window
 export const OVERLAP_DAYS = 7;     // late-booked transactions; import is idempotent so overlap is safe
@@ -87,11 +88,12 @@ export async function syncConnection(
 
   const ar = await proposeArMatches(tx, ctx, AR_MATCH);
   const ap = await proposeApMatches(tx, ctx, AP_MATCH);
+  const expense = await proposeExpenseMatches(tx, ctx, EXPENSE_MATCH);
   await tx.query(
     `UPDATE bank_feed_connections SET last_error = $1, updated_at = now() WHERE id = $2 AND client_company_id = $3`,
     [lastError, connectionId, ctx.clientCompanyId],
   );
-  const proposals = ar.proposalIds.length + ap.proposalIds.length;
+  const proposals = ar.proposalIds.length + ap.proposalIds.length + expense.proposalIds.length;
   await appendAudit(tx, ctx, {
     action: 'sync', entityType: 'bank_feed_connection', entityId: connectionId,
     before: null, after: { status: 'linked', accounts: results, proposals },
