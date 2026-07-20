@@ -26,7 +26,10 @@ export type Operation =
   | 'templates.write' // admin: manage onboarding templates
   | 'receivables.settle' // settle or void an AR receivable
   | 'dunning.write' // edit the dunning policy
-  | 'dunning.run'; // trigger a dunning run
+  | 'dunning.run' // trigger a dunning run
+  | 'expenses.write' // create/edit/submit/delete own (or, firm-side, any) expense claim
+  | 'expenses.reimburse' // settle a claim / build a reimbursement payment order — firm-side only
+  | 'expenses.settings.write'; // set the client's mileage rate — firm-side only
 
 /**
  * Which roles may perform each mutating operation.
@@ -56,6 +59,9 @@ const OPERATION_ROLES: Record<Operation, readonly UserRole[]> = {
   'receivables.settle': ['firm_admin', 'accountant'],
   'dunning.write': ['firm_admin', 'accountant'],
   'dunning.run': ['firm_admin', 'accountant'],
+  'expenses.write': ['firm_admin', 'accountant', 'owner', 'employee'],
+  'expenses.reimburse': ['firm_admin', 'accountant'],
+  'expenses.settings.write': ['firm_admin', 'accountant'],
 };
 
 /** True if `role` is permitted to perform `op`. Unrecognised roles are denied. */

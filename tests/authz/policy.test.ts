@@ -26,6 +26,9 @@ const MATRIX: Record<Operation, UserRole[]> = {
   'receivables.settle': ['firm_admin', 'accountant'],
   'dunning.write': ['firm_admin', 'accountant'],
   'dunning.run': ['firm_admin', 'accountant'],
+  'expenses.write': ['firm_admin', 'accountant', 'owner', 'employee'],
+  'expenses.reimburse': ['firm_admin', 'accountant'],
+  'expenses.settings.write': ['firm_admin', 'accountant'],
 };
 
 describe('authz policy — role matrix', () => {
@@ -84,6 +87,17 @@ test('receivables settle and dunning are firm-side only', () => {
   for (const op of ['receivables.settle', 'dunning.write', 'dunning.run'] as const) {
     expect(isRoleAllowed('firm_admin', op)).toBe(true);
     expect(isRoleAllowed('accountant', op)).toBe(true);
+    expect(isRoleAllowed('owner', op)).toBe(false);
+    expect(isRoleAllowed('employee', op)).toBe(false);
+  }
+});
+
+test('expense ops: write is all-roles (self-scoped in domain), reimburse/settings are firm-side', () => {
+  expect(isRoleAllowed('employee', 'expenses.write')).toBe(true);
+  expect(isRoleAllowed('owner', 'expenses.write')).toBe(true);
+  for (const op of ['expenses.reimburse', 'expenses.settings.write'] as const) {
+    expect(isRoleAllowed('accountant', op)).toBe(true);
+    expect(isRoleAllowed('firm_admin', op)).toBe(true);
     expect(isRoleAllowed('owner', op)).toBe(false);
     expect(isRoleAllowed('employee', op)).toBe(false);
   }
