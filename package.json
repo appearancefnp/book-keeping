@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "seed": "node --env-file=.env --import tsx src/dev/seed.ts",
-    "provision-admin": "node --env-file=.env --import tsx src/dev/provision-admin.ts"
+    "provision-admin": "node --env-file=.env --import tsx src/dev/provision-admin.ts",
+    "worker": "node --env-file=.env --import tsx src/jobs/worker.ts"
   },
   "dependencies": {
     "@vercel/blob": "^2.6.1",
