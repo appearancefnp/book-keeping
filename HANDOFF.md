@@ -19,7 +19,8 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > (P&L/BS/cash-flow), accounts payable/bills, live bank feeds, AR lifecycle (recurring
 > invoices/quotes/reminders), aged AR/AP, expense claims.
 >
-> **Progress:** M1 (financial statements) — **P&L + Balance Sheet shipped 2026-07-10**
+> **Progress:** M6 (expense claims) — **done, shipped 2026-07-20**, see entry below.
+> M1 (financial statements) — **P&L + Balance Sheet shipped 2026-07-10**
 > (`src/reports/`, `/reports` page; Cash-Flow still deferred, needs activity classification).
 > M2 (accounts payable) — **done, shipped 2026-07-10** — `src/payables/` (bills, settlement,
 > pay-run, aging), camt.053 debit matching (clear transit / settle direct), `/bills` + pay-run UI,
@@ -105,6 +106,43 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > `limit: 20`) — fine at hobby scale, but loop reap+drain under a time budget before
 > C-recurring adds a second daily job type to the queue; the standalone `npm run worker` is
 > unaffected.
+>
+> **M6 (expense claims / reimbursements) — done, shipped 2026-07-20.** `src/expenses/`:
+> claims CRUD with server-side totals, mileage lines (km × rate, with the rate snapshotted
+> onto the line at entry time so a later mileage-rate change doesn't retroactively reprice
+> old claims), and self-scope (employee/owner can create/edit/submit/delete only their own
+> claim; firm roles read and act on all). Lifecycle: submit (draft→submitted, creates a
+> pending posting proposal); approve posts DR each line's expense account (net if the line
+> is VAT-deductible, gross if not — non-deductible VAT is just part of the expense cost) +
+> DR **5722** for the summed deductible VAT, CR **5610** (new "employee settlements" account)
+> for the claim's gross total; reject sends the claim back to `draft` (mirrors the bill/AR
+> reject pattern). Reimburse: `settleClaim` (DR 5610 / CR bank) plus a pain.001 SEPA
+> credit-transfer payment order built per-claim to the employee's IBAN (throws, naming
+> whoever's missing one, if any payee lacks it). Receipt upload goes through the blob store
+> with AI prefill but deliberately skips the intake-proposal pipeline (a receipt is a claim
+> line, not a document awaiting a posting decision). Self-service rides two new employee
+> columns — `user_id` (+ a partial unique index enforcing at most one link per user per
+> client) and `iban` — and `documents.source` gains `'expense'` for these receipt photos.
+> Bank side: `proposeExpenseMatches` recognizes a bank debit equal to an approved claim's
+> gross as an `expense_direct` match, wired into `/api/bank/import` and the bankfeed sync
+> next to the existing AP/AR matchers; `confirmMatch` settles it through `settleClaim`.
+> New authz ops: `expenses.write` (all four roles, self-scoped), `expenses.reimburse` +
+> `expenses.settings.write` (firm-side only — reimbursing and setting the mileage rate are
+> accountant/firm_admin actions). Migration **043**: `expense_claims` / `expense_claim_lines`
+> / `expense_settings` (RLS + FORCE RLS + tenant-isolation policy on all three, mirroring the
+> rest of the schema), `expense_settings` holding one row per client with a default
+> 30-cents/km mileage rate. Routes: `/api/expenses` (GET/POST), `/api/expenses/[id]`
+> (submit|settle|delete), `/api/expenses/payment-order`, `/api/expenses/settings` (GET/PUT),
+> `/api/expenses/upload`. UI: `/expenses` — employee composer (receipt + mileage lines),
+> firm reimburse view, owner read-only attributed list — nav entry, and employee-card
+> user-link + IBAN fields (`/payroll/employees/[id]`). Full suite: **609 tests**. Account
+> **5610** extends the pre-existing hard-coded account-mapping debt (§M2 follow-ups above) —
+> settlement/VAT-input accounts are env-var overridable (`EXPENSE_SETTLEMENT_ACCOUNT`,
+> `EXPENSE_VAT_INPUT_ACCOUNT`) same as the bills/pay-run routes, but there is still no
+> per-client account-mapping settings screen. Deferred, documented as such rather than
+> silently dropped: reimbursement via a payroll component (payout through the next payslip
+> instead of a standalone bank transfer), multi-currency claims, per-diem/business-trip
+> daily-allowance orders, and approval spending limits.
 >
 > **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`,
 > since merged to `main`; full backend suite **333/333**, root+web typecheck clean, web
