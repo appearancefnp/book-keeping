@@ -63,8 +63,8 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > 2. A 429 on the account-details call fails the whole sync at connection level (now
 >    mitigated by per-requisition caching; residual on first sync).
 > 3. Cosmetics that ride: no confirmation on connection Remove, misleading success toast when
->    a manual sync finds the consent expired, no maxDuration on the cron route, raw provider
->    error text untranslated in `last_error`.
+>    a manual sync finds the consent expired, raw provider error text untranslated in
+>    `last_error`.
 > 4. With GoCardless keys unset in production the stub will "connect" a demo bank and import
 >    demo transactions into real books — the real-key cutover must remove stub-imported rows
 >    via the normal reversal flow.
@@ -102,8 +102,8 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > (quotes→invoice, customer statements), and the per-client account-mapping settings screen
 > debt (unchanged, see §M2 follow-ups above).
 >
-> **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`
-> (not yet merged to `main`); full backend suite **333/333**, root+web typecheck clean, web
+> **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`,
+> since merged to `main`; full backend suite **333/333**, root+web typecheck clean, web
 > build clean. Per-task reviews all passed; a **final whole-branch review (workflow, high
 > effort) was run** and surfaced 10 findings — the **5 correctness bugs were fixed** on-branch
 > and re-reviewed:
