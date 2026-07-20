@@ -6,6 +6,7 @@ import { validateEn16931 } from './validate.js';
 import { postEntry } from '../ledger/posting.js';
 import { toCents } from '../db/money.js';
 import { appendAudit } from '../audit/audit.js';
+import { applyCreditNoteToInvoice } from '../receivables/apply-credit-note.js';
 
 export async function sendInvoice(
   tx: PoolClient, ctx: TenantContext,
@@ -88,5 +89,19 @@ export async function sendCreditNote(
   );
   const einvoiceId = res.rows[0].id as string;
   await appendAudit(tx, ctx, { action: 'send', entityType: 'einvoice', entityId: einvoiceId, before: null, after: { docType: 'credit_note', invoiceNumber: cn.invoiceNumber, messageId, entryId } });
+
+  // 6. If this credit note references an open invoice, apply it like a payment so the
+  // AR open-item model and dunning agree with the GL reversal just posted above.
+  if (cn.correctedInvoiceNumber) {
+    await applyCreditNoteToInvoice(tx, ctx, {
+      creditNoteEinvoiceId: einvoiceId,
+      correctedInvoiceNumber: cn.correctedInvoiceNumber,
+      creditNoteGrandCents: toCents(cn.grandTotal),
+      currency: cn.currency,
+      issueDate: cn.issueDate,
+      journalEntryId: entryId,
+    });
+  }
+
   return { einvoiceId, entryId, messageId };
 }
