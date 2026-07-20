@@ -6,7 +6,7 @@ import { resolveTenantContext } from '@domain/auth/context.js';
 import { withTenant } from '@domain/db/pool.js';
 import { parseCamt053 } from '@domain/banking/camt-parser.js';
 import { importStatement } from '@domain/banking/import.js';
-import { proposeApMatches, proposeArMatches } from '@domain/banking/match.js';
+import { proposeApMatches, proposeArMatches, proposeExpenseMatches } from '@domain/banking/match.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
 
@@ -15,6 +15,9 @@ import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
 const AP_MATCH = { payablesAccount: '5310', bankAccount: '2620', bankClearingAccount: '2699' };
 // Accounts for AR-side auto-matching of unmatched bank credits: 2310 receivables, 2620 bank.
 const AR_MATCH = { receivableAccount: '2310', bankAccount: '2620' };
+// Accounts for expense-claim reimbursement auto-matching of unmatched bank debits:
+// 5610 employee settlements, 2620 bank.
+const EXPENSE_MATCH = { bankAccount: '2620', settlementAccount: '5610' };
 
 export async function POST(req: NextRequest) {
   const token = await getSessionToken();
@@ -42,7 +45,8 @@ export async function POST(req: NextRequest) {
       const imported = await importStatement(tx, ctx, stmt);
       const ap = await proposeApMatches(tx, ctx, AP_MATCH);
       const ar = await proposeArMatches(tx, ctx, AR_MATCH);
-      return { ...imported, apProposals: ap.proposalIds.length, arProposals: ar.proposalIds.length };
+      const expense = await proposeExpenseMatches(tx, ctx, EXPENSE_MATCH);
+      return { ...imported, apProposals: ap.proposalIds.length, arProposals: ar.proposalIds.length, expenseProposals: expense.proposalIds.length };
     });
     return NextResponse.json(result, { status: 200 });
   } catch (err) {

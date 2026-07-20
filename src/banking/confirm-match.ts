@@ -70,6 +70,19 @@ export async function postApprovedBankMatch(
     return { entryId };
   }
 
+  if (raw.kind === 'expense_direct') {
+    const p = prop.payload as { claimId: string; bankAccount: string; settlementAccount: string };
+    const { settleClaim } = await import('../expenses/reimburse.js');
+    const { entryId } = await settleClaim(tx, ctx, {
+      claimId: p.claimId, paidDate: bookingDate, method: 'bank_match',
+      bankTransactionId: raw.bankTransactionId, bankAccount: p.bankAccount, settlementAccount: p.settlementAccount,
+    });
+    await tx.query(`UPDATE proposals SET status='posted', resolved_entry_id=$1, resolved_by=$2, resolved_at=now() WHERE id=$3 AND client_company_id=$4`, [entryId, ctx.actorId, proposalId, ctx.clientCompanyId]);
+    await tx.query(`UPDATE bank_transactions SET status='reconciled', matched_entry_id=$1 WHERE id=$2 AND client_company_id=$3`, [entryId, raw.bankTransactionId, ctx.clientCompanyId]);
+    await appendAudit(tx, ctx, { action: 'posted', entityType: 'bank_match', entityId: proposalId, before: { status: 'approved' }, after: { status: 'posted', entryId, kind: 'expense_direct' } });
+    return { entryId };
+  }
+
   if (raw.kind === 'receivable_direct') {
     const p = prop.payload as { einvoiceId: string; receivableAccount: string; bankAccount: string };
     const { settleReceivable } = await import('../receivables/settlement.js');

@@ -59,6 +59,59 @@ export async function proposeArMatches(
   return { proposalIds };
 }
 
+export interface ExpenseMatchConfig { bankAccount: string; settlementAccount: string; }
+
+/**
+ * Propose reimbursements for unmatched DEBIT bank transactions that exactly equal one
+ * APPROVED (not yet reimbursed) claim's gross total. Mirrors proposeApMatches' bill
+ * branch: dedup guarded within one import (claimed Set) and across imports (NOT EXISTS
+ * against unresolved bank_match proposals referencing the same claimId). Amount-only
+ * matching is an accepted MVP limitation (no reference/fuzzy matching yet).
+ */
+export async function proposeExpenseMatches(
+  tx: PoolClient, ctx: TenantContext, config: ExpenseMatchConfig,
+): Promise<{ proposalIds: string[] }> {
+  const txns = await tx.query(
+    `SELECT id, amount_cents::text AS "amountCents", reference, counterparty
+     FROM bank_transactions
+     WHERE client_company_id = $1 AND status = 'unmatched' AND side = 'debit'
+     ORDER BY booking_date, id`,
+    [ctx.clientCompanyId],
+  );
+
+  const proposalIds: string[] = [];
+  const claimedIds = new Set<string>();
+  for (const t of txns.rows) {
+    const amountEur = (Number(t.amountCents) / 100).toFixed(2);
+    const claim = await tx.query(
+      `SELECT c.id, c.description FROM expense_claims c
+       WHERE c.client_company_id = $1 AND c.status = 'approved'
+         AND c.total_cents = $2::bigint
+         AND ($3::uuid[] IS NULL OR c.id <> ALL($3::uuid[]))
+         AND NOT EXISTS (
+           SELECT 1 FROM proposals p
+           WHERE p.client_company_id = $1 AND p.type = 'bank_match'
+             AND p.status IN ('pending_approval','approved')
+             AND p.payload->>'claimId' = c.id::text
+         )
+       ORDER BY c.created_at LIMIT 1`,
+      [ctx.clientCompanyId, t.amountCents, claimedIds.size ? [...claimedIds] : null],
+    );
+    if (!claim.rowCount) continue;
+    const claimId = claim.rows[0].id as string;
+    const { id } = await createProposal(tx, ctx, {
+      type: 'bank_match',
+      payload: { kind: 'expense_direct', bankTransactionId: t.id, claimId, amountCents: t.amountCents, bankAccount: config.bankAccount, settlementAccount: config.settlementAccount },
+      rationale: { ruleRef: 'expense-direct', computation: `Bank debit of ${amountEur} EUR reimburses claim ${claim.rows[0].description}.`, sourceRefs: { bankTransactionId: t.id, claimId } } as Rationale,
+      status: 'pending_approval',
+    });
+    await tx.query(`UPDATE bank_transactions SET status = 'matched' WHERE id = $1 AND client_company_id = $2`, [t.id, ctx.clientCompanyId]);
+    claimedIds.add(claimId);
+    proposalIds.push(id);
+  }
+  return { proposalIds };
+}
+
 export interface ApMatchConfig { payablesAccount: string; bankAccount: string; bankClearingAccount: string; }
 
 /**
