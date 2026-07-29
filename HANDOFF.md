@@ -20,8 +20,21 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > invoices/quotes/reminders), aged AR/AP, expense claims.
 >
 > **Progress:** M6 (expense claims) — **done, shipped 2026-07-20**, see entry below.
-> M1 (financial statements) — **P&L + Balance Sheet shipped 2026-07-10**
-> (`src/reports/`, `/reports` page; Cash-Flow still deferred, needs activity classification).
+> M1 (financial statements) — **done, shipped 2026-07-29** — P&L + Balance Sheet
+> (2026-07-10), then **Cash-Flow statement + Statement of Equity (2026-07-29)** completing
+> the set. `src/reports/cash-flow.ts` (indirect method) + `src/reports/equity.ts`, read-only
+> over the ledger, **no migration**; `/api/reports/cash-flow` + `/api/reports/statement-of-equity`,
+> two `/reports` tabs (from/to picker, CSV/Excel/PDF export, reconciliation/balanced indicators).
+> Cash-flow O/I/F + cash classification is a config account-code map defaulting to the LR chart
+> (`CASHFLOW_CASH_CODES` `26` / `CASHFLOW_INVESTING_CODES` `11,12,13` / `CASHFLOW_FINANCING_CODES`
+> `51,52`; equity is always financing by `accounts.type`) — env-overridable, deliberately extending
+> the hard-coded account-mapping debt (§M2 follow-ups) rather than resolving it (still no per-client
+> mapping screen). Reconciles to the change in cash **by construction** (every entry balances, so
+> debit-normal movements sum to zero); the split between buckets is the only mapping-dependent part.
+> Known behaviour: depreciation add-back presentation (operating vs investing) depends on where
+> accumulated-depreciation codes sit in the map — cash effect is always nil and the statement always
+> reconciles. See `docs/superpowers/specs/2026-07-29-cash-flow-equity-design.md`. **This clears the
+> last Tier-1 credibility-floor gap** (all six Tier-1 rows now ✅).
 > M2 (accounts payable) — **done, shipped 2026-07-10** — `src/payables/` (bills, settlement,
 > pay-run, aging), camt.053 debit matching (clear transit / settle direct), `/bills` + pay-run UI,
 > aged-payables tab on `/reports` — the full money-out loop. M5 now has its AP half.

@@ -22,12 +22,12 @@ The hard, differentiating parts are strong and ahead of incumbents: append-only 
 ledger, AI/OCR intake, proposal/approval with inline rationale, RLS multi-tenancy, Peppol/
 EN 16931, payroll engine. **The app is strong on the novel wedge and thin on the boring core.**
 Tier 1 below is the credibility floor — the set that would lose a head-to-head demo against
-Xero today. **As of 2026-07-20, five of six Tier 1 rows are ✅ (M2, M3, M5, M6, M7); M1 is
-🔶 (P&L + Balance Sheet shipped, Cash-Flow statement still ⛔) — the only Tier-1 gap left.**
-M4 is 🔶 too but tracked separately from the credibility floor (its money-in loop, dunning,
-and aging are shipped; only recurring invoices and quotes→invoice remain, both Tier-2-adjacent
-polish rather than day-to-day bookkeeping table stakes). Tiers 2–4 are prioritisation, not
-emergencies.
+Xero today. **As of 2026-07-29, all six Tier 1 rows are ✅ (M1, M2, M3, M5, M6, M7) — the
+credibility floor is cleared: M1's Cash-Flow statement + Statement of Equity shipped 2026-07-29,
+the last Tier-1 gap.** M4 is 🔶 but tracked separately from the credibility floor (its money-in
+loop, dunning, and aging are shipped; only recurring invoices and quotes→invoice remain, both
+Tier-2-adjacent polish rather than day-to-day bookkeeping table stakes). Tiers 2–4 are
+prioritisation, not emergencies.
 
 ---
 
@@ -38,7 +38,7 @@ These are absent everywhere (backend + UI) and, unlike the Phase 2–3 modules, 
 
 | # | Gap | Status | Notes |
 |---|-----|--------|-------|
-| M1 | **Financial statements** — Profit & Loss / Income Statement, Balance Sheet, Cash-Flow statement, Statement of Equity, on demand for any period | 🔶 | **P&L + Balance Sheet shipped 2026-07-10** — `src/reports/` (`profitAndLoss`, `balanceSheet` over `accountBalances`), read-only API routes, and the `/reports` page (period picker, trilingual, balanced-invariant indicator). Balance Sheet folds the unclosed current-period result into equity. **Cash-Flow statement + Statement of Equity still ⛔** (Cash-Flow needs activity classification — its own design). Distinct from the statutory *annual report* (`HANDOFF §5`, §6.8). Unblocks M5 (aged reports) and M14 (report depth). See `docs/superpowers/plans/2026-07-10-financial-statements.md`. |
+| M1 | **Financial statements** — Profit & Loss / Income Statement, Balance Sheet, Cash-Flow statement, Statement of Equity, on demand for any period | ✅ | **P&L + Balance Sheet shipped 2026-07-10**; **Cash-Flow statement + Statement of Equity shipped 2026-07-29** — `src/reports/` (`profitAndLoss`, `balanceSheet`, `cashFlow`, `statementOfEquity` over `accountBalances`), read-only API routes, and the `/reports` page (period picker, trilingual, reconciliation/balanced-invariant indicators, CSV/Excel/PDF export). Cash-flow is indirect-method (net profit → working-capital → investing → financing → net change in cash), reconciling to the change in cash by construction; activity classification is a config account-code map defaulting to the LR chart, env-overridable (`CASHFLOW_CASH_CODES`/`CASHFLOW_INVESTING_CODES`/`CASHFLOW_FINANCING_CODES`), deliberately extending the hard-coded account-mapping debt (see M2 row / `HANDOFF.md`). No migration — statements key off `accounts.type` + the code map. Distinct from the statutory *annual report* (`HANDOFF §5`, §6.8). See `docs/superpowers/specs/2026-07-29-cash-flow-equity-design.md` and `docs/superpowers/plans/2026-07-10-financial-statements.md`. |
 | M2 | **Accounts payable / vendor bills** — enter supplier bills, track what's owed, schedule/batch pay, AP aging | ✅ | **Shipped 2026-07-10** — `src/payables/` (bills, settlement, pay-run, aging), camt.053 debit matching (clear transit / settle direct), `/bills` + pay-run UI, aged-payables tab on `/reports` — the full money-out loop. M5 now has its AP half. |
 | M3 | **Live bank feeds (open banking / PSD2)** | ✅ | **Shipped 2026-07-19** — `src/bankfeed/` (GoCardless Bank Account Data behind a `BankFeedProvider` seam mirroring `AccessPoint`/`VidClient`, plus a keyless auto-linking stub), connections/consent lifecycle UI on `/bank` + `/bank/callback`, daily Vercel cron (`web/vercel.json`) and manual "Sync now" feeding the existing camt.053 matching engine unchanged. Accepted limitations: cross-source dedup vs a camt.053 upload of the same account depends on the bank populating the end-to-end id in both sources; the hard-coded LR chart constants in `src/bankfeed/sync.ts` extend the pre-existing account-mapping debt (see M2 row / `HANDOFF.md`). See `docs/superpowers/specs/2026-07-19-bank-feeds-design.md`. |
 | M4 | **AR lifecycle** — quotes/estimates → convert to invoice; **recurring / subscription invoices**; automated payment reminders (dunning); customer statements; late fees | 🔶 | **Slice A — AR money-in loop — shipped 2026-07-13** (`src/receivables/`: open-item tracking on `einvoices` + `invoice_payments`, `settleReceivable`, `arAging`, invoice-linked bank matching wired into camt.053 import via `proposeArMatches` + `receivable_direct` confirm branch, retiring the unused GL-level `proposeMatches`; aged-receivables tab on `/reports`; customer default payment terms). See `docs/superpowers/plans/2026-07-13-ar-money-in-loop.md`. **Slice A UI — shipped 2026-07-14** (`/invoices` payment-status/due/outstanding columns via extended `listEinvoices` + `PaymentStatusBadge`; inline settle/void drawer wired to `POST /api/receivables/[id]`; see `docs/superpowers/plans/2026-07-14-ar-ui-settle.md`). **Slice B — dunning + informational late fees — shipped 2026-07-14** (`src/dunning/`: per-client `dunning_policy`/`dunning_stages` config, pure `accruedLateFeeCents`, `runDunning` scanning overdue receivables and emitting idempotent per-level tasks via `dunning_events`; run + policy routes; policy editor + "Run reminders now" on the `/reports` AR-aging tab. Bookkeeper-facing — reminders surface as tasks. See `docs/superpowers/plans/2026-07-14-ar-dunning.md`. Pre-scheduler follow-ups tracked: `ON CONFLICT` on the events insert + route range-validation before wiring a cron). **Merged to `main` 2026-07-20**, together with the job-queue/worker/reaper infra the M4 workstream built as "C-infra" (durable Postgres `jobs` table + `bookkeeping_worker`/`bookkeeping_supervisor` roles + handler registry + `drainOnce` + chain reaper, `src/jobs/`) — this resolves slice C's scheduler gating decision (see the slice-C handoff doc: recurring generation becomes a `recurring_generate` job handler in `src/jobs/register.ts`, mirroring `dunning_run`'s self-perpetuation). Migrations renumbered 032→037 (receivables) and 033–036→038–041 (dunning, jobs, dunning-jobs-backfill, supervisor role) to land after the pre-existing `main` migrations; new **042** applies referenced AR credit notes against their invoice (`invoice_payments` method `'credit_note'`, capped at outstanding) so dunning stops chasing credited invoices, and nets unapplied credit-note remainders into `arAging` by issue-date age (GL-tied) — both integration reconciliations beyond the original slice plans. `GET /api/cron/jobs-drain` is now the Vercel cron entrypoint for the queue (06:00, after bank-sync 05:00), with timing-safe cron-secret auth on both cron routes. **Still ⛔: recurring/subscription invoices (C-recurring — scheduler now resolved, feature itself not started), quotes→invoice (D), customer statement view.** |
@@ -110,10 +110,11 @@ The three that decide a head-to-head demo, do first, in order:
    behind the established interface+stub seam; existing matching engine consumes it unchanged.
 
 M7 (credit notes) is done (✅, shipped 2026-07-17); M6 (expense claims) is done (✅, shipped
-2026-07-20); M4 (AR lifecycle, 🔶) rounds out invoicing — C-recurring and slice D (quotes→invoice,
-customer statements) remain. With M2/M3/M5/M6/M7 shipped, **M1's Cash-Flow statement is the
-only Tier-1 gap standing between this app and clearing the credibility floor outright.**
-M8–M13 follow the spec's Phase 2–3 order; Tiers 3–4 are opportunistic. Every item follows
+2026-07-20); M1 (financial statements) is now done (✅ — Cash-Flow + Statement of Equity shipped
+2026-07-29, completing the set). M4 (AR lifecycle, 🔶) rounds out invoicing — C-recurring and
+slice D (quotes→invoice, customer statements) remain. **With all six Tier-1 rows shipped, the
+credibility floor is cleared;** the next unblocked work is M4's remaining slices, then M8–M13 in
+the spec's Phase 2–3 order (Tiers 3–4 opportunistic). Every item follows
 the house convention:
 **migration + domain (`src/<module>/`) + tests + API route + page**, external systems behind an
 adapter interface with a stub (`HANDOFF.md` Conventions).

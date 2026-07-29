@@ -1,15 +1,20 @@
 import { expect, test } from 'vitest';
 import {
   profitAndLossTable, comparativeProfitAndLossTable, balanceSheetTable, comparativeBalanceSheetTable,
-  generalLedgerTable, trialBalanceTable, apAgingTable, arAgingTable, type ReportLabels,
+  generalLedgerTable, trialBalanceTable, apAgingTable, arAgingTable,
+  cashFlowTable, statementOfEquityTable, type ReportLabels,
 } from '../../src/reports/tabular.js';
 
 // Minimal English fixture labels (the web route supplies real translations).
 const L: ReportLabels = {
   pl: 'Profit & Loss', bs: 'Balance Sheet', gl: 'General Ledger', trial: 'Trial Balance', apAging: 'Aged Payables', arAging: 'Aged Receivables',
+  cashFlow: 'Cash Flow', equityStmt: 'Statement of Equity',
   period: 'Period', asOf: 'As of', comparisonPeriod: 'Comparison', client: 'Client', generated: 'Generated',
   income: 'Income', expense: 'Expenses', assets: 'Assets', liabilities: 'Liabilities', equity: 'Equity',
   netProfit: 'Net profit', currentResult: 'Current-period result', totalAssets: 'Total assets', totalLiabEquity: 'Total liabilities & equity',
+  operating: 'Operating activities', investing: 'Investing activities', financing: 'Financing activities',
+  netChange: 'Net change in cash', openingCash: 'Cash at start', closingCash: 'Cash at end',
+  movement: 'Change', resultForPeriod: 'Result for the period',
   code: 'Code', account: 'Account', amount: 'Amount', current: 'Current', comparison: 'Comparison', variance: 'Variance', variancePct: 'Variance %',
   date: 'Date', memo: 'Memo', description: 'Description', debit: 'Debit', credit: 'Credit', balance: 'Balance', opening: 'Opening', closing: 'Closing', total: 'Total',
   bucketCurrent: 'Current', d1_30: '1–30', d31_60: '31–60', d61_90: '61–90', d90plus: '90+',
@@ -140,4 +145,40 @@ test('comparativeBalanceSheetTable localizes totalAssets/totalLiabilitiesAndEqui
   expect(rows.at(-2)!.cells[1]).not.toBe('Total assets');
   expect(rows.at(-1)!.cells[1]).toBe('TLE');
   expect(rows.at(-1)!.cells[1]).not.toBe('Total liabilities & equity');
+});
+
+test('cashFlowTable lays out the three activity sections with a reconciliation tail', () => {
+  const cf = {
+    from: '2026-03-01', to: '2026-03-31', netProfit: '120.00',
+    workingCapital: [{ code: '2310', name: 'Debtors', amount: '-100.00' }], operatingSubtotal: '20.00',
+    investing: [{ code: '1210', name: 'Fixed assets', amount: '-800.00' }], investingSubtotal: '-800.00',
+    financing: [{ code: '3300', name: 'Capital', amount: '1000.00' }], financingSubtotal: '1000.00',
+    netChange: '220.00', openingCash: '0.00', closingCash: '220.00', reconciles: true,
+  };
+  const t = cashFlowTable(cf, L);
+  expect(t.title).toBe('Cash Flow');
+  expect(t.rows.filter((r) => r.kind === 'section')).toHaveLength(3); // operating/investing/financing
+  // net-profit line leads the operating section
+  const first = t.rows.find((r) => r.kind === 'data')!;
+  expect(first.cells).toEqual(['', 'Net profit', '120.00']);
+  const opening = t.rows.find((r) => r.kind === 'opening')!;
+  const closing = t.rows.find((r) => r.kind === 'closing')!;
+  expect(opening.cells).toEqual(['', 'Cash at start', '0.00']);
+  expect(closing.cells).toEqual(['', 'Cash at end', '220.00']);
+});
+
+test('statementOfEquityTable appends the result line and a totals subtotal', () => {
+  const eq = {
+    from: '2026-03-01', to: '2026-03-31',
+    accounts: [{ code: '3300', name: 'Capital', opening: '1000.00', movement: '-200.00', closing: '800.00' }],
+    result: { opening: '0.00', movement: '180.00', closing: '180.00' },
+    openingTotal: '1000.00', movementTotal: '-20.00', closingTotal: '980.00', balanced: true,
+  };
+  const t = statementOfEquityTable(eq, L);
+  expect(t.title).toBe('Statement of Equity');
+  expect(t.columns.map((c) => c.key)).toEqual(['code', 'account', 'opening', 'movement', 'closing']);
+  const resultRow = t.rows.find((r) => r.cells[1] === 'Result for the period')!;
+  expect(resultRow.cells).toEqual(['', 'Result for the period', '0.00', '180.00', '180.00']);
+  const totals = t.rows.find((r) => r.kind === 'subtotal')!;
+  expect(totals.cells).toEqual(['', 'Total', '1000.00', '-20.00', '980.00']);
 });

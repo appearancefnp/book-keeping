@@ -35,7 +35,22 @@ interface ComparativeBalanceSheet {
   currentPeriodResult: ComparativeLine; totalAssets: ComparativeLine; totalLiabilitiesAndEquity: ComparativeLine;
 }
 
-type Tab = 'pl' | 'bs' | 'trial' | 'gl' | 'apaging' | 'araging';
+interface CfLine { code: string; name: string; amount: string; }
+interface CashFlow {
+  from: string; to: string; netProfit: string;
+  workingCapital: CfLine[]; operatingSubtotal: string;
+  investing: CfLine[]; investingSubtotal: string;
+  financing: CfLine[]; financingSubtotal: string;
+  netChange: string; openingCash: string; closingCash: string; reconciles: boolean;
+}
+interface EqAccountLine { code: string; name: string; opening: string; movement: string; closing: string; }
+interface StatementOfEquity {
+  from: string; to: string; accounts: EqAccountLine[];
+  result: { opening: string; movement: string; closing: string };
+  openingTotal: string; movementTotal: string; closingTotal: string; balanced: boolean;
+}
+
+type Tab = 'pl' | 'bs' | 'trial' | 'gl' | 'apaging' | 'araging' | 'cashflow' | 'equity';
 
 function todayIso(): string { return new Date().toISOString().slice(0, 10); }
 function firstOfMonthIso(): string { return todayIso().slice(0, 8) + '01'; }
@@ -69,6 +84,8 @@ function ReportsInner() {
   const [aging, setAging] = useState<ApAging | null>(null);
   const [gl, setGl] = useState<GeneralLedger | null>(null);
   const [trial, setTrial] = useState<TrialRow[] | null>(null);
+  const [cf, setCf] = useState<CashFlow | null>(null);
+  const [eq, setEq] = useState<StatementOfEquity | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -129,6 +146,10 @@ function ReportsInner() {
         url = `/api/reports/trial-balance?clientCompanyId=${encodeURIComponent(clientCompanyId)}`;
       } else if (tab === 'apaging') {
         url = `/api/reports/ap-aging?clientCompanyId=${encodeURIComponent(clientCompanyId)}&asOf=${asOf}`;
+      } else if (tab === 'cashflow') {
+        url = `/api/reports/cash-flow?clientCompanyId=${encodeURIComponent(clientCompanyId)}&from=${from}&to=${to}`;
+      } else if (tab === 'equity') {
+        url = `/api/reports/statement-of-equity?clientCompanyId=${encodeURIComponent(clientCompanyId)}&from=${from}&to=${to}`;
       } else {
         url = `/api/reports/ar-aging?clientCompanyId=${encodeURIComponent(clientCompanyId)}&asOf=${asOf}`;
       }
@@ -138,11 +159,11 @@ function ReportsInner() {
         throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
       }
       const data = (await res.json()) as {
-        report?: ProfitAndLoss | BalanceSheet | ApAging | GeneralLedger | ComparativeProfitAndLoss | ComparativeBalanceSheet;
+        report?: ProfitAndLoss | BalanceSheet | ApAging | GeneralLedger | ComparativeProfitAndLoss | ComparativeBalanceSheet | CashFlow | StatementOfEquity;
         rows?: TrialRow[];
         comparative?: boolean;
       };
-      setPl(null); setPlCmp(null); setBs(null); setBsCmp(null); setAging(null); setGl(null);
+      setPl(null); setPlCmp(null); setBs(null); setBsCmp(null); setAging(null); setGl(null); setCf(null); setEq(null);
       if (tab === 'pl') {
         if (data.comparative) setPlCmp(data.report as ComparativeProfitAndLoss);
         else setPl(data.report as ProfitAndLoss);
@@ -153,6 +174,10 @@ function ReportsInner() {
         setGl(data.report as GeneralLedger);
       } else if (tab === 'trial') {
         setTrial(data.rows ?? []);
+      } else if (tab === 'cashflow') {
+        setCf(data.report as CashFlow);
+      } else if (tab === 'equity') {
+        setEq(data.report as StatementOfEquity);
       } else {
         setAging(data.report as ApAging);
       }
@@ -206,7 +231,7 @@ function ReportsInner() {
 
   const exportUrl = useCallback((format: 'csv' | 'xlsx' | 'pdf'): string => {
     const p = new URLSearchParams({ clientCompanyId: clientCompanyId ?? '', report: tab, format, lang });
-    if (tab === 'pl' || tab === 'gl') { p.set('from', from); p.set('to', to); }
+    if (tab === 'pl' || tab === 'gl' || tab === 'cashflow' || tab === 'equity') { p.set('from', from); p.set('to', to); }
     if (tab === 'bs' || tab === 'trial' || tab === 'apaging' || tab === 'araging') p.set('asOf', asOf);
     if (tab === 'pl' && compareFrom && compareTo) { p.set('compareFrom', compareFrom); p.set('compareTo', compareTo); }
     if (tab === 'bs' && compareAsOf) p.set('compareAsOf', compareAsOf);
@@ -290,6 +315,27 @@ function ReportsInner() {
     </div>
   );
 
+  const renderCfSection = (title: string, lines: CfLine[], subtotal: string) => (
+    <div className={styles.section}>
+      <h3 className={styles.sectionTitle}>{title}</h3>
+      <table className={styles.table}>
+        <tbody>
+          {lines.map((l, i) => (
+            <tr key={`${l.code}-${i}`}>
+              <td className={styles.code}>{l.code}</td>
+              <td className={styles.name}>{l.name}</td>
+              <td className={styles.amount}>{fmtMoney(l.amount)}</td>
+            </tr>
+          ))}
+          <tr className={styles.subtotalRow}>
+            <td /><td className={styles.name}>{title}</td>
+            <td className={styles.amount}>{fmtMoney(subtotal)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+
   const renderComparativeTotal = (label: string, l: ComparativeLine) => (
     <div className={styles.tableWrapper}>
       <table className={styles.table}>
@@ -318,6 +364,8 @@ function ReportsInner() {
           <button role="tab" aria-selected={tab === 'gl'} className={tab === 'gl' ? styles.tabActive : styles.tab} onClick={() => setTab('gl')}>{t('reports.tab.gl')}</button>
           <button role="tab" aria-selected={tab === 'apaging'} className={tab === 'apaging' ? styles.tabActive : styles.tab} onClick={() => setTab('apaging')}>{t('reports.tab.apaging')}</button>
           <button role="tab" aria-selected={tab === 'araging'} className={tab === 'araging' ? styles.tabActive : styles.tab} onClick={() => setTab('araging')}>{t('reports.tab.araging')}</button>
+          <button role="tab" aria-selected={tab === 'cashflow'} className={tab === 'cashflow' ? styles.tabActive : styles.tab} onClick={() => setTab('cashflow')}>{t('reports.tab.cashflow')}</button>
+          <button role="tab" aria-selected={tab === 'equity'} className={tab === 'equity' ? styles.tabActive : styles.tab} onClick={() => setTab('equity')}>{t('reports.tab.equity')}</button>
         </div>
 
         {tab !== 'trial' && (
@@ -353,6 +401,16 @@ function ReportsInner() {
                 <label className={styles.field}>{t('reports.from')}<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
                 <label className={styles.field}>{t('reports.to')}<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
               </>
+            ) : (tab === 'cashflow' || tab === 'equity') ? (
+              <>
+                <label className={styles.field}>{t('reports.from')}<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+                <label className={styles.field}>{t('reports.to')}<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+                <div className={styles.presets}>
+                  <button onClick={() => setPreset('month')}>{t('reports.preset.month')}</button>
+                  <button onClick={() => setPreset('quarter')}>{t('reports.preset.quarter')}</button>
+                  <button onClick={() => setPreset('year')}>{t('reports.preset.year')}</button>
+                </div>
+              </>
             ) : (
               <label className={styles.field}>{t('reports.asOf')}<input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} /></label>
             )}
@@ -368,7 +426,9 @@ function ReportsInner() {
           (tab === 'trial' && trial) ||
           (tab === 'gl' && gl) ||
           (tab === 'apaging' && aging) ||
-          (tab === 'araging' && aging)
+          (tab === 'araging' && aging) ||
+          (tab === 'cashflow' && cf) ||
+          (tab === 'equity' && eq)
         ) && exportBar}
 
         {!error && !loading && tab === 'pl' && pl && (
@@ -579,6 +639,87 @@ function ReportsInner() {
                 {dunMsg && <p className={styles.dunMsg}>{dunMsg}</p>}
               </section>
             )}
+          </div>
+        )}
+
+        {!error && !loading && tab === 'cashflow' && cf && (
+          <div className={styles.statement}>
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>{t('reports.cf.operating')}</h3>
+              <table className={styles.table}>
+                <tbody>
+                  <tr>
+                    <td className={styles.code} />
+                    <td className={styles.name}>{Number(cf.netProfit) < 0 ? t('reports.netLoss') : t('reports.netProfit')}</td>
+                    <td className={styles.amount}>{fmtMoney(cf.netProfit)}</td>
+                  </tr>
+                  {cf.workingCapital.map((l, i) => (
+                    <tr key={`${l.code}-${i}`}>
+                      <td className={styles.code}>{l.code}</td>
+                      <td className={styles.name}>{l.name}</td>
+                      <td className={styles.amount}>{fmtMoney(l.amount)}</td>
+                    </tr>
+                  ))}
+                  <tr className={styles.subtotalRow}>
+                    <td /><td className={styles.name}>{t('reports.cf.operating')}</td>
+                    <td className={styles.amount}>{fmtMoney(cf.operatingSubtotal)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            {renderCfSection(t('reports.cf.investing'), cf.investing, cf.investingSubtotal)}
+            {renderCfSection(t('reports.cf.financing'), cf.financing, cf.financingSubtotal)}
+            <div className={styles.grandTotal}><span>{t('reports.cf.netChange')}</span><span className={styles.amount}>{fmtMoney(cf.netChange)}</span></div>
+            <div className={styles.grandTotal}><span>{t('reports.cf.openingCash')}</span><span className={styles.amount}>{fmtMoney(cf.openingCash)}</span></div>
+            <div className={styles.grandTotal}><span>{t('reports.cf.closingCash')}</span><span className={styles.amount}>{fmtMoney(cf.closingCash)}</span></div>
+            <div className={cf.reconciles ? styles.balanced : styles.unbalanced}>
+              {cf.reconciles ? t('reports.cf.reconciled') : t('reports.cf.notReconciled')}
+            </div>
+          </div>
+        )}
+
+        {!error && !loading && tab === 'equity' && eq && (
+          <div className={styles.statement}>
+            <div className={styles.tableWrapper}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th scope="col" className={styles.code}>{t('reports.col.code')}</th>
+                    <th scope="col" className={styles.name}>{t('reports.col.name')}</th>
+                    <th scope="col" className={styles.amount}>{t('reports.gl.opening')}</th>
+                    <th scope="col" className={styles.amount}>{t('reports.eq.movement')}</th>
+                    <th scope="col" className={styles.amount}>{t('reports.gl.closing')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {eq.accounts.map((a, i) => (
+                    <tr key={`${a.code}-${i}`}>
+                      <td className={styles.code}>{a.code}</td>
+                      <td className={styles.name}>{a.name}</td>
+                      <td className={styles.amount}>{fmtMoney(a.opening)}</td>
+                      <td className={styles.amount}>{fmtMoney(a.movement)}</td>
+                      <td className={styles.amount}>{fmtMoney(a.closing)}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td className={styles.code} />
+                    <td className={styles.name}>{t('reports.eq.result')}</td>
+                    <td className={styles.amount}>{fmtMoney(eq.result.opening)}</td>
+                    <td className={styles.amount}>{fmtMoney(eq.result.movement)}</td>
+                    <td className={styles.amount}>{fmtMoney(eq.result.closing)}</td>
+                  </tr>
+                  <tr className={styles.subtotalRow}>
+                    <td /><td className={styles.name}>{t('reports.aging.total')}</td>
+                    <td className={styles.amount}>{fmtMoney(eq.openingTotal)}</td>
+                    <td className={styles.amount}>{fmtMoney(eq.movementTotal)}</td>
+                    <td className={styles.amount}>{fmtMoney(eq.closingTotal)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className={eq.balanced ? styles.balanced : styles.unbalanced}>
+              {eq.balanced ? t('reports.balanced') : t('reports.unbalanced')}
+            </div>
           </div>
         )}
       </main>

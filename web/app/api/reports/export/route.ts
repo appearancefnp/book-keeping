@@ -8,12 +8,15 @@ import { profitAndLoss } from '@domain/reports/profit-and-loss.js';
 import { balanceSheet } from '@domain/reports/balance-sheet.js';
 import { comparativeProfitAndLoss, comparativeBalanceSheet } from '@domain/reports/comparative.js';
 import { generalLedger } from '@domain/reports/general-ledger.js';
+import { cashFlow } from '@domain/reports/cash-flow.js';
+import { statementOfEquity } from '@domain/reports/equity.js';
 import { accountBalances } from '@domain/ledger/balances.js';
 import { apAging } from '@domain/payables/aging.js';
 import { arAging } from '@domain/receivables/aging.js';
 import {
   profitAndLossTable, comparativeProfitAndLossTable, balanceSheetTable, comparativeBalanceSheetTable,
-  generalLedgerTable, trialBalanceTable, apAgingTable, arAgingTable, type ReportTable,
+  generalLedgerTable, trialBalanceTable, apAgingTable, arAgingTable,
+  cashFlowTable, statementOfEquityTable, type ReportTable,
 } from '@domain/reports/tabular.js';
 import { tableToCsv } from '@domain/reports/csv.js';
 import { reportDocumentHtml } from '@domain/reports/report-html.js';
@@ -23,7 +26,7 @@ import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { isValidIsoDate } from '@/app/lib/date';
 import { errorToStatus } from '@/app/lib/authz';
 
-const REPORTS = ['pl', 'bs', 'gl', 'trial', 'apaging', 'araging'] as const;
+const REPORTS = ['pl', 'bs', 'gl', 'trial', 'apaging', 'araging', 'cashflow', 'equity'] as const;
 const FORMATS = ['csv', 'xlsx', 'pdf'] as const;
 type ReportKind = (typeof REPORTS)[number];
 type Format = (typeof FORMATS)[number];
@@ -81,6 +84,10 @@ export async function GET(req: NextRequest) {
           return apAgingTable(await apAging(tx, ctx, { asOf }), L);
         case 'araging':
           return arAgingTable(await arAging(tx, ctx, { asOf }), L);
+        case 'cashflow':
+          return cashFlowTable(await cashFlow(tx, ctx, { from, to }), L);
+        case 'equity':
+          return statementOfEquityTable(await statementOfEquity(tx, ctx, { from, to }), L);
       }
     });
 

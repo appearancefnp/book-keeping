@@ -2,6 +2,8 @@ import type { ProfitAndLoss, StatementSection } from './profit-and-loss.js';
 import type { BalanceSheet } from './balance-sheet.js';
 import type { ComparativeProfitAndLoss, ComparativeBalanceSheet, ComparativeSection, ComparativeLine } from './comparative.js';
 import type { GeneralLedger } from './general-ledger.js';
+import type { CashFlowStatement } from './cash-flow.js';
+import type { StatementOfEquity } from './equity.js';
 import type { DatedBalanceRow } from '../ledger/balances.js';
 import type { ApAging } from '../payables/aging.js';
 import type { ArAging } from '../receivables/aging.js';
@@ -13,9 +15,12 @@ export interface ReportTable { title: string; meta: { label: string; value: stri
 
 export interface ReportLabels {
   pl: string; bs: string; gl: string; trial: string; apAging: string; arAging: string;
+  cashFlow: string; equityStmt: string;
   period: string; asOf: string; comparisonPeriod: string; client: string; generated: string;
   income: string; expense: string; assets: string; liabilities: string; equity: string;
   netProfit: string; currentResult: string; totalAssets: string; totalLiabEquity: string;
+  operating: string; investing: string; financing: string; netChange: string; openingCash: string; closingCash: string;
+  movement: string; resultForPeriod: string;
   code: string; account: string; amount: string; current: string; comparison: string; variance: string; variancePct: string;
   date: string; memo: string; description: string; debit: string; credit: string; balance: string; opening: string; closing: string; total: string;
   bucketCurrent: string; d1_30: string; d31_60: string; d61_90: string; d90plus: string;
@@ -172,6 +177,54 @@ export function apAgingTable(aging: ApAging, labels: ReportLabels): ReportTable 
       { key: 'total', label: labels.total, align: 'right' },
     ],
     rows: [{ cells: [aging.current, aging.d1_30, aging.d31_60, aging.d61_90, aging.d90plus, aging.total], kind: 'data' }],
+  };
+}
+
+// ---- cash flow (indirect) ----
+export function cashFlowTable(cf: CashFlowStatement, labels: ReportLabels): ReportTable {
+  const rows: ReportRow[] = [];
+  rows.push({ cells: [labels.operating, '', ''], kind: 'section' });
+  rows.push({ cells: ['', labels.netProfit, cf.netProfit], kind: 'data' });
+  for (const l of cf.workingCapital) rows.push({ cells: [l.code, l.name, l.amount], kind: 'data' });
+  rows.push({ cells: ['', labels.operating, cf.operatingSubtotal], kind: 'subtotal' });
+  rows.push({ cells: [labels.investing, '', ''], kind: 'section' });
+  for (const l of cf.investing) rows.push({ cells: [l.code, l.name, l.amount], kind: 'data' });
+  rows.push({ cells: ['', labels.investing, cf.investingSubtotal], kind: 'subtotal' });
+  rows.push({ cells: [labels.financing, '', ''], kind: 'section' });
+  for (const l of cf.financing) rows.push({ cells: [l.code, l.name, l.amount], kind: 'data' });
+  rows.push({ cells: ['', labels.financing, cf.financingSubtotal], kind: 'subtotal' });
+  rows.push({ cells: ['', labels.netChange, cf.netChange], kind: 'subtotal' });
+  rows.push({ cells: ['', labels.openingCash, cf.openingCash], kind: 'opening' });
+  rows.push({ cells: ['', labels.closingCash, cf.closingCash], kind: 'closing' });
+  return {
+    title: labels.cashFlow,
+    meta: [{ label: labels.period, value: `${cf.from} – ${cf.to}` }],
+    columns: [
+      { key: 'code', label: labels.code, align: 'left' },
+      { key: 'account', label: labels.account, align: 'left' },
+      { key: 'amount', label: labels.amount, align: 'right' },
+    ],
+    rows,
+  };
+}
+
+// ---- statement of equity ----
+export function statementOfEquityTable(eq: StatementOfEquity, labels: ReportLabels): ReportTable {
+  const rows: ReportRow[] = [];
+  for (const a of eq.accounts) rows.push({ cells: [a.code, a.name, a.opening, a.movement, a.closing], kind: 'data' });
+  rows.push({ cells: ['', labels.resultForPeriod, eq.result.opening, eq.result.movement, eq.result.closing], kind: 'data' });
+  rows.push({ cells: ['', labels.total, eq.openingTotal, eq.movementTotal, eq.closingTotal], kind: 'subtotal' });
+  return {
+    title: labels.equityStmt,
+    meta: [{ label: labels.period, value: `${eq.from} – ${eq.to}` }],
+    columns: [
+      { key: 'code', label: labels.code, align: 'left' },
+      { key: 'account', label: labels.account, align: 'left' },
+      { key: 'opening', label: labels.opening, align: 'right' },
+      { key: 'movement', label: labels.movement, align: 'right' },
+      { key: 'closing', label: labels.closing, align: 'right' },
+    ],
+    rows,
   };
 }
 

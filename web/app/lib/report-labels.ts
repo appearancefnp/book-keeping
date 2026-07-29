@@ -9,9 +9,13 @@ export function reportLabels(lang: ExportLang): ReportLabels & { print: string }
   const m = PACKS[lang] ?? PACKS.lv;
   return {
     pl: m['reports.tab.pl'], bs: m['reports.tab.bs'], gl: m['reports.tab.gl'], trial: m['reports.tab.trial'], apAging: m['reports.tab.apaging'], arAging: m['reports.tab.araging'],
+    cashFlow: m['reports.tab.cashflow'], equityStmt: m['reports.tab.equity'],
     period: m['reports.from'], asOf: m['reports.asOf'], comparisonPeriod: m['reports.compareTo'], client: m['top.client'], generated: m['export.generated'],
     income: m['reports.income'], expense: m['reports.expense'], assets: m['reports.assets'], liabilities: m['reports.liabilities'], equity: m['reports.equity'],
     netProfit: m['reports.netProfit'], currentResult: m['reports.currentResult'], totalAssets: m['reports.totalAssets'], totalLiabEquity: m['reports.totalLiabEquity'],
+    operating: m['reports.cf.operating'], investing: m['reports.cf.investing'], financing: m['reports.cf.financing'],
+    netChange: m['reports.cf.netChange'], openingCash: m['reports.cf.openingCash'], closingCash: m['reports.cf.closingCash'],
+    movement: m['reports.eq.movement'], resultForPeriod: m['reports.eq.result'],
     code: m['reports.col.code'], account: m['reports.gl.account'], amount: m['reports.col.amount'],
     current: m['reports.col.current'], comparison: m['reports.col.comparison'], variance: m['reports.col.variance'], variancePct: m['reports.col.variancePct'],
     date: m['reports.col.date'], memo: m['reports.col.memo'], description: m['reports.col.description'], debit: m['reports.col.debit'], credit: m['reports.col.credit'],
