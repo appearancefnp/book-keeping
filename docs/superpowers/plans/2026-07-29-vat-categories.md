@@ -190,6 +190,14 @@ ALTER TABLE bill_lines ADD COLUMN vat_deductible boolean NOT NULL DEFAULT true;
 ALTER TABLE bill_lines ADD COLUMN cn_code text;
 ALTER TABLE bill_lines ADD COLUMN net_mass_kg numeric;
 
+-- A vendor credit note reverses a purchase, so it needs the identical category and
+-- deductibility model — Task 6 mirrors Task 5's posting logic and cannot without these.
+ALTER TABLE vendor_credit_note_lines ADD COLUMN vat_category text NOT NULL DEFAULT 'S'
+  CHECK (vat_category IN ('S','Z','E','AE','K','G','O'));
+ALTER TABLE vendor_credit_note_lines ADD COLUMN vat_deductible boolean NOT NULL DEFAULT true;
+ALTER TABLE vendor_credit_note_lines ADD COLUMN cn_code text;
+ALTER TABLE vendor_credit_note_lines ADD COLUMN net_mass_kg numeric;
+
 -- ECSL reports per member state, and reverse-charge eligibility is a country question.
 -- Not derived from the vat_no prefix: vat_no is nullable and often blank on existing rows.
 ALTER TABLE parties ADD COLUMN country_code char(2) NOT NULL DEFAULT 'LV';
