@@ -10,7 +10,7 @@ import { createBill } from '../../src/payables/bills.js';
 import { apAging } from '../../src/payables/aging.js';
 import { createVendorCreditNote } from '../../src/payables/credit-notes.js';
 
-const ACCTS = { vatInputAccount: '5721', payablesAccount: '5310' };
+const ACCTS = { vatInputAccount: '5721', vatOutputAccount: '5721', payablesAccount: '5310' };
 
 beforeAll(async () => { await resetDb(); });
 beforeEach(async () => { await resetDb(); });
@@ -21,7 +21,7 @@ async function billDue(t: { firmId: string; clientCompanyId: string }, dueDate: 
     const v = await createParty(tx, ctx(t), { kind: 'vendor', name: num });
     const b = await createBill(tx, ctx(t), {
       vendorPartyId: v.id, billNumber: num, issueDate: '2026-01-01', dueDate, currency: 'EUR',
-      lines: [{ description: 'x', expenseAccount: '7710', net, vatRate: 0, vat: '0.00' }],
+      lines: [{ description: 'x', expenseAccount: '7710', net, vatRate: 0, vat: '0.00', vatCategory: 'Z' }],
     }, ACCTS);
     await approveProposal(tx, ctx(t), b.proposalId);
     await postApprovedPosting(tx, ctx(t), b.proposalId);

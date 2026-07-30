@@ -7,7 +7,7 @@ import { receiveInboundInvoices } from '../../src/einvoice/inbound.js';
 import { getProposal } from '../../src/proposals/proposals.js';
 
 const template = { expenseAccount: '7710', vatInputAccount: '5722', payablesAccount: '5310' };
-const accounts = { vatInputAccount: '5722', payablesAccount: '5310' };
+const accounts = { vatInputAccount: '5722', vatOutputAccount: '5721', payablesAccount: '5310' };
 const inv: EInvoice = {
   invoiceNumber: 'SUP-INV-9', issueDate: '2026-03-12', currency: 'EUR',
   supplier: { name: 'SIA Piegādātājs', regNo: '40300000000', vatNo: 'LV40300000000' },

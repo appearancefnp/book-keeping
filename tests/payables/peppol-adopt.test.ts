@@ -9,7 +9,7 @@ import { receiveInboundInvoices } from '../../src/einvoice/inbound.js';
 import { listBills } from '../../src/payables/bills.js';
 
 const TEMPLATE = { expenseAccount: '7710', vatInputAccount: '5721', payablesAccount: '5310' };
-const ACCTS = { vatInputAccount: '5721', payablesAccount: '5310' };
+const ACCTS = { vatInputAccount: '5721', vatOutputAccount: '5721', payablesAccount: '5310' };
 
 beforeAll(async () => { await resetDb(); });
 beforeEach(async () => { await resetDb(); });

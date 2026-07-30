@@ -9,7 +9,7 @@ import { postApprovedPosting } from '../../src/proposals/post-proposal.js';
 import { createBill, getBill } from '../../src/payables/bills.js';
 import { createPayRun } from '../../src/payables/pay-run.js';
 
-const ACCTS = { vatInputAccount: '5721', payablesAccount: '5310' };
+const ACCTS = { vatInputAccount: '5721', vatOutputAccount: '5721', payablesAccount: '5310' };
 const PR_ACCTS = { payablesAccount: '5310', bankClearingAccount: '2699' };
 
 beforeAll(async () => { await resetDb(); });
@@ -21,7 +21,7 @@ async function openBill(t: { firmId: string; clientCompanyId: string }, iban: st
     const v = await createParty(tx, ctx(t), { kind: 'vendor', name: `V-${num}`, iban });
     const b = await createBill(tx, ctx(t), {
       vendorPartyId: v.id, billNumber: num, issueDate: '2026-03-01', dueDate: '2026-03-31', currency: 'EUR',
-      lines: [{ description: 'x', expenseAccount: '7710', net: '100.00', vatRate: 0, vat: '0.00' }],
+      lines: [{ description: 'x', expenseAccount: '7710', net: '100.00', vatRate: 0, vat: '0.00', vatCategory: 'Z' }],
     }, ACCTS);
     await approveProposal(tx, ctx(t), b.proposalId);
     await postApprovedPosting(tx, ctx(t), b.proposalId);
