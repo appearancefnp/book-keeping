@@ -18,6 +18,7 @@
 - New tables get `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` + a tenant-isolation policy on `client_company_id = current_setting('app.current_client_id', true)::uuid` + explicit `GRANT` to `bookkeeping_app`. Copy `migrations/030_bills.sql`.
 - Every user-facing string goes in all three catalogs (LV/RU/EN) in `web/app/lib/i18n.ts`.
 - The VAT category code list is exactly `S, Z, E, AE, K, G, O` — the same list in the TypeScript union, both SQL `CHECK` constraints, and the zod enums.
+- **The AE/K rate is side-dependent, and this is load-bearing.** On a *wire* document (an outbound invoice, or a supplier's inbound one) BR-AE-5 / BR-IC-5 require the invoiced rate to be **0** — the customer accounts for the VAT at their own domestic rate, which is never transmitted. In *our own purchase records* (`bill_lines`, vendor credit notes) the same line must carry the **domestic rate** (21/12/5), because `buildBillEntry` multiplies by it to self-assess. Hence `categoryIssues(line, side)`, and hence the inbound path substituting the domestic rate from `tax_rules`. Sales fixtures use rate 0 on AE/K lines; purchase fixtures use the real rate.
 - Run `npm test` (root) and `npx tsc --noEmit` in **both** root and `web/` before declaring any task done.
 - **Never run two vitest suites concurrently** — `resetDb()` drops the public schema on a shared database.
 - Commit after every task, with the session trailer: `Claude-Session: https://claude.ai/code/session_01BQ5EiunbJpf7XY9Bge3gB1`
@@ -57,7 +58,7 @@
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: `VatCategory`, `VAT_CATEGORIES`, `isVatCategory`, `chargesVat`, `selfAssesses`, `inEcsl`, `ecslSupplyType`, `exemptionReasonFor`, `selfAssessedVatCents`, `categoryIssues` — every later task depends on these exact names.
+- Produces: `VatCategory`, `VAT_CATEGORIES`, `isVatCategory`, `chargesVat`, `selfAssesses`, `inEcsl`, `ecslSupplyType`, `exemptionReasonFor`, `selfAssessedVatCents`, `DocumentSide`, `categoryIssues(line, side?)` — every later task depends on these exact names. `categoryIssues` defaults to `'sales'`; the bills and credit-note schemas pass `'purchase'`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -118,11 +119,29 @@ test('self-assessed VAT rounds half-up per line', () => {
 test('categoryIssues enforces rate/VAT consistency per category', () => {
   expect(categoryIssues({ vatCategory: 'S', vatRate: 21, vatCents: 2100n })).toEqual([]);
   expect(categoryIssues({ vatCategory: 'S', vatRate: 0, vatCents: 0n })[0]).toContain('BR-S-5');
-  expect(categoryIssues({ vatCategory: 'K', vatRate: 21, vatCents: 0n })).toEqual([]);
   expect(categoryIssues({ vatCategory: 'K', vatRate: 21, vatCents: 2100n })[0]).toContain('BR-IC-8');
-  expect(categoryIssues({ vatCategory: 'AE', vatRate: 0, vatCents: 0n })[0]).toContain('BR-AE-5');
   expect(categoryIssues({ vatCategory: 'E', vatRate: 21, vatCents: 0n })[0]).toContain('BR-E-5');
   expect(categoryIssues({ vatCategory: 'Z', vatRate: 0, vatCents: 100n })[0]).toContain('BR-Z-8');
+});
+
+test('a sales-side reverse-charge or intra-EU line must carry a zero rate (BR-AE-5, BR-IC-5)', () => {
+  // The customer applies their own domestic rate; it is never transmitted on the invoice.
+  expect(categoryIssues({ vatCategory: 'AE', vatRate: 0, vatCents: 0n }, 'sales')).toEqual([]);
+  expect(categoryIssues({ vatCategory: 'K', vatRate: 0, vatCents: 0n }, 'sales')).toEqual([]);
+  expect(categoryIssues({ vatCategory: 'AE', vatRate: 21, vatCents: 0n }, 'sales')[0]).toContain('BR-AE-5');
+  expect(categoryIssues({ vatCategory: 'K', vatRate: 21, vatCents: 0n }, 'sales')[0]).toContain('BR-IC-5');
+});
+
+test('a purchase-side reverse-charge line must carry the domestic rate it self-assesses at', () => {
+  // Our own bill record, not a wire document: the vendor invoices 0%, we supply the LV rate.
+  expect(categoryIssues({ vatCategory: 'AE', vatRate: 21, vatCents: 0n }, 'purchase')).toEqual([]);
+  expect(categoryIssues({ vatCategory: 'K', vatRate: 21, vatCents: 0n }, 'purchase')).toEqual([]);
+  expect(categoryIssues({ vatCategory: 'AE', vatRate: 0, vatCents: 0n }, 'purchase')[0]).toContain('BR-AE-5');
+});
+
+test('sales is the default side', () => {
+  expect(categoryIssues({ vatCategory: 'AE', vatRate: 21, vatCents: 0n }))
+    .toEqual(categoryIssues({ vatCategory: 'AE', vatRate: 21, vatCents: 0n }, 'sales'));
 });
 ```
 
@@ -251,12 +270,25 @@ export function selfAssessedVatCents(netCents: bigint, vatRate: number): bigint 
 }
 
 /**
+ * Which side of the trade a line sits on. The two differ on ONE point: what VAT rate an
+ * AE/K line carries.
+ *
+ * - `'sales'` is a wire document. BR-AE-5 / BR-IC-5 require the invoiced rate to be 0:
+ *   the customer accounts for the VAT at *their* domestic rate, which is never
+ *   transmitted on the invoice.
+ * - `'purchase'` is our own bill record. The vendor invoiced 0%, so the domestic rate we
+ *   self-assess at has to be supplied locally — buildBillEntry multiplies by it.
+ */
+export type DocumentSide = 'sales' | 'purchase';
+
+/**
  * Consistency rules between a line's category, its rate, and its *invoiced* VAT.
  * Returns EN 16931-flavoured issue strings; empty means consistent. Shared by the zod
- * schemas (bills, credit notes) and validateEn16931 so both reject the same shapes.
+ * schemas (bills, credit notes — `'purchase'`) and validateEn16931 (`'sales'`).
  */
 export function categoryIssues(
   line: { vatCategory: VatCategory; vatRate: number; vatCents: bigint },
+  side: DocumentSide = 'sales',
 ): string[] {
   const issues: string[] = [];
   const { vatCategory: cat, vatRate: rate, vatCents: vat } = line;
@@ -266,16 +298,19 @@ export function categoryIssues(
     return issues;
   }
 
-  // Every non-standard category invoices zero VAT. AE/K still carry the rate that
-  // self-assessment multiplies by, so a zero rate there is a mistake.
+  // Every non-standard category invoices zero VAT.
   if (vat !== 0n) {
     const rule = cat === 'K' ? 'BR-IC-8' : cat === 'AE' ? 'BR-AE-8' : `BR-${cat}-8`;
     issues.push(`${rule}: a '${cat}' line must carry zero invoiced VAT`);
   }
+
   if (selfAssesses(cat)) {
-    if (!(rate > 0)) {
-      const rule = cat === 'K' ? 'BR-IC-5' : 'BR-AE-5';
-      issues.push(`${rule}: a '${cat}' line requires the domestic VAT rate used for self-assessment`);
+    const rule = cat === 'K' ? 'BR-IC-5' : 'BR-AE-5';
+    if (side === 'sales' && rate !== 0) {
+      issues.push(`${rule}: a sales '${cat}' line must have a zero VAT rate — the customer accounts for the VAT at their own domestic rate`);
+    }
+    if (side === 'purchase' && !(rate > 0)) {
+      issues.push(`${rule}: a purchase '${cat}' line requires the domestic VAT rate used for self-assessment`);
     }
   } else if (rate !== 0) {
     issues.push(`BR-${cat}-5: a '${cat}' line must have a zero VAT rate`);
@@ -330,7 +365,8 @@ const base: EInvoice = {
   supplier: { name: 'SIA Pardevejs', regNo: '40100000000', vatNo: 'LV40100000000' },
   customer: { name: 'OU Ostja', regNo: '11111111', vatNo: 'EE101010101' },
   lines: [
-    { description: 'Consulting', net: '1000.00', vatRate: 21, vat: '0.00', vatCategory: 'AE' },
+    // A sales AE/K line carries rate 0 on the wire (BR-AE-5 / BR-IC-5).
+    { description: 'Consulting', net: '1000.00', vatRate: 0, vat: '0.00', vatCategory: 'AE' },
     { description: 'Local part', net: '100.00', vatRate: 21, vat: '21.00', vatCategory: 'S' },
   ],
   netTotal: '1100.00', vatTotal: '21.00', grandTotal: '1121.00',
@@ -349,7 +385,7 @@ test('a line with no explicit category defaults to standard rate', () => {
 
 test('categoryTotals groups by category and rate, preserving first-seen order', () => {
   expect(categoryTotals(base.lines)).toEqual([
-    { category: 'AE', rate: 21, taxableCents: 100000n, taxCents: 0n },
+    { category: 'AE', rate: 0, taxableCents: 100000n, taxCents: 0n },
     { category: 'S', rate: 21, taxableCents: 10000n, taxCents: 2100n },
   ]);
 });
@@ -365,19 +401,21 @@ test('TaxTotal carries one TaxSubtotal per category with its exemption reason', 
   expect(xml.match(/<cac:TaxSubtotal>/g)?.length).toBe(2);
 });
 
-test('an intra-Community supply emits the VATEX-EU-IC reason code', () => {
+test('an intra-Community supply emits the VATEX-EU-IC reason code at a zero rate', () => {
   const xml = buildUblInvoice({
     ...base,
-    lines: [{ description: 'Goods', net: '500.00', vatRate: 21, vat: '0.00', vatCategory: 'K' }],
+    lines: [{ description: 'Goods', net: '500.00', vatRate: 0, vat: '0.00', vatCategory: 'K' }],
     netTotal: '500.00', vatTotal: '0.00', grandTotal: '500.00',
   });
   expect(xml).toContain('<cbc:TaxExemptionReasonCode>VATEX-EU-IC</cbc:TaxExemptionReasonCode>');
+  expect(xml).toContain('<cbc:ID>K</cbc:ID>\n        <cbc:Percent>0</cbc:Percent>');
 });
 
 test('the category round-trips through the parser', () => {
   const parsed = parseUblInvoice(buildUblInvoice(base));
   expect(parsed.lines.map((l) => l.vatCategory)).toEqual(['AE', 'S']);
-  expect(parsed.lines[0]!.vatRate).toBe(21);
+  expect(parsed.lines[0]!.vatRate).toBe(0);   // a wire AE line carries no rate
+  expect(parsed.lines[1]!.vatRate).toBe(21);
 });
 
 test('a missing or unknown category parses as standard rate', () => {
@@ -543,12 +581,20 @@ const ok: EInvoice = {
   invoiceNumber: 'INV-9', issueDate: '2026-06-10', currency: 'EUR',
   supplier: { name: 'SIA A', regNo: '40100000000', vatNo: 'LV40100000000' },
   customer: { name: 'OU B', regNo: '11111111', vatNo: 'EE101010101' },
-  lines: [{ description: 'Goods', net: '500.00', vatRate: 21, vat: '0.00', vatCategory: 'K' }],
+  lines: [{ description: 'Goods', net: '500.00', vatRate: 0, vat: '0.00', vatCategory: 'K' }],
   netTotal: '500.00', vatTotal: '0.00', grandTotal: '500.00',
 };
 
 test('an intra-Community supply is valid with a customer VAT id', () => {
   expect(validateEn16931(ok).valid).toBe(true);
+});
+
+test('BR-IC-5: a sales intra-Community line may not carry a VAT rate', () => {
+  const bad: EInvoice = {
+    ...ok,
+    lines: [{ description: 'Goods', net: '500.00', vatRate: 21, vat: '0.00', vatCategory: 'K' }],
+  };
+  expect(validateEn16931(bad).issues.join(' ')).toContain('BR-IC-5');
 });
 
 test('BR-IC-1: an intra-Community supply requires a customer VAT identifier', () => {
@@ -596,9 +642,10 @@ Expected: FAIL — the BR-IC-1 / BR-AE-8 / BR-S-5 / BR-CO-14 assertions find no 
 In `src/einvoice/validate.ts`, after the existing checks and before the `return`:
 
 ```ts
-  // Per-line category consistency (shared with the bills/credit-note zod schemas).
+  // Per-line category consistency. 'sales' — this is a wire document, so an AE/K line
+  // must carry a zero rate (BR-AE-5 / BR-IC-5); the purchase side passes 'purchase'.
   for (const [i, l] of inv.lines.entries()) {
-    for (const issue of categoryIssues({ vatCategory: l.vatCategory ?? 'S', vatRate: l.vatRate, vatCents: toCents(l.vat) })) {
+    for (const issue of categoryIssues({ vatCategory: l.vatCategory ?? 'S', vatRate: l.vatRate, vatCents: toCents(l.vat) }, 'sales')) {
       issues.push(`line ${i + 1}: ${issue}`);
     }
   }
@@ -673,7 +720,7 @@ const invoice: EInvoice = {
   supplier: { name: 'SIA A', regNo: '40100000000', vatNo: 'LV40100000000' },
   customer: { name: 'OU B', regNo: '11111111', vatNo: 'EE101010101' },
   lines: [
-    { description: 'Goods to EE', net: '500.00', vatRate: 21, vat: '0.00', vatCategory: 'K' },
+    { description: 'Goods to EE', net: '500.00', vatRate: 0, vat: '0.00', vatCategory: 'K' },
     { description: 'Domestic', net: '100.00', vatRate: 21, vat: '21.00', vatCategory: 'S' },
   ],
   netTotal: '600.00', vatTotal: '21.00', grandTotal: '621.00',
@@ -955,8 +1002,10 @@ In `newBillSchema`, extend the line object and add the consistency refinement al
     // unbalanced entry that postEntry rejects with a confusing "does not balance" error.
     message: 'Negative amounts are not supported (credit notes are out of scope — see M7)',
   }).refine(
-    (l) => categoryIssues({ vatCategory: l.vatCategory ?? 'S', vatRate: l.vatRate, vatCents: toCents(l.vat) }).length === 0,
-    (l) => ({ message: categoryIssues({ vatCategory: l.vatCategory ?? 'S', vatRate: l.vatRate, vatCents: toCents(l.vat) }).join('; ') }),
+    // 'purchase': the vendor invoiced 0% on an AE/K line, so OUR record must carry the
+    // domestic rate we self-assess at. The sales side requires the opposite (rate 0).
+    (l) => categoryIssues({ vatCategory: l.vatCategory ?? 'S', vatRate: l.vatRate, vatCents: toCents(l.vat) }, 'purchase').length === 0,
+    (l) => ({ message: categoryIssues({ vatCategory: l.vatCategory ?? 'S', vatRate: l.vatRate, vatCents: toCents(l.vat) }, 'purchase').join('; ') }),
   )).min(1),
 ```
 
@@ -1122,7 +1171,7 @@ Expected: FAIL — the AE line produces no VAT legs.
 - [ ] **Step 4: Mirror the Task 5 logic**
 
 In `src/payables/credit-notes.ts`:
-1. Add `vatCategory?: VatCategory` and `vatDeductible?: boolean` to the credit-note line type, plus the same two zod fields and the `categoryIssues` refinement used in Task 5.
+1. Add `vatCategory?: VatCategory` and `vatDeductible?: boolean` to the credit-note line type, plus the same two zod fields and the same `categoryIssues(..., 'purchase')` refinement used in Task 5 — a vendor credit note is a purchase-side record, so an AE/K line carries the domestic rate it self-assesses at.
 2. In the entry builder, walk the lines exactly as `buildBillEntry` does, but emit each amount on the opposite side: a deductible self-assessed line becomes `CR expense net`, `CR vatInputAccount assessed`, `DR payables net`, `DR vatOutputAccount assessed`; a non-deductible one becomes `CR expense (net + assessed)`, `DR payables net`, `DR vatOutputAccount assessed`.
 3. Persist `vat_category` / `vat_deductible` in the credit-note line insert and select them back in the detail reader, matching Task 5's SQL.
 
@@ -1154,10 +1203,13 @@ Claude-Session: https://claude.ai/code/session_01BQ5EiunbJpf7XY9Bge3gB1"
 - Test: `tests/einvoice/inbound.test.ts` (extend)
 
 **Interfaces:**
-- Consumes: parsed `vatCategory` (Task 2); `NewBillLine.vatCategory` (Task 5); `chargesVat` (Task 1).
-- Produces: no new exports. `reconciledLineVatCents` becomes category-aware — it distributes the vendor's declared VAT total across **charging lines only**.
+- Consumes: parsed `vatCategory` (Task 2); `NewBillLine.vatCategory` (Task 5); `chargesVat` / `selfAssesses` (Task 1); `getTaxRate` from `src/tax/rules.js`.
+- Produces: no new exports. `reconciledLineVatCents` becomes category-aware — it distributes the vendor's declared VAT total across **charging lines only** — and the invoice branch substitutes the client's domestic rate on self-assessing lines.
 
-Today `reconciledLineVatCents` spreads the declared VAT total across every line and dumps the rounding remainder on the last one. On a mixed invoice (one standard line, one reverse-charge line) that would assign VAT to a line that must carry none.
+Two problems to solve here:
+
+1. `reconciledLineVatCents` currently spreads the declared VAT total across every line and dumps the rounding remainder on the last one. On a mixed invoice (one standard line, one reverse-charge line) that would assign VAT to a line that must carry none.
+2. **A vendor's AE/K line legitimately arrives at rate 0** — BR-AE-5 / BR-IC-5 forbid the supplier from stating a rate, because the *buyer* applies their own domestic rate. So the parsed rate cannot be stored as-is: `buildBillEntry` multiplies `vat_rate` by the net to self-assess, and a zero rate would silently self-assess nothing. The inbound path must substitute the client's domestic standard rate (`getTaxRate(tx, 'vat_standard_rate', issueDate)`) on every self-assessing line. This is also why `categoryIssues` takes a side: the same line is rate-0 on the wire and rate-21 in our books.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1172,7 +1224,8 @@ test('a mixed inbound invoice keeps VAT off the reverse-charge line', async () =
     supplier: { name: 'OU Vendor', regNo: '11111111', vatNo: 'EE101010101' },
     customer: { name: 'SIA Us', regNo: '40100000000', vatNo: 'LV40100000000' },
     lines: [
-      { description: 'EU service', net: '200.00', vatRate: 21, vat: '0.00', vatCategory: 'AE' },
+      // The vendor states no rate on the reverse-charge line — that is the conformant form.
+      { description: 'EU service', net: '200.00', vatRate: 0, vat: '0.00', vatCategory: 'AE' },
       { description: 'Domestic goods', net: '100.00', vatRate: 21, vat: '21.00', vatCategory: 'S' },
     ],
     netTotal: '300.00', vatTotal: '21.00', grandTotal: '321.00',
@@ -1185,6 +1238,28 @@ test('a mixed inbound invoice keeps VAT off the reverse-charge line', async () =
 
   const bill = await withTenant(ctx(t), (tx) => getBill(tx, ctx(t), billIds[0]!));
   expect(bill.lines.map((l) => [l.vatCategory, l.vatCents])).toEqual([['AE', '0'], ['S', '2100']]);
+});
+
+test('an inbound reverse-charge line is stored at the domestic rate so it self-assesses', async () => {
+  const t = await makeFirmAndClient();
+  await seed(t);
+  const xml = buildUblInvoice({
+    invoiceNumber: 'IN-RC-1', issueDate: '2026-06-12', currency: 'EUR',
+    supplier: { name: 'OU Vendor', regNo: '11111111', vatNo: 'EE101010101' },
+    customer: { name: 'SIA Us', regNo: '40100000000', vatNo: 'LV40100000000' },
+    lines: [{ description: 'EU service', net: '1000.00', vatRate: 0, vat: '0.00', vatCategory: 'AE' }],
+    netTotal: '1000.00', vatTotal: '0.00', grandTotal: '1000.00',
+  });
+  const { billIds } = await withTenant(ctx(t), (tx) => receiveInboundInvoices(tx, ctx(t), {
+    ap: new StubAccessPoint([{ ublXml: xml, messageId: 'm2' }]),
+    template, accounts: { vatInputAccount: '5722', vatOutputAccount: '5721', payablesAccount: '5310' },
+  }));
+
+  const bill = await withTenant(ctx(t), (tx) => getBill(tx, ctx(t), billIds[0]!));
+  // Stored at the LV standard rate (21 from tax_rules), not the vendor's 0.
+  expect(bill.lines[0]!.vatRate).toBe('21');
+  expect(bill.lines[0]!.vatCents).toBe('0');       // nothing was invoiced
+  expect(bill.grandTotalCents).toBe('100000');     // the vendor is paid net
 });
 ```
 
@@ -1223,21 +1298,37 @@ function reconciledLineVatCents(
 }
 ```
 
-Add `import { chargesVat, type VatCategory } from '../tax/categories.js';`.
+Add `import { chargesVat, selfAssesses, type VatCategory } from '../tax/categories.js';` and `import { getTaxRate } from '../tax/rules.js';`.
 
-- [ ] **Step 4: Pass the category through to the bill lines**
+- [ ] **Step 4: Pass the category through, substituting the domestic rate where we self-assess**
 
-In both the invoice and credit-note branches of `receiveInboundInvoices`, the line mapper gains the category:
+Add a small helper next to `reconciledLineVatCents`:
 
 ```ts
+/**
+ * The VAT rate to STORE for a parsed line. A conformant supplier states no rate on an
+ * AE/K line (BR-AE-5 / BR-IC-5) because the buyer applies their own — so we substitute
+ * the client's domestic standard rate, which is what buildBillEntry self-assesses at.
+ * Every other category keeps the rate the supplier stated.
+ */
+function storedVatRate(line: { vatRate: number; vatCategory?: VatCategory }, domesticRate: number): number {
+  return selfAssesses(line.vatCategory ?? 'S') ? domesticRate : line.vatRate;
+}
+```
+
+In both the invoice and credit-note branches of `receiveInboundInvoices`, read the domestic rate once per document (it is date-effective) and use it in the line mapper:
+
+```ts
+      const domesticRate = Number((await getTaxRate(tx, 'vat_standard_rate', cn.issueDate)).value);
+      ...
         lines: cn.lines.map((l, i) => ({
           description: l.description, expenseAccount: args.template.expenseAccount,
-          net: l.net, vatRate: l.vatRate, vat: fromCents(lineVat[i]!),
+          net: l.net, vatRate: storedVatRate(l, domesticRate), vat: fromCents(lineVat[i]!),
           vatCategory: l.vatCategory ?? 'S',
         })),
 ```
 
-Apply the same one-line addition in the invoice branch.
+Apply the same two additions in the invoice branch (using that branch's issue date). `reconciledLineVatCents` still runs on the **parsed** lines, before substitution — it only derives VAT for charging lines, and substitution never touches those.
 
 - [ ] **Step 5: Run the test to verify it passes**
 
@@ -1409,7 +1500,7 @@ test('aggregates sales and purchases per category', async () => {
     await sendInvoice(tx, ctx(t), {
       invoice: invoice('S-1', [
         { description: 'Domestic', net: '100.00', vatRate: 21, vat: '21.00', vatCategory: 'S' },
-        { description: 'EU goods', net: '500.00', vatRate: 21, vat: '0.00', vatCategory: 'K' },
+        { description: 'EU goods', net: '500.00', vatRate: 0, vat: '0.00', vatCategory: 'K' },
       ], '600.00', '21.00', '621.00'),
       recipientPeppolId: '0088:ee', ap: new StubAccessPoint(),
       receivableAccount: '2310', salesAccount: '6110', vatAccount: '5721',
