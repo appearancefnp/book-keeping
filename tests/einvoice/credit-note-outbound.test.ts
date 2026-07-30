@@ -80,7 +80,7 @@ test('sendCreditNote with zero VAT posts a 2-line entry with no VAT line', async
   const ap = new StubAccessPoint();
   const zeroVatCn: ECreditNote = {
     ...cn, invoiceNumber: 'CN-2026-002',
-    lines: [{ description: 'Atgriešana (intra-EU)', net: '100.00', vatRate: 0, vat: '0.00' }],
+    lines: [{ description: 'Atgriešana (intra-EU)', net: '100.00', vatRate: 0, vat: '0.00', vatCategory: 'K' }],
     netTotal: '100.00', vatTotal: '0.00', grandTotal: '100.00',
   };
   const { entryId, salesId, vatId, receivableId } = await withTenant(ctx(t), async (tx) => {

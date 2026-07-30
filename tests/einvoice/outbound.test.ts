@@ -47,7 +47,7 @@ test('sends a zero-VAT invoice: posts a 2-line entry with no VAT line', async ()
   const ap = new StubAccessPoint();
   const zeroVatInv: EInvoice = {
     ...inv, invoiceNumber: 'INV-2026-002',
-    lines: [{ description: 'Prece (intra-EU)', net: '100.00', vatRate: 0, vat: '0.00' }],
+    lines: [{ description: 'Prece (intra-EU)', net: '100.00', vatRate: 0, vat: '0.00', vatCategory: 'K' }],
     netTotal: '100.00', vatTotal: '0.00', grandTotal: '100.00',
   };
   const { entryId } = await withTenant(ctx(t), async (tx) => {
