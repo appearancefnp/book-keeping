@@ -16,23 +16,29 @@ beforeAll(async () => { await resetDb(); });
 beforeEach(async () => { await resetDb(); });
 afterAll(async () => { await closeDb(); });
 
-/** Same helper as tests/receivables/aging.test.ts: builds an invoice with a given grand total. */
+/**
+ * Same helper as tests/receivables/aging.test.ts: builds an invoice with a given grand total.
+ * `vatRate: 21` matches SAMPLE_INVOICE's standard rate so the line satisfies BR-S-5; the `vat`
+ * amount stays a token 1.00 to keep grand totals round rather than reflecting a real 21% calc.
+ */
 function invoiceWithTotal(invoiceNumber: string, grand: string): EInvoice {
   const vat = '1.00';
   const net = fromCents(toCents(grand) - toCents(vat));
   return {
     ...SAMPLE_INVOICE,
     invoiceNumber,
-    lines: [{ description: 'Prece', net, vatRate: 0, vat }],
+    lines: [{ description: 'Prece', net, vatRate: 21, vat }],
     netTotal: net, vatTotal: vat, grandTotal: grand,
   };
 }
 
+// vatRate: 21 matches SAMPLE_INVOICE's standard rate for BR-S-5; `vat` stays a token 0.17 to
+// keep grandTotal a round 20.00 rather than reflecting a real 21% calc on the net.
 const BASE_CN: ECreditNote = {
   invoiceNumber: 'CN-2026-001', issueDate: '2026-04-10', currency: 'EUR',
   supplier: { name: 'SIA Pārdevējs', regNo: '40100000000', vatNo: 'LV40100000000' },
   customer: { name: 'SIA Klients', regNo: '40200000000', vatNo: 'LV40200000000' },
-  lines: [{ description: 'Atgriešana', net: '19.83', vatRate: 0, vat: '0.17' }],
+  lines: [{ description: 'Atgriešana', net: '19.83', vatRate: 21, vat: '0.17' }],
   netTotal: '19.83', vatTotal: '0.17', grandTotal: '20.00',
 };
 
@@ -63,7 +69,8 @@ test('a fully applied credit note does not double-count in aging', async () => {
     invoice: invoiceWithTotal('INV-B', '100.00'), dueDate: '2026-04-20',
   });
 
-  const cn: ECreditNote = { ...BASE_CN, invoiceNumber: 'CN-2026-002', correctedInvoiceNumber: 'INV-B', grandTotal: '40.00', netTotal: '39.66', vatTotal: '0.34', lines: [{ description: 'Atgriešana', net: '39.66', vatRate: 0, vat: '0.34' }] };
+  // vatRate: 21 for BR-S-5 (token vat 0.34, unrelated to a real 21% calc — see BASE_CN comment).
+  const cn: ECreditNote = { ...BASE_CN, invoiceNumber: 'CN-2026-002', correctedInvoiceNumber: 'INV-B', grandTotal: '40.00', netTotal: '39.66', vatTotal: '0.34', lines: [{ description: 'Atgriešana', net: '39.66', vatRate: 21, vat: '0.34' }] };
   await withTenant(cid, (tx) => sendCreditNote(tx, cid, {
     creditNote: cn, recipientPeppolId: '0088:123', ap: new StubAccessPoint(),
     receivableAccount: '2310', salesAccount: '6110', vatAccount: '5721',
@@ -81,7 +88,8 @@ test('an oversized credit note nets only its unapplied remainder', async () => {
     invoice: invoiceWithTotal('INV-C', '30.00'), dueDate: '2026-04-20',
   });
 
-  const cn: ECreditNote = { ...BASE_CN, invoiceNumber: 'CN-2026-003', correctedInvoiceNumber: 'INV-C', grandTotal: '100.00', netTotal: '99.17', vatTotal: '0.83', lines: [{ description: 'Atgriešana', net: '99.17', vatRate: 0, vat: '0.83' }] };
+  // vatRate: 21 for BR-S-5 (token vat 0.83, unrelated to a real 21% calc — see BASE_CN comment).
+  const cn: ECreditNote = { ...BASE_CN, invoiceNumber: 'CN-2026-003', correctedInvoiceNumber: 'INV-C', grandTotal: '100.00', netTotal: '99.17', vatTotal: '0.83', lines: [{ description: 'Atgriešana', net: '99.17', vatRate: 21, vat: '0.83' }] };
   await withTenant(cid, (tx) => sendCreditNote(tx, cid, {
     creditNote: cn, recipientPeppolId: '0088:123', ap: new StubAccessPoint(),
     receivableAccount: '2310', salesAccount: '6110', vatAccount: '5721',
@@ -109,7 +117,8 @@ test('AR aging total ties to the GL receivable balance', async () => {
     receivableAccount: '2310', salesAccount: '6110', vatAccount: '5721',
   }));
 
-  const unreferencedCn: ECreditNote = { ...BASE_CN, invoiceNumber: 'CN-2026-005', grandTotal: '10.00', netTotal: '9.91', vatTotal: '0.09', lines: [{ description: 'Atgriešana', net: '9.91', vatRate: 0, vat: '0.09' }] };
+  // vatRate: 21 for BR-S-5 (token vat 0.09, unrelated to a real 21% calc — see BASE_CN comment).
+  const unreferencedCn: ECreditNote = { ...BASE_CN, invoiceNumber: 'CN-2026-005', grandTotal: '10.00', netTotal: '9.91', vatTotal: '0.09', lines: [{ description: 'Atgriešana', net: '9.91', vatRate: 21, vat: '0.09' }] };
   await withTenant(cid, (tx) => sendCreditNote(tx, cid, {
     creditNote: unreferencedCn, recipientPeppolId: '0088:123', ap: new StubAccessPoint(),
     receivableAccount: '2310', salesAccount: '6110', vatAccount: '5721',
