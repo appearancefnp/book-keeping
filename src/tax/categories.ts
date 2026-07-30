@@ -65,12 +65,31 @@ export function selfAssessedVatCents(netCents: bigint, vatRate: number): bigint 
 }
 
 /**
+ * Which side of the trade a line sits on. The two differ on ONE point: what VAT rate an
+ * AE/K line carries.
+ *
+ * - `'sales'` is a wire document. BR-AE-5 / BR-IC-5 require the invoiced rate to be 0:
+ *   the customer accounts for the VAT at *their* domestic rate, which is never
+ *   transmitted on the invoice.
+ * - `'purchase'` is our own bill record. The vendor invoiced 0%, so the domestic rate we
+ *   self-assess at has to be supplied locally — buildBillEntry multiplies by it.
+ */
+export type DocumentSide = 'sales' | 'purchase';
+
+function ruleIdForCategory(cat: VatCategory, suffix: string): string {
+  if (cat === 'K') return `BR-IC-${suffix}`;
+  if (cat === 'AE') return `BR-AE-${suffix}`;
+  return `BR-${cat}-${suffix}`;
+}
+
+/**
  * Consistency rules between a line's category, its rate, and its *invoiced* VAT.
  * Returns EN 16931-flavoured issue strings; empty means consistent. Shared by the zod
  * schemas (bills, credit notes) and validateEn16931 so both reject the same shapes.
  */
 export function categoryIssues(
   line: { vatCategory: VatCategory; vatRate: number; vatCents: bigint },
+  side: DocumentSide = 'sales',
 ): string[] {
   const issues: string[] = [];
   const { vatCategory: cat, vatRate: rate, vatCents: vat } = line;
@@ -80,19 +99,23 @@ export function categoryIssues(
     return issues;
   }
 
-  // Every non-standard category invoices zero VAT. AE/K still carry the rate that
-  // self-assessment multiplies by, so a zero rate there is a mistake.
+  // Every non-standard category invoices zero VAT.
   if (vat !== 0n) {
-    const rule = cat === 'K' ? 'BR-IC-8' : cat === 'AE' ? 'BR-AE-8' : `BR-${cat}-8`;
+    const rule = ruleIdForCategory(cat, '8');
     issues.push(`${rule}: a '${cat}' line must carry zero invoiced VAT`);
   }
+
   if (selfAssesses(cat)) {
-    if (!(rate > 0)) {
-      const rule = cat === 'K' ? 'BR-IC-5' : 'BR-AE-5';
-      issues.push(`${rule}: a '${cat}' line requires the domestic VAT rate used for self-assessment`);
+    const rule = ruleIdForCategory(cat, '5');
+    if (side === 'sales' && rate !== 0) {
+      issues.push(`${rule}: a sales '${cat}' line must have a zero VAT rate — the customer accounts for the VAT at their own domestic rate`);
+    }
+    if (side === 'purchase' && !(rate > 0)) {
+      issues.push(`${rule}: a purchase '${cat}' line requires the domestic VAT rate used for self-assessment`);
     }
   } else if (rate !== 0) {
-    issues.push(`BR-${cat}-5: a '${cat}' line must have a zero VAT rate`);
+    const rule = ruleIdForCategory(cat, '5');
+    issues.push(`${rule}: a '${cat}' line must have a zero VAT rate`);
   }
   return issues;
 }

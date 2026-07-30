@@ -52,9 +52,27 @@ test('self-assessed VAT rounds half-up per line', () => {
 test('categoryIssues enforces rate/VAT consistency per category', () => {
   expect(categoryIssues({ vatCategory: 'S', vatRate: 21, vatCents: 2100n })).toEqual([]);
   expect(categoryIssues({ vatCategory: 'S', vatRate: 0, vatCents: 0n })[0]).toContain('BR-S-5');
-  expect(categoryIssues({ vatCategory: 'K', vatRate: 21, vatCents: 0n })).toEqual([]);
   expect(categoryIssues({ vatCategory: 'K', vatRate: 21, vatCents: 2100n })[0]).toContain('BR-IC-8');
-  expect(categoryIssues({ vatCategory: 'AE', vatRate: 0, vatCents: 0n })[0]).toContain('BR-AE-5');
   expect(categoryIssues({ vatCategory: 'E', vatRate: 21, vatCents: 0n })[0]).toContain('BR-E-5');
   expect(categoryIssues({ vatCategory: 'Z', vatRate: 0, vatCents: 100n })[0]).toContain('BR-Z-8');
+});
+
+test('a sales-side reverse-charge or intra-EU line must carry a zero rate (BR-AE-5, BR-IC-5)', () => {
+  // The customer applies their own domestic rate; it is never transmitted on the invoice.
+  expect(categoryIssues({ vatCategory: 'AE', vatRate: 0, vatCents: 0n }, 'sales')).toEqual([]);
+  expect(categoryIssues({ vatCategory: 'K', vatRate: 0, vatCents: 0n }, 'sales')).toEqual([]);
+  expect(categoryIssues({ vatCategory: 'AE', vatRate: 21, vatCents: 0n }, 'sales')[0]).toContain('BR-AE-5');
+  expect(categoryIssues({ vatCategory: 'K', vatRate: 21, vatCents: 0n }, 'sales')[0]).toContain('BR-IC-5');
+});
+
+test('a purchase-side reverse-charge line must carry the domestic rate it self-assesses at', () => {
+  // Our own bill record, not a wire document: the vendor invoices 0%, we supply the LV rate.
+  expect(categoryIssues({ vatCategory: 'AE', vatRate: 21, vatCents: 0n }, 'purchase')).toEqual([]);
+  expect(categoryIssues({ vatCategory: 'K', vatRate: 21, vatCents: 0n }, 'purchase')).toEqual([]);
+  expect(categoryIssues({ vatCategory: 'AE', vatRate: 0, vatCents: 0n }, 'purchase')[0]).toContain('BR-AE-5');
+});
+
+test('sales is the default side', () => {
+  expect(categoryIssues({ vatCategory: 'AE', vatRate: 21, vatCents: 0n }))
+    .toEqual(categoryIssues({ vatCategory: 'AE', vatRate: 21, vatCents: 0n }, 'sales'));
 });

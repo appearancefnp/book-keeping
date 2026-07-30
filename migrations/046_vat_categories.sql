@@ -15,7 +15,8 @@ CREATE TABLE einvoice_lines (
   vat_cents bigint NOT NULL,
   vat_category text NOT NULL CHECK (vat_category IN ('S','Z','E','AE','K','G','O')),
   cn_code text,
-  net_mass_kg numeric
+  net_mass_kg numeric,
+  UNIQUE (einvoice_id, line_no)
 );
 CREATE INDEX einvoice_lines_einvoice_idx ON einvoice_lines(einvoice_id);
 CREATE INDEX einvoice_lines_client_category_idx ON einvoice_lines(client_company_id, vat_category);
