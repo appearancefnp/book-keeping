@@ -80,7 +80,9 @@ singleton returning `StubAccessPoint` today. Mirrors the established `makeBlobSt
 `src/blob/factory.ts`. Three independent `new StubAccessPoint()` instances exist today
 (`web/app/lib/access-point.ts`, `src/jobs/register.ts`'s `recurringAccessPoint`, and per-test
 construction); they converge on this factory so the real Access Point lands in one place when
-`HANDOFF.md` #1 ships. Singleton rather than new-per-call preserves today's semantics: a real
+`HANDOFF.md` #1 ships. A fourth call site, `src/dev/seed.ts:97`, survives untouched — it is a
+deliberate dev-only throwaway that seeds one demo invoice and is never meant to share state with
+the factory singleton, so it does not converge here. Singleton rather than new-per-call preserves today's semantics: a real
 Access Point will hold a connection and certificate, and one instance per process is correct.
 `StubAccessPoint.receive()` has no production caller (`src/einvoice/inbound.ts:72` takes `ap` as
 an argument and nothing in `web/` wires it), so the change is behaviour-preserving.

@@ -325,13 +325,15 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > `bank_match` cases. A throw here rolls the approval back in the same transaction (mirroring
 > `postApprovedPosting`/`postApprovedBankMatch`), so a failure leaves the proposal
 > `pending_approval` and retryable rather than approved-but-unissued. Along the way,
-> `sendInvoice`'s three call sites (composer issue, credit-note issue, this one) each
-> constructed their own `StubAccessPoint` and repeated the `2310`/`6110`/`5721` account triple;
-> both are now single seams — `getAccessPoint()` (`src/einvoice/access-point-factory.ts`, a
-> lazily-constructed singleton, same pattern as `makeBlobStore()`) and
+> `sendInvoice`'s three production call sites (composer issue, credit-note issue, this one)
+> each constructed their own `StubAccessPoint` and repeated the `2310`/`6110`/`5721` account
+> triple; both are now single seams — `getAccessPoint()` (`src/einvoice/access-point-factory.ts`,
+> a lazily-constructed singleton, same pattern as `makeBlobStore()`) and
 > `outboundInvoiceAccounts()` (`src/einvoice/accounts.ts`, env-overridable, same stopgap as the
 > bills/pay-run account constants) — one place to swap in a real Access Point (`HANDOFF.md` #1)
-> or point at different account codes, instead of three. UI: a **Recurring tab on `/invoices`**
+> or point at different account codes, instead of three. A fourth `new StubAccessPoint()` call
+> survives untouched at `src/dev/seed.ts:97` — a deliberate dev-only throwaway seeding one demo
+> invoice, not a production path, so it was left off the factory rather than silently missed. UI: a **Recurring tab on `/invoices`**
 > listing templates (cadence, next-run date, Active/Paused, pause action) alongside the
 > existing Outbox tab, and a **third composer mode** (`/invoices/new` document type
 > "Recurring") that swaps the invoice-number/issue-date fields for cadence fields and surfaces
@@ -364,6 +366,25 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > absent (`getAccessPoint()`/`outboundInvoiceAccounts()` extend the existing env-var stopgap,
 > same bucket as §M2 follow-ups, rather than resolving it); and M9 known-debt items 1, 3, 4, 5,
 > 6, 7, 9, 10, and 11 above all still stand as written.
+> Two inherited risks the final whole-branch review on this wave surfaced, neither introduced
+> here but both made more consequential by it:
+> - **Concurrent double-approve is not actually guarded.** `transition()` in
+>   `src/proposals/lifecycle.ts` reads via a plain `SELECT` (no `FOR UPDATE`) and then
+>   `UPDATE proposals SET status=… WHERE id=… AND client_company_id=…` with no status predicate.
+>   Two simultaneous approvals of the same proposal both pass the check under READ COMMITTED, so
+>   both proceed. Pre-existing and shared by `posting`/`bank_match`, but this wave is what makes
+>   the consequence a duplicate outbound invoice: two `einvoices` rows with the same
+>   `invoice_number`, two journal entries, two Access Point dispatches — and
+>   `einvoices.invoice_number` still has no uniqueness constraint (M9 known-debt item 6 above).
+>   The design doc's claim that "double-approve is already guarded" holds only for *serial*
+>   approvals. Mitigation when addressed: `FOR UPDATE` on the read, or `AND status = $from` on
+>   the `UPDATE` with a `rowCount` check.
+> - **"A failed issue rolls back the approval" is DB-only.** `sendInvoice` performs its network
+>   `ap.send` inside the DB transaction (`src/einvoice/outbound.ts` already carries a comment
+>   about the dispatched-but-unrecorded window). If the send succeeds and anything after it
+>   throws, the proposal correctly returns to `pending_approval` — and the retry the design
+>   invites becomes a second dispatch of the same invoice, with no idempotency key. Harmless
+>   under `StubAccessPoint`; a real Access Point makes it a duplicate invoice to the customer.
 >
 > **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`,
 > since merged to `main`; full backend suite **333/333**, root+web typecheck clean, web
