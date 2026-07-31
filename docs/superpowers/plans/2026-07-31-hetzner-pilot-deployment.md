@@ -535,10 +535,35 @@ resolve the workspace-root ambiguity the build was warning about."
 **Files:**
 - Create: `docker-compose.prod.yml`
 - Create: `deploy/Caddyfile`
+- Modify: `package.json` (the four `--env-file=.env` scripts — see Step 0)
 
 **Interfaces:**
 - Consumes: the image from Task 3 (built locally as `bookkeeping:test`, published by Task 5 as `ghcr.io/<owner>/bookkeeping:<sha>`).
 - Produces: a `docker compose -f docker-compose.prod.yml` stack with services named `db`, `web`, `worker`, `caddy`, a named volume `pgdata`, and a named volume `blobdata` mounted at `/app/.blob-store` in `web`. Task 6's backup script depends on those exact service and volume names.
+
+- [ ] **Step 0: Stop requiring an on-disk `.env` (carried forward from Task 3)**
+
+Task 3's implementer and reviewer both reproduced this: root `package.json`'s `migrate`, `worker`, `provision-admin`, and `seed` scripts all run `node --env-file=.env …`, and Node treats a **missing** `.env` as fatal — `docker run … npm run migrate` dies with `node: .env: not found` before it ever reads `DATABASE_URL`. `.dockerignore` correctly excludes `.env`, so the image has none. Compose's `environment:` sets process variables but does **not** put a file at `/app/.env`, so the stack would fail on its first migrate.
+
+Fix it at the source rather than shipping a secrets file into the image or bind-mounting one. Node 24 supports `--env-file-if-exists`, which loads the file when present and is a no-op when absent. In root `package.json`, change all four scripts from `--env-file=.env` to `--env-file-if-exists=.env`:
+
+```json
+    "migrate": "node --env-file-if-exists=.env --import tsx src/db/migrate.ts",
+    "seed": "node --env-file-if-exists=.env --import tsx src/dev/seed.ts",
+    "provision-admin": "node --env-file-if-exists=.env --import tsx src/dev/provision-admin.ts",
+    "worker": "node --env-file-if-exists=.env --import tsx src/jobs/worker.ts"
+```
+
+Local development is unaffected — `.env` still exists and is still loaded. This also unblocks Task 5, where CI has no `.env` at all.
+
+Verify both directions before moving on:
+
+```bash
+npm run migrate                        # still works locally, .env present
+mv .env .env.bak && npm run migrate ; echo "exit=$?" ; mv .env.bak .env
+```
+
+Expected: the first succeeds. The second must fail on a *connection* error (no `DATABASE_URL` set), **not** on `node: .env: not found` — that distinction is the whole point. Restore `.env` either way; it holds this worktree's private-DB credentials on port 5434.
 
 - [ ] **Step 1: Write the Caddyfile**
 
@@ -630,7 +655,7 @@ volumes:
   caddyconfig:
 ```
 
-Note: `npm run worker` runs `node --env-file=.env --import tsx src/jobs/worker.ts`, and there is no `.env` in the image. Verify in Step 4 whether Node 24 treats a missing `--env-file` as fatal; if it does, the fix is an empty `/app/.env` added in the Dockerfile runtime stage (`RUN touch .env`) so the flag resolves while all real configuration still comes from the container environment.
+Note: the `worker` service runs `npm run worker`, and there is no `.env` in the image. Step 0 already resolved that — `--env-file-if-exists` makes the missing file a no-op, so every value above arrives purely through the container environment. No `.env` is bind-mounted and no empty placeholder file is created.
 
 - [ ] **Step 3: Validate the Compose file parses**
 
@@ -691,7 +716,7 @@ Leave the volumes in place; Task 6 uses this stack again.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add docker-compose.prod.yml deploy/Caddyfile .gitignore
+git add docker-compose.prod.yml deploy/Caddyfile package.json .gitignore
 git commit -m "build: production compose stack with Caddy
 
 Four services on one Compose network: caddy holds the only public ports, db
