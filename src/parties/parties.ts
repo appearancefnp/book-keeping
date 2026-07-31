@@ -6,13 +6,15 @@ import { appendAudit } from '../audit/audit.js';
 export type PartyKind = 'customer' | 'vendor' | 'both';
 export interface PartyRow { id: string; kind: PartyKind; name: string; regNo: string | null; vatNo: string | null; iban: string | null; paymentTermsDays: number | null; countryCode: string; }
 
+const countryCodeSchema = z.string().length(2).transform((s) => s.toUpperCase());
+
 const newPartySchema = z.object({
   kind: z.enum(['customer', 'vendor', 'both']),
   name: z.string().min(1),
   regNo: z.string().min(1).nullable().optional(),
   vatNo: z.string().min(1).nullable().optional(),
   iban: z.string().min(1).nullable().optional(),
-  countryCode: z.string().length(2).transform((s) => s.toUpperCase()).optional(),
+  countryCode: countryCodeSchema.default('LV'),
   paymentTermsDays: z.number().int().min(0).max(365).nullable().optional(),
 });
 
@@ -37,7 +39,7 @@ export async function createParty(
   const res = await tx.query(
     `INSERT INTO parties(client_company_id, kind, name, reg_no, vat_no, iban, country_code, payment_terms_days)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-    [ctx.clientCompanyId, p.kind, p.name, p.regNo ?? null, p.vatNo ?? null, p.iban ?? null, p.countryCode ?? 'LV', p.paymentTermsDays ?? null],
+    [ctx.clientCompanyId, p.kind, p.name, p.regNo ?? null, p.vatNo ?? null, p.iban ?? null, p.countryCode, p.paymentTermsDays ?? null],
   );
   const id = res.rows[0].id as string;
   await appendAudit(tx, ctx, { action: 'create', entityType: 'party', entityId: id, before: null, after: p });
@@ -70,14 +72,14 @@ export async function updateParty(
   patch: { name?: string; regNo?: string | null; vatNo?: string | null; kind?: PartyKind; iban?: string | null; countryCode?: string; paymentTermsDays?: number | null },
 ): Promise<void> {
   const before = await getParty(tx, ctx, id);
-  const countryCodeNormalized = patch.countryCode ? patch.countryCode.toUpperCase() : undefined;
+  const patchCountryCode = patch.countryCode !== undefined ? countryCodeSchema.parse(patch.countryCode) : undefined;
   const merged = {
     name: patch.name ?? before.name,
     regNo: patch.regNo !== undefined ? patch.regNo : before.regNo,
     vatNo: patch.vatNo !== undefined ? patch.vatNo : before.vatNo,
     kind: patch.kind ?? before.kind,
     iban: patch.iban !== undefined ? patch.iban : before.iban,
-    countryCode: patch.countryCode !== undefined ? (countryCodeNormalized ?? before.countryCode) : before.countryCode,
+    countryCode: patchCountryCode !== undefined ? patchCountryCode : before.countryCode,
     paymentTermsDays: patch.paymentTermsDays !== undefined ? patch.paymentTermsDays : before.paymentTermsDays,
   };
   await tx.query(
