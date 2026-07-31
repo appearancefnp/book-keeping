@@ -1523,6 +1523,13 @@ test('aggregates sales and purchases per category', async () => {
     }, billAccounts);
   });
 
+  // The bill must be APPROVED AND POSTED to count — an 'awaiting_approval' bill has no
+  // ledger entry, so including it would make the breakdown report VAT computeVat cannot see.
+  await withTenant(ctx(t), async (tx) => {
+    await approveProposal(tx, ctx(t), proposalId);
+    await postApprovedPosting(tx, ctx(t), proposalId);
+  });
+
   const b = await withTenant(ctx(t), (tx) => vatBreakdown(tx, ctx(t), period));
   const byCat = Object.fromEntries(b.rows.map((r) => [r.category, r]));
 
@@ -1539,6 +1546,71 @@ test('aggregates sales and purchases per category', async () => {
   // Document-derived totals: output = sales VAT + all self-assessed; input = purchase VAT + deductible self-assessed.
   expect(b.documentOutputVatCents).toBe('25200');   // 2100 + 23100
   expect(b.documentInputVatCents).toBe('25200');    // 4200 + 21000
+});
+
+test('an unapproved bill is invisible — it has no ledger entry to reconcile against', async () => {
+  const t = await makeFirmAndClient();
+  const vendorId = await seed(t);
+  await withTenant(ctx(t), (tx) => createBill(tx, ctx(t), {
+    vendorPartyId: vendorId, billNumber: 'B-PENDING', issueDate: '2026-06-16', dueDate: '2026-07-16', currency: 'EUR',
+    lines: [{ description: 'Domestic', expenseAccount: '7710', net: '200.00', vatRate: 21, vat: '42.00' }],
+  }, billAccounts));
+
+  const b = await withTenant(ctx(t), (tx) => vatBreakdown(tx, ctx(t), period));
+  expect(b.rows).toEqual([]);
+  expect(b.documentInputVatCents).toBe('0');
+});
+
+test('an AR credit note is subtracted from sales, matching the ledger reversal', async () => {
+  const t = await makeFirmAndClient();
+  await seed(t);
+  await withTenant(ctx(t), async (tx) => {
+    await sendInvoice(tx, ctx(t), {
+      invoice: invoice('S-CN-1', [{ description: 'Goods', net: '100.00', vatRate: 21, vat: '21.00', vatCategory: 'S' }], '100.00', '21.00', '121.00'),
+      recipientPeppolId: '0088:ee', ap: new StubAccessPoint(),
+      receivableAccount: '2310', salesAccount: '6110', vatAccount: '5721',
+    });
+    await sendCreditNote(tx, ctx(t), {
+      creditNote: { ...invoice('CN-1', [{ description: 'Return', net: '20.00', vatRate: 21, vat: '4.20', vatCategory: 'S' }], '20.00', '4.20', '24.20'), correctedInvoiceNumber: 'S-CN-1' },
+      recipientPeppolId: '0088:ee', ap: new StubAccessPoint(),
+      receivableAccount: '2310', salesAccount: '6110', vatAccount: '5721',
+    });
+  });
+
+  const b = await withTenant(ctx(t), (tx) => vatBreakdown(tx, ctx(t), period));
+  const s = b.rows.find((r) => r.category === 'S')!;
+  expect(s.salesNetCents).toBe('8000');            // 100.00 - 20.00
+  expect(s.salesVatCents).toBe('1680');            // 21.00 - 4.20, exactly what computeVat reports
+  expect(b.documentOutputVatCents).toBe('1680');
+});
+
+test('a posted vendor credit note is subtracted from purchases', async () => {
+  const t = await makeFirmAndClient();
+  const vendorId = await seed(t);
+  const ids = await withTenant(ctx(t), async (tx) => {
+    const bill = await createBill(tx, ctx(t), {
+      vendorPartyId: vendorId, billNumber: 'B-CN-1', issueDate: '2026-06-10', dueDate: '2026-07-10', currency: 'EUR',
+      lines: [{ description: 'Goods', expenseAccount: '7710', net: '200.00', vatRate: 21, vat: '42.00' }],
+    }, billAccounts);
+    const cn = await createVendorCreditNote(tx, ctx(t), {
+      vendorPartyId: vendorId, creditNoteNumber: 'VCN-1', issueDate: '2026-06-20', currency: 'EUR',
+      correctedBillNumber: 'B-CN-1',
+      lines: [{ description: 'Return', expenseAccount: '7710', net: '50.00', vatRate: 21, vat: '10.50' }],
+    }, creditNoteAccounts);
+    return { billProposal: bill.proposalId, cnProposal: cn.proposalId };
+  });
+  await withTenant(ctx(t), async (tx) => {
+    for (const p of [ids.billProposal, ids.cnProposal]) {
+      await approveProposal(tx, ctx(t), p);
+      await postApprovedPosting(tx, ctx(t), p);
+    }
+  });
+
+  const b = await withTenant(ctx(t), (tx) => vatBreakdown(tx, ctx(t), period));
+  const s = b.rows.find((r) => r.category === 'S')!;
+  expect(s.purchaseNetCents).toBe('15000');        // 200.00 - 50.00
+  expect(s.purchaseVatCents).toBe('3150');         // 42.00 - 10.50
+  expect(b.documentInputVatCents).toBe('3150');
 });
 
 test('excludes documents outside the period', async () => {
@@ -1619,14 +1691,19 @@ export async function vatBreakdown(
     return r;
   };
 
+  // Credit notes are stored with POSITIVE net/vat (see src/einvoice/lines.ts) but their GL
+  // posting REVERSES the sale, so they must be subtracted here or this aggregate diverges
+  // from computeVat's ledger sweep on any period containing one. `journal_entry_id IS NOT
+  // NULL` is the precise "is it in the ledger?" test, which is what reconciliation needs.
   const sales = await tx.query(
     `SELECT el.vat_category AS "category",
-            COALESCE(SUM(el.net_cents), 0)::text AS "netCents",
-            COALESCE(SUM(el.vat_cents), 0)::text AS "vatCents"
+            COALESCE(SUM(CASE WHEN e.doc_type = 'credit_note' THEN -el.net_cents ELSE el.net_cents END), 0)::text AS "netCents",
+            COALESCE(SUM(CASE WHEN e.doc_type = 'credit_note' THEN -el.vat_cents ELSE el.vat_cents END), 0)::text AS "vatCents"
      FROM einvoice_lines el
      JOIN einvoices e ON e.id = el.einvoice_id
      WHERE el.client_company_id = $1
        AND e.direction = 'outbound'
+       AND e.journal_entry_id IS NOT NULL
        AND e.issue_date BETWEEN $2 AND $3
      GROUP BY el.vat_category`,
     [ctx.clientCompanyId, args.fromDate, args.toDate],
@@ -1637,18 +1714,40 @@ export async function vatBreakdown(
     r.salesVatCents = s.vatCents;
   }
 
+  // Purchases are bills MINUS vendor credit notes, and only those actually posted to the
+  // ledger. Two reasons this is not just bill_lines:
+  //   1. A vendor credit note reverses a purchase in the GL but lives in its own table, so
+  //      omitting it leaves the purchase side permanently overstated.
+  //   2. A bill sits in 'awaiting_approval' with NO ledger entry until its posting proposal
+  //      is approved (src/proposals/post-proposal.ts sets journal_entry_id then), so counting
+  //      unapproved bills would report VAT the ledger has never seen.
+  // `journal_entry_id IS NOT NULL` covers both precisely, and subsumes the old
+  // `status <> 'void'` heuristic (a voided bill is never posted).
+  // ROUND stays INSIDE the SUM: buildBillEntry rounds each line independently, so the
+  // aggregate must too, or reconciliation reports phantom cent-level mismatches.
   const purchases = await tx.query(
-    `SELECT bl.vat_category AS "category",
-            COALESCE(SUM(bl.net_cents), 0)::text AS "netCents",
-            COALESCE(SUM(bl.vat_cents), 0)::text AS "vatCents",
-            COALESCE(SUM(ROUND(bl.net_cents * bl.vat_rate / 100)), 0)::text AS "selfAssessed",
-            COALESCE(SUM(CASE WHEN bl.vat_deductible THEN ROUND(bl.net_cents * bl.vat_rate / 100) ELSE 0 END), 0)::text AS "selfAssessedDeductible"
-     FROM bill_lines bl
-     JOIN bills b ON b.id = bl.bill_id
-     WHERE bl.client_company_id = $1
-       AND b.status <> 'void'
-       AND b.issue_date BETWEEN $2 AND $3
-     GROUP BY bl.vat_category`,
+    `WITH purchase_lines AS (
+       SELECT bl.vat_category, bl.net_cents, bl.vat_cents, bl.vat_rate, bl.vat_deductible, 1 AS sign
+       FROM bill_lines bl
+       JOIN bills b ON b.id = bl.bill_id
+       WHERE bl.client_company_id = $1
+         AND b.journal_entry_id IS NOT NULL
+         AND b.issue_date BETWEEN $2 AND $3
+       UNION ALL
+       SELECT cl.vat_category, cl.net_cents, cl.vat_cents, cl.vat_rate, cl.vat_deductible, -1 AS sign
+       FROM vendor_credit_note_lines cl
+       JOIN vendor_credit_notes cn ON cn.id = cl.credit_note_id
+       WHERE cl.client_company_id = $1
+         AND cn.journal_entry_id IS NOT NULL
+         AND cn.issue_date BETWEEN $2 AND $3
+     )
+     SELECT vat_category AS "category",
+            COALESCE(SUM(sign * net_cents), 0)::text AS "netCents",
+            COALESCE(SUM(sign * vat_cents), 0)::text AS "vatCents",
+            COALESCE(SUM(sign * ROUND(net_cents * vat_rate / 100)), 0)::bigint::text AS "selfAssessed",
+            COALESCE(SUM(CASE WHEN vat_deductible THEN sign * ROUND(net_cents * vat_rate / 100) ELSE 0 END), 0)::bigint::text AS "selfAssessedDeductible"
+     FROM purchase_lines
+     GROUP BY vat_category`,
     [ctx.clientCompanyId, args.fromDate, args.toDate],
   );
   for (const p of purchases.rows) {
