@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import {
   profitAndLossTable, comparativeProfitAndLossTable, balanceSheetTable, comparativeBalanceSheetTable,
   generalLedgerTable, trialBalanceTable, apAgingTable, arAgingTable,
-  cashFlowTable, statementOfEquityTable, type ReportLabels,
+  cashFlowTable, statementOfEquityTable, vatReturnTable, ecslTable, type ReportLabels,
 } from '../../src/reports/tabular.js';
 
 // Minimal English fixture labels (the web route supplies real translations).
@@ -18,6 +18,11 @@ const L: ReportLabels = {
   code: 'Code', account: 'Account', amount: 'Amount', current: 'Current', comparison: 'Comparison', variance: 'Variance', variancePct: 'Variance %',
   date: 'Date', memo: 'Memo', description: 'Description', debit: 'Debit', credit: 'Credit', balance: 'Balance', opening: 'Opening', closing: 'Closing', total: 'Total',
   bucketCurrent: 'Current', d1_30: '1–30', d31_60: '31–60', d61_90: '61–90', d90plus: '90+',
+  vatReturn: 'VAT return', ecsl: 'EC Sales List',
+  category: 'VAT treatment', salesNet: 'Sales (net)', salesVat: 'Sales VAT', purchaseNet: 'Purchases (net)', purchaseVat: 'Purchase VAT',
+  selfAssessedVat: 'Self-assessed VAT', country: 'Country', vatNo: 'VAT number', supplyType: 'Supply', goods: 'Goods', services: 'Services',
+  invoices: 'Documents', outputVat: 'Output VAT', inputVat: 'Input VAT', netPayable: 'Net payable',
+  reconciled: 'Ledger and documents agree', notReconciled: 'Ledger and documents disagree',
 };
 
 test('profitAndLossTable lays out income + expense sections with subtotals and net', () => {
@@ -181,4 +186,38 @@ test('statementOfEquityTable appends the result line and a totals subtotal', () 
   expect(resultRow.cells).toEqual(['', 'Result for the period', '0.00', '180.00', '180.00']);
   const totals = t.rows.find((r) => r.kind === 'subtotal')!;
   expect(totals.cells).toEqual(['', 'Total', '1000.00', '-20.00', '980.00']);
+});
+
+test('the VAT return table lists totals then one row per category', () => {
+  const table = vatReturnTable({
+    period: { fromDate: '2026-06-01', toDate: '2026-06-30' },
+    outputVat: '21.00', inputVat: '10.50', netPayable: '10.50',
+    ruleRef: { ruleType: 'vat_standard_rate', value: '21', effectiveFrom: '2013-01-01' },
+    reconciles: true,
+    breakdown: {
+      rows: [{ category: 'S', salesNetCents: '10000', salesVatCents: '2100', purchaseNetCents: '5000', purchaseVatCents: '1050', selfAssessedVatCents: '0', selfAssessedDeductibleCents: '0' }],
+      documentOutputVatCents: '2100', documentInputVatCents: '1050',
+    },
+  }, L);
+
+  expect(table.title).toBe('VAT return');
+  expect(table.rows.some((r) => r.cells.includes('21.00'))).toBe(true);
+  expect(table.rows.some((r) => r.cells[0] === 'S')).toBe(true);
+  expect(table.meta.some((m) => m.value === '2026-06-01 – 2026-06-30')).toBe(true);
+});
+
+test('the ECSL table lists one row per counterparty and supply type', () => {
+  const table = ecslTable({
+    period: { fromDate: '2026-06-01', toDate: '2026-06-30' },
+    rows: [
+      { countryCode: 'EE', vatNo: 'EE101010101', supplyType: 'goods', netCents: '70000', documentCount: 2 },
+      { countryCode: 'LT', vatNo: 'LT100001', supplyType: 'services', netCents: '40000', documentCount: 1 },
+    ],
+    totalNetCents: '110000', issues: [],
+  }, L);
+
+  expect(table.title).toBe('EC Sales List');
+  expect(table.rows.filter((r) => r.kind === 'data').length).toBe(2);
+  expect(table.rows.at(-1)!.kind).toBe('subtotal');
+  expect(table.rows.at(-1)!.cells).toContain('1100.00');
 });

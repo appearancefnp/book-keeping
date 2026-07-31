@@ -13,10 +13,12 @@ import { statementOfEquity } from '@domain/reports/equity.js';
 import { accountBalances } from '@domain/ledger/balances.js';
 import { apAging } from '@domain/payables/aging.js';
 import { arAging } from '@domain/receivables/aging.js';
+import { assembleVatDeclaration } from '@domain/tax/vat-declaration.js';
+import { ecSalesList } from '@domain/tax/ecsl.js';
 import {
   profitAndLossTable, comparativeProfitAndLossTable, balanceSheetTable, comparativeBalanceSheetTable,
   generalLedgerTable, trialBalanceTable, apAgingTable, arAgingTable,
-  cashFlowTable, statementOfEquityTable, type ReportTable,
+  cashFlowTable, statementOfEquityTable, vatReturnTable, ecslTable, type ReportTable,
 } from '@domain/reports/tabular.js';
 import { tableToCsv } from '@domain/reports/csv.js';
 import { reportDocumentHtml } from '@domain/reports/report-html.js';
@@ -26,7 +28,9 @@ import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { isValidIsoDate } from '@/app/lib/date';
 import { errorToStatus } from '@/app/lib/authz';
 
-const REPORTS = ['pl', 'bs', 'gl', 'trial', 'apaging', 'araging', 'cashflow', 'equity'] as const;
+const REPORTS = ['pl', 'bs', 'gl', 'trial', 'apaging', 'araging', 'cashflow', 'equity', 'vatreturn', 'ecsl'] as const;
+// Representative LR chart defaults — accountant to confirm; matches vat-compute.ts / seed.ts.
+const VAT_CONFIG = { outputVatAccount: process.env.VAT_OUTPUT_ACCOUNT ?? '5721', inputVatAccount: process.env.VAT_INPUT_ACCOUNT ?? '5722' };
 const FORMATS = ['csv', 'xlsx', 'pdf'] as const;
 type ReportKind = (typeof REPORTS)[number];
 type Format = (typeof FORMATS)[number];
@@ -88,6 +92,10 @@ export async function GET(req: NextRequest) {
           return cashFlowTable(await cashFlow(tx, ctx, { from, to }), L);
         case 'equity':
           return statementOfEquityTable(await statementOfEquity(tx, ctx, { from, to }), L);
+        case 'vatreturn':
+          return vatReturnTable(await assembleVatDeclaration(tx, ctx, { fromDate: from, toDate: to, config: VAT_CONFIG }), L);
+        case 'ecsl':
+          return ecslTable(await ecSalesList(tx, ctx, { fromDate: from, toDate: to }), L);
       }
     });
 
