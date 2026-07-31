@@ -618,6 +618,8 @@ export const EN = {
   'filings.periodicity': 'Filing frequency',
   'filings.periodicity.monthly': 'Monthly',
   'filings.periodicity.quarterly': 'Quarterly',
+  'filings.save': 'Save',
+  'filings.total': 'Total',
   'nav.filings': 'Filings',
   'nav.short.filings': 'Filings',
 } as const;
@@ -1242,6 +1244,8 @@ export const LV: Record<keyof typeof EN, string> = {
   'filings.periodicity': 'Deklarēšanas periodiskums',
   'filings.periodicity.monthly': 'Reizi mēnesī',
   'filings.periodicity.quarterly': 'Reizi ceturksnī',
+  'filings.save': 'Saglabāt',
+  'filings.total': 'Kopā',
   'nav.filings': 'Deklarācijas',
   'nav.short.filings': 'Dekl.',
 };
@@ -1866,6 +1870,8 @@ export const RU: Record<keyof typeof EN, string> = {
   'filings.periodicity': 'Периодичность декларирования',
   'filings.periodicity.monthly': 'Ежемесячно',
   'filings.periodicity.quarterly': 'Ежеквартально',
+  'filings.save': 'Сохранить',
+  'filings.total': 'Итого',
   'nav.filings': 'Декларации',
   'nav.short.filings': 'Декл.',
 };

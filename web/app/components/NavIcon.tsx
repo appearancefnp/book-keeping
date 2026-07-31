@@ -17,7 +17,8 @@ export type NavIconName =
   | 'settings'
   | 'reports'
   | 'bills'
-  | 'expenses';
+  | 'expenses'
+  | 'filings';
 
 const PATHS: Record<NavIconName, React.ReactNode> = {
   // Checklist / approval queue
@@ -138,6 +139,18 @@ const PATHS: Record<NavIconName, React.ReactNode> = {
       <path d="M7.25 6h5.5M7.25 8.5h3.5" strokeLinecap="round" />
       <circle cx="14" cy="13" r="2.75" fill="var(--surface, #fff)" />
       <path d="M14 11.9v2.2M13.1 13h1.8" strokeLinecap="round" />
+    </>
+  ),
+  // Filings — a document (mirrors `documents`) with a stamp/check badge, like the payroll/expenses coin idiom
+  filings: (
+    <>
+      <path
+        d="M6 2.75h5.5L16 7.25V17a1.25 1.25 0 01-1.25 1.25h-8.5A1.25 1.25 0 015 17V4A1.25 1.25 0 016 2.75zM11.25 3v4h4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="13.5" cy="13.5" r="2.75" fill="var(--surface, #fff)" />
+      <path d="M12.35 13.5l.85.85 1.5-1.7" strokeLinecap="round" strokeLinejoin="round" />
     </>
   ),
 };
