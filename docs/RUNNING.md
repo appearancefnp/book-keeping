@@ -342,7 +342,7 @@ chmod 600 .env
 ```
 
 **`DEV_ROUTES_ENABLED` and `BANKFEED_ALLOW_STUB` stay unset** — leave them out of `.env`
-entirely (both commented out in `.env.example`). §4.7's smoke checklist verifies this by
+entirely (both commented out in `.env.example`). §4.8's smoke checklist verifies this by
 hitting the routes, not by reading the file back.
 
 Root `package.json`'s `migrate`/`seed`/`provision-admin`/`worker` scripts run under
@@ -428,7 +428,49 @@ docker compose -f docker-compose.prod.yml --env-file .env run --rm \
 Open the printed `https://<your-domain>/invite/<token>` (72h TTL, single use — §3.4), set a
 password, and enrol TOTP before the account activates.
 
-### 4.6 Backups
+### 4.6 Bank-feed sync
+
+`npm run worker` (the `worker` service) only drains the job queue — dunning, recurring
+invoices, chain reapers. It does **not** call `syncAllClients` (`src/bankfeed/cron.ts`),
+which has exactly one caller: `GET /api/cron/bank-sync`, still guarded by `CRON_SECRET`
+(`web/app/lib/cron-auth.ts`) exactly as it was on Vercel. Nothing schedules that route on
+the VPS unless you install this timer — without it, linked bank connections silently stop
+gaining new transactions (and `src/bankfeed/sync.ts`'s cursor still advances to "today" on
+every attempted sync, so a long-enough gap permanently loses whatever fell outside the
+provider's history window, with no error anywhere).
+
+```bash
+sudo cp deploy/bookkeeping-banksync.service deploy/bookkeeping-banksync.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now bookkeeping-banksync.timer
+```
+
+The service's `EnvironmentFile=` points at `/opt/bookkeeping/.env` — the same file from
+§4.3 — since `CRON_SECRET` and `SITE_ADDRESS` already live there; there's no separate
+`banksync.env`. `scripts/bank-sync.sh` `curl`s
+`https://$SITE_ADDRESS/api/cron/bank-sync` with `Authorization: Bearer $CRON_SECRET` and
+`--fail`, so a 401 (missing/wrong secret) or 5xx makes the unit show `failed`, not
+`active (exited)` — a bad config is visible in `systemctl status
+bookkeeping-banksync.service` instead of silently doing nothing.
+
+Runs daily at 01:30 (`deploy/bookkeeping-banksync.timer`), deliberately **before** the
+02:30 backup (§4.7) so the day's freshly-synced transactions land in that night's dump
+rather than waiting for the next one — mirroring the old Vercel ordering where bank-sync
+(05:00) ran ahead of jobs-drain (06:00).
+
+**Verify it actually works, not just that the unit is enabled** — a unit can be
+`enabled`/`active` while the route still 401s on a stale or missing secret:
+
+```bash
+sudo systemctl start bookkeeping-banksync.service   # run it once, on demand
+sudo systemctl status bookkeeping-banksync.service  # expect "Active: inactive (dead)" — a
+                                                      #   oneshot that succeeded, not "failed"
+# Or call the route directly and check the status code yourself:
+curl -i -H "Authorization: Bearer $CRON_SECRET" "https://$SITE_ADDRESS/api/cron/bank-sync"
+# Expect HTTP/1.1 200 and a JSON body ({"synced":N,"failed":N}) — not 401.
+```
+
+### 4.7 Backups
 
 ```bash
 sudo cp deploy/bookkeeping-backup.service deploy/bookkeeping-backup.timer /etc/systemd/system/
@@ -493,7 +535,7 @@ The drill cannot verify one thing on its own: that the restored dump's schema is
 (an empty `Applied: []` — anything else means the dump predates a migration that's since
 landed).
 
-### 4.7 Smoke checklist
+### 4.8 Smoke checklist
 
 Do this against the real, DNS-pointed domain, not `SITE_ADDRESS=localhost`. Every task in
 this plan tested Caddy with `SITE_ADDRESS=localhost`, which routes to Caddy's *internal* CA
@@ -504,7 +546,9 @@ formality after the fact:
 - [ ] `GET https://<host>/api/health` → `{"ok":true}` (confirms TLS issuance succeeded, DNS
       is correct, and `web` can reach `db`)
 - [ ] Log in as the provisioned admin: email + password + current TOTP code
-- [ ] Upload a document and confirm extraction runs (Stub unless an AI key is set)
+- [ ] Upload a document with no AI key configured and confirm it **fails closed** (500, not
+      a fabricated extraction) — with `INTAKE_ALLOW_STUB_EXTRACTOR` unset, `/api/documents/capture`
+      and `/api/expenses/upload` refuse to fall back to the canned-invoice stub in production
 - [ ] Issue an invoice and confirm it posts and appears in the outbox
 - [ ] `GET /api/dev/bootstrap` → **403**, with `DEV_ROUTES_ENABLED` unset. Verify by hitting
       the URL, not by reading `.env` back — this route migrates, seeds, and signs the caller
@@ -518,7 +562,7 @@ formality after the fact:
 - [ ] The §3.5 Blob cache-bypass check does **not** apply here — `LocalBlobStore` has no CDN
       in front of it, so there is no cache to bypass
 
-### 4.8 Deploy and roll back
+### 4.9 Deploy and roll back
 
 ```bash
 # set APP_IMAGE in .env to the new tag first if pinning a specific sha rather than :latest
@@ -531,12 +575,12 @@ Rollback is the same three commands with the previous tag in `APP_IMAGE`. Migrat
 forward-only by design — the ledger is append-only, corrections are reversals — so rolling
 back application code never implies rolling back the schema.
 
-### 4.9 Known limitations
+### 4.10 Known limitations
 
 Named so they stay visible rather than forgotten, not because they block this pilot:
 
 - **No observability** — no structured logging in `web/app`, no error tracking, no uptime
-  monitor. There is no platform to page; the restore drill in §4.6 is the main safety net.
+  monitor. There is no platform to page; the restore drill in §4.7 is the main safety net.
 - **No disk encryption at rest** (payroll data includes `personas kods`).
 - **No GDPR data export/erasure workflow.** With one pilot client an Art. 15/17 request is
   answerable by hand; document that in whatever is signed with the accountant.

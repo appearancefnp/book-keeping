@@ -27,6 +27,9 @@ services:
       WORKER_DATABASE_URL: ${WORKER_DATABASE_URL}
       SUPERVISOR_DATABASE_URL: ${SUPERVISOR_DATABASE_URL}
       BLOB_DIR: /app/.blob-store
+      # Required so /api/cron/bank-sync (called by the bookkeeping-banksync.timer, not by
+      # `npm run worker`) doesn't 401 unconditionally — see docs/RUNNING.md §4.6.
+      CRON_SECRET: ${CRON_SECRET:?CRON_SECRET is required — /api/cron/bank-sync 401s without it and nothing syncs bank feeds}
       GOCARDLESS_SECRET_ID: ${GOCARDLESS_SECRET_ID:-}
       GOCARDLESS_SECRET_KEY: ${GOCARDLESS_SECRET_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}

@@ -99,9 +99,16 @@ What the VPS changes in the app's favour, with no code written:
   `BLOB_READ_WRITE_TOKEN` is unset. No Blob quota, no 30-day lockout, no R2 adapter to
   write. Documents land on a bind-mounted volume.
 - **`npm run worker` (`src/jobs/worker.ts`) becomes a long-running loop** instead of a
-  once-daily HTTP cron. The 20-jobs/day ceiling and the ±59 min jitter both disappear.
-  `web/vercel.json`'s crons and `/api/cron/*` routes stay in the repo, unused on this
-  target, so the Vercel path remains viable.
+  once-daily HTTP cron — but only for `/api/cron/jobs-drain`'s work (dunning, recurring
+  invoices, chain reapers). The 20-jobs/day ceiling and the ±59 min jitter both disappear
+  for that path. **`/api/cron/bank-sync` is a separate route that `npm run worker` does
+  not call** — `syncAllClients` (`src/bankfeed/cron.ts`) has no registered job handler and
+  no other caller. It needs its own scheduler on this target: a systemd timer
+  (`deploy/bookkeeping-banksync.timer`/`.service`) that curls the existing route with
+  `CRON_SECRET`, mirroring `bookkeeping-backup.timer`. `web/vercel.json`'s crons and
+  `/api/cron/*` routes stay in the repo, unused on the Vercel path (which remains viable
+  as a seeded-demo-only URL), but on the VPS `/api/cron/bank-sync` is very much in use —
+  called by the new timer rather than by Vercel.
 
 The two-role DB model survives unchanged: `ADMIN_DATABASE_URL` → the container's
 superuser for migrations and `provision-admin`; `DATABASE_URL` → non-owner

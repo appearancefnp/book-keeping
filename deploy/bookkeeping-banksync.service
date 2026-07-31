@@ -1,0 +1,10 @@
+[Unit]
+Description=Bookkeeping daily bank-feed sync
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/bookkeeping/.env
+ExecStart=/opt/bookkeeping/scripts/bank-sync.sh
