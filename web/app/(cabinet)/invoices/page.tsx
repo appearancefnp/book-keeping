@@ -9,7 +9,7 @@ import { LOCALE_FOR } from '@/app/lib/i18n';
 import { SkeletonCard } from '@/app/components/SkeletonCard';
 import { ErrorState } from '@/app/components/ErrorState';
 import { EmptyState } from '@/app/components/EmptyState';
-import { formatCents } from '@/app/lib/format';
+import { formatCents, formatDecimal } from '@/app/lib/format';
 import { PaymentStatusBadge } from '@/app/components/PaymentStatusBadge';
 import type { ReceivableStatus } from '@domain/receivables/receivables.js';
 import styles from './page.module.css';
@@ -293,7 +293,7 @@ function InvoicesInner() {
                         <td>{r.invoicePayload.customer.name}</td>
                         <td>{cadenceLabel(r)}</td>
                         <td>{r.active ? fmtDate(r.nextRunDate) : '—'}</td>
-                        <td className={styles.colAmount}>{r.invoicePayload.grandTotal} {r.invoicePayload.currency}</td>
+                        <td className={styles.colAmount}>{formatDecimal(r.invoicePayload.grandTotal, r.invoicePayload.currency) ?? `${r.invoicePayload.grandTotal} ${r.invoicePayload.currency}`}</td>
                         <td>{t(r.active ? 'einv.rec.active' : 'einv.rec.paused')}</td>
                         <td>
                           {r.active && (
