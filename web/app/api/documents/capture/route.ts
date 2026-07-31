@@ -39,16 +39,26 @@ function selectExtractor(): DocumentExtractor {
   return new StubExtractor(CANNED);
 }
 
-const handler = makeCaptureHandler({
-  blob: makeBlobStore(),
-  extractor: selectExtractor(),
-  resolveTemplate: () => TEMPLATE,
-});
+// Defer handler construction to request time, not module evaluation time. selectExtractor() throws
+// when no AI key is configured and the stub extractor is not allowed in production; this must fail
+// on upload (when running in production), not during `next build`'s page-data collection phase
+// (where no AI key exists). Making it lazy ensures the build succeeds while the guard still fires
+// at request time.
+let handler: ReturnType<typeof makeCaptureHandler> | undefined;
+function getHandler(): ReturnType<typeof makeCaptureHandler> {
+  handler ??= makeCaptureHandler({
+    blob: makeBlobStore(),
+    extractor: selectExtractor(),
+    resolveTemplate: () => TEMPLATE,
+  });
+  return handler;
+}
+
 export async function POST(req: Request) {
   const token = await getSessionToken();
   if (!token) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
   const body = (await req.json().catch(() => ({}))) as { clientCompanyId?: string; bytesBase64?: string; mime?: string };
   if (!body.clientCompanyId) return NextResponse.json({ error: 'missing clientCompanyId' }, { status: 400 });
-  const res = await handler({ token, clientCompanyId: body.clientCompanyId, body, atUnixSeconds: nowUnix() });
+  const res = await getHandler()({ token, clientCompanyId: body.clientCompanyId, body, atUnixSeconds: nowUnix() });
   return NextResponse.json(res.body, { status: res.status });
 }

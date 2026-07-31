@@ -40,7 +40,17 @@ function selectExtractor(): DocumentExtractor {
 }
 
 const blobStore = makeBlobStore();
-const extractor = selectExtractor();
+
+// Defer extractor selection to request time, not module evaluation time. selectExtractor() throws
+// when no AI key is configured and the stub extractor is not allowed in production; this must fail
+// on upload (when running in production), not during `next build`'s page-data collection phase
+// (where no AI key exists). Making it lazy ensures the build succeeds while the guard still fires
+// at request time.
+let extractorInstance: DocumentExtractor | undefined;
+function getExtractor(): DocumentExtractor {
+  extractorInstance ??= selectExtractor();
+  return extractorInstance;
+}
 
 export async function POST(req: NextRequest) {
   const token = await getSessionToken();
@@ -61,7 +71,7 @@ export async function POST(req: NextRequest) {
     const bytes = Buffer.from(await file.arrayBuffer());
     const result = await withTenant(ctx, (tx) => storeExpenseReceipt(tx, ctx, {
       bytes, mimeType: file.type || 'application/octet-stream', filename: file.name || 'receipt',
-      blobStore, extractor,
+      blobStore, extractor: getExtractor(),
     }));
     return NextResponse.json(result, { status: 200 });
   } catch (err) {
