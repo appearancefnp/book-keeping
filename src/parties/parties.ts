@@ -4,7 +4,7 @@ import type { TenantContext } from '../tenancy/context.js';
 import { appendAudit } from '../audit/audit.js';
 
 export type PartyKind = 'customer' | 'vendor' | 'both';
-export interface PartyRow { id: string; kind: PartyKind; name: string; regNo: string | null; vatNo: string | null; iban: string | null; paymentTermsDays: number | null; }
+export interface PartyRow { id: string; kind: PartyKind; name: string; regNo: string | null; vatNo: string | null; iban: string | null; paymentTermsDays: number | null; countryCode: string; }
 
 const newPartySchema = z.object({
   kind: z.enum(['customer', 'vendor', 'both']),
@@ -12,10 +12,11 @@ const newPartySchema = z.object({
   regNo: z.string().min(1).nullable().optional(),
   vatNo: z.string().min(1).nullable().optional(),
   iban: z.string().min(1).nullable().optional(),
+  countryCode: z.string().length(2).transform((s) => s.toUpperCase()).optional(),
   paymentTermsDays: z.number().int().min(0).max(365).nullable().optional(),
 });
 
-const SELECT_COLS = 'id, kind, name, reg_no AS "regNo", vat_no AS "vatNo", iban, payment_terms_days AS "paymentTermsDays"';
+const SELECT_COLS = 'id, kind, name, reg_no AS "regNo", vat_no AS "vatNo", iban, country_code AS "countryCode", payment_terms_days AS "paymentTermsDays"';
 
 /**
  * Compute an invoice due date from its issue date plus a customer's payment-terms days.
@@ -30,13 +31,13 @@ export function dueDateFromTerms(issueDate: string, paymentTermsDays: number): s
 
 export async function createParty(
   tx: PoolClient, ctx: TenantContext,
-  input: { kind: PartyKind; name: string; regNo?: string | null; vatNo?: string | null; iban?: string | null; paymentTermsDays?: number | null },
+  input: { kind: PartyKind; name: string; regNo?: string | null; vatNo?: string | null; iban?: string | null; countryCode?: string; paymentTermsDays?: number | null },
 ): Promise<{ id: string }> {
   const p = newPartySchema.parse(input);
   const res = await tx.query(
-    `INSERT INTO parties(client_company_id, kind, name, reg_no, vat_no, iban, payment_terms_days)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-    [ctx.clientCompanyId, p.kind, p.name, p.regNo ?? null, p.vatNo ?? null, p.iban ?? null, p.paymentTermsDays ?? null],
+    `INSERT INTO parties(client_company_id, kind, name, reg_no, vat_no, iban, country_code, payment_terms_days)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+    [ctx.clientCompanyId, p.kind, p.name, p.regNo ?? null, p.vatNo ?? null, p.iban ?? null, p.countryCode ?? 'LV', p.paymentTermsDays ?? null],
   );
   const id = res.rows[0].id as string;
   await appendAudit(tx, ctx, { action: 'create', entityType: 'party', entityId: id, before: null, after: p });
@@ -66,21 +67,23 @@ export async function listParties(
 
 export async function updateParty(
   tx: PoolClient, ctx: TenantContext, id: string,
-  patch: { name?: string; regNo?: string | null; vatNo?: string | null; kind?: PartyKind; iban?: string | null; paymentTermsDays?: number | null },
+  patch: { name?: string; regNo?: string | null; vatNo?: string | null; kind?: PartyKind; iban?: string | null; countryCode?: string; paymentTermsDays?: number | null },
 ): Promise<void> {
   const before = await getParty(tx, ctx, id);
+  const countryCodeNormalized = patch.countryCode ? patch.countryCode.toUpperCase() : undefined;
   const merged = {
     name: patch.name ?? before.name,
     regNo: patch.regNo !== undefined ? patch.regNo : before.regNo,
     vatNo: patch.vatNo !== undefined ? patch.vatNo : before.vatNo,
     kind: patch.kind ?? before.kind,
     iban: patch.iban !== undefined ? patch.iban : before.iban,
+    countryCode: patch.countryCode !== undefined ? (countryCodeNormalized ?? before.countryCode) : before.countryCode,
     paymentTermsDays: patch.paymentTermsDays !== undefined ? patch.paymentTermsDays : before.paymentTermsDays,
   };
   await tx.query(
-    `UPDATE parties SET name=$1, reg_no=$2, vat_no=$3, kind=$4, iban=$5, payment_terms_days=$6
-     WHERE id=$7 AND client_company_id=$8`,
-    [merged.name, merged.regNo, merged.vatNo, merged.kind, merged.iban, merged.paymentTermsDays, id, ctx.clientCompanyId],
+    `UPDATE parties SET name=$1, reg_no=$2, vat_no=$3, kind=$4, iban=$5, country_code=$6, payment_terms_days=$7
+     WHERE id=$8 AND client_company_id=$9`,
+    [merged.name, merged.regNo, merged.vatNo, merged.kind, merged.iban, merged.countryCode, merged.paymentTermsDays, id, ctx.clientCompanyId],
   );
   await appendAudit(tx, ctx, { action: 'update', entityType: 'party', entityId: id, before, after: merged });
 }
