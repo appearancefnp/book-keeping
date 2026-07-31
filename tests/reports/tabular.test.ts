@@ -23,6 +23,7 @@ const L: ReportLabels = {
   selfAssessedVat: 'Self-assessed VAT', country: 'Country', vatNo: 'VAT number', supplyType: 'Supply', goods: 'Goods', services: 'Services',
   invoices: 'Documents', outputVat: 'Output VAT', inputVat: 'Input VAT', netPayable: 'Net payable',
   reconciled: 'Ledger and documents agree', notReconciled: 'Ledger and documents disagree',
+  issues: 'Cannot be reported',
 };
 
 test('profitAndLossTable lays out income + expense sections with subtotals and net', () => {
@@ -220,4 +221,50 @@ test('the ECSL table lists one row per counterparty and supply type', () => {
   expect(table.rows.filter((r) => r.kind === 'data').length).toBe(2);
   expect(table.rows.at(-1)!.kind).toBe('subtotal');
   expect(table.rows.at(-1)!.cells).toContain('1100.00');
+});
+
+test('vatReturnTable meta reports agreement or disagreement in plain text, never both at once', () => {
+  const base = {
+    period: { fromDate: '2026-06-01', toDate: '2026-06-30' },
+    outputVat: '21.00', inputVat: '10.50', netPayable: '10.50',
+    ruleRef: { ruleType: 'vat_standard_rate', value: '21', effectiveFrom: '2013-01-01' },
+    breakdown: {
+      rows: [{ category: 'S' as const, salesNetCents: '10000', salesVatCents: '2100', purchaseNetCents: '5000', purchaseVatCents: '1050', selfAssessedVatCents: '0', selfAssessedDeductibleCents: '0' }],
+      documentOutputVatCents: '2100', documentInputVatCents: '1050',
+    },
+  };
+
+  const agreeing = vatReturnTable({ ...base, reconciles: true }, L);
+  expect(agreeing.meta.some((m) => m.label === 'Ledger and documents agree')).toBe(true);
+  expect(agreeing.meta.some((m) => m.label === 'Ledger and documents disagree')).toBe(false);
+
+  const disagreeing = vatReturnTable({ ...base, reconciles: false }, L);
+  expect(disagreeing.meta.some((m) => m.label === 'Ledger and documents disagree')).toBe(true);
+  expect(disagreeing.meta.some((m) => m.label === 'Ledger and documents agree')).toBe(false);
+});
+
+test('ecslTable appends unreportable supplies as a warning section after the total, never before it', () => {
+  const list = {
+    period: { fromDate: '2026-06-01', toDate: '2026-06-30' },
+    rows: [{ countryCode: 'EE', vatNo: 'EE101010101', supplyType: 'goods' as const, netCents: '70000', documentCount: 2 }],
+    totalNetCents: '70000',
+    issues: ['Invoice INV-2026-0042: customer has no VAT number', 'Invoice INV-2026-0051: no linked customer party'],
+  };
+  const table = ecslTable(list, L);
+
+  const columnCount = table.columns.length;
+  for (const row of table.rows) expect(row.cells.length).toBe(columnCount);
+
+  const subtotalIdx = table.rows.findIndex((r) => r.kind === 'subtotal');
+  const sectionIdx = table.rows.findIndex((r) => r.kind === 'section' && r.cells[0] === 'Cannot be reported');
+  expect(subtotalIdx).toBeGreaterThanOrEqual(0);
+  expect(sectionIdx).toBeGreaterThan(subtotalIdx);
+
+  const trailing = table.rows.slice(sectionIdx + 1);
+  expect(trailing.map((r) => r.cells[0])).toEqual(list.issues);
+  for (const r of trailing) expect(r.kind).toBe('data');
+
+  const noIssues = ecslTable({ ...list, issues: [] }, L);
+  expect(noIssues.rows.some((r) => r.kind === 'section')).toBe(false);
+  expect(noIssues.rows.length).toBe(2); // 1 data row + 1 subtotal, nothing appended
 });

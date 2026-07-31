@@ -28,6 +28,7 @@ export function reportLabels(lang: ExportLang): ReportLabels & { print: string }
     goods: m['filings.goods'], services: m['filings.services'], invoices: m['filings.col.invoices'],
     outputVat: m['filings.outputVat'], inputVat: m['filings.inputVat'], netPayable: m['filings.netPayable'],
     reconciled: m['filings.reconciled'], notReconciled: m['filings.notReconciled'],
+    issues: m['filings.issues'],
     print: m['export.print'],
   };
 }

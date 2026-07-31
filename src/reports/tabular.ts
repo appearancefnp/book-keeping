@@ -29,8 +29,12 @@ export interface ReportLabels {
   bucketCurrent: string; d1_30: string; d31_60: string; d61_90: string; d90plus: string;
   vatReturn: string; ecsl: string;
   category: string; salesNet: string; salesVat: string; purchaseNet: string; purchaseVat: string; selfAssessedVat: string;
-  country: string; vatNo: string; supplyType: string; goods: string; services: string; invoices: string;
+  country: string; vatNo: string; supplyType: string; goods: string; services: string;
+  /** Column header for a per-counterparty document count (invoices AND credit notes) — displayed
+   *  text intentionally says "documents", not "invoices", even though the field is named `invoices`. */
+  invoices: string;
   outputVat: string; inputVat: string; netPayable: string; reconciled: string; notReconciled: string;
+  issues: string;
 }
 
 const PCT = (v: string | null): string => (v === null ? '—' : v);
@@ -294,6 +298,13 @@ export function ecslTable(list: EcSalesList, labels: ReportLabels): ReportTable 
     ],
   }));
   rows.push({ kind: 'subtotal', cells: ['', '', '', labels.total, centsToDecimal(list.totalNetCents)] });
+  // Supplies VID would reject outright (no linked party, or a party with no VAT number) — surfaced
+  // in the exported table body itself, after the total, so every format (CSV/XLSX/PDF) warns the
+  // bookkeeper without needing renderer changes. Omitted entirely when there's nothing to report.
+  if (list.issues.length > 0) {
+    rows.push({ kind: 'section', cells: [labels.issues, '', '', '', ''] });
+    for (const issue of list.issues) rows.push({ kind: 'data', cells: [issue, '', '', '', ''] });
+  }
   return {
     title: labels.ecsl,
     meta: [{ label: labels.period, value: `${list.period.fromDate} – ${list.period.toDate}` }],
