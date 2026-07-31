@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import type { TenantContext } from '../tenancy/context.js';
 import { appPool, workerPool, supervisorPool, withTenant, withWorker } from '../db/pool.js';
+import { requireEnv } from '../db/require-env.js';
 import { claimDue, completeJob, failJob, type Job } from './queue.js';
 import { getHandler } from './handlers.js';
 import { reapOnce } from './reapers.js';
@@ -71,5 +72,6 @@ async function main(): Promise<void> {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  requireEnv(['DATABASE_URL', 'WORKER_DATABASE_URL', 'SUPERVISOR_DATABASE_URL']);
   main().catch((e) => { console.error(e); process.exit(1); });
 }
