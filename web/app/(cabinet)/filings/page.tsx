@@ -81,9 +81,8 @@ function FilingsInner() {
   const [year, setYear] = useState<number>(() => new Date().getFullYear());
   const [periodLabel, setPeriodLabel] = useState<string>('');
 
-  const [vatReturnData, setVatReturnData] = useState<{ period: FilingPeriod; declaration: VatDeclaration } | null>(null);
-  const [ecslData, setEcslData] = useState<{ period: FilingPeriod; list: EcSalesList } | null>(null);
-  const [prepared, setPrepared] = useState<{ vatreturn: string | null; ecsl: string | null }>({ vatreturn: null, ecsl: null });
+  const [vatReturnData, setVatReturnData] = useState<{ period: FilingPeriod; declaration: VatDeclaration; filing: { id: string; status: string } | null } | null>(null);
+  const [ecslData, setEcslData] = useState<{ period: FilingPeriod; list: EcSalesList; filing: { id: string; status: string } | null } | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -131,9 +130,9 @@ function FilingsInner() {
         throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
       }
       if (tab === 'vatreturn') {
-        setVatReturnData((await res.json()) as { period: FilingPeriod; declaration: VatDeclaration });
+        setVatReturnData((await res.json()) as { period: FilingPeriod; declaration: VatDeclaration; filing: { id: string; status: string } | null });
       } else {
-        setEcslData((await res.json()) as { period: FilingPeriod; list: EcSalesList });
+        setEcslData((await res.json()) as { period: FilingPeriod; list: EcSalesList; filing: { id: string; status: string } | null });
       }
     } catch (err) {
       setError((err as Error).message ?? t('state.error'));
@@ -143,10 +142,6 @@ function FilingsInner() {
   }, [clientCompanyId, tab, periodLabel, t]);
 
   useEffect(() => { load(); }, [load]);
-
-  // A previous "prepared" confirmation refers to a specific period; once the period changes
-  // it no longer applies to what's on screen.
-  useEffect(() => { setPrepared({ vatreturn: null, ecsl: null }); }, [periodLabel]);
 
   const periodOptions = useMemo(() => {
     if (periodicity === 'monthly') {
@@ -223,7 +218,7 @@ function FilingsInner() {
       });
       const body = (await res.json().catch(() => ({}))) as { proposalId?: string; error?: string };
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-      setPrepared((p) => ({ ...p, [tab]: body.proposalId ?? null }));
+      await load(); // refetch so `filing` reflects the proposal just created
     } catch (err) {
       setError((err as Error).message ?? t('state.error'));
     } finally {
@@ -367,8 +362,16 @@ function FilingsInner() {
 
             <div className={styles.actions}>
               <button type="button" onClick={prepare} disabled={busy}>{t('filings.prepare')}</button>
-              {prepared.vatreturn && (
-                <p className={styles.preparedMsg}>{t('filings.prepared')} — <Link href={`/${q}`}>{t('nav.queue')}</Link></p>
+              {vatReturnData.filing && (
+                <>
+                  <p className={styles.preparedMsg}>
+                    {t(vatReturnData.filing.status === 'approved' ? 'filings.approved' : 'filings.prepared')}
+                    {' — '}<Link href={`/${q}`}>{t('nav.queue')}</Link>
+                  </p>
+                  <a href={`/api/filings/${vatReturnData.filing.id}?clientCompanyId=${encodeURIComponent(clientCompanyId ?? '')}&download=1`}>
+                    {t('filings.downloadXml')}
+                  </a>
+                </>
               )}
             </div>
           </div>
@@ -427,8 +430,16 @@ function FilingsInner() {
 
             <div className={styles.actions}>
               <button type="button" onClick={prepare} disabled={busy}>{t('filings.prepare')}</button>
-              {prepared.ecsl && (
-                <p className={styles.preparedMsg}>{t('filings.prepared')} — <Link href={`/${q}`}>{t('nav.queue')}</Link></p>
+              {ecslData.filing && (
+                <>
+                  <p className={styles.preparedMsg}>
+                    {t(ecslData.filing.status === 'approved' ? 'filings.approved' : 'filings.prepared')}
+                    {' — '}<Link href={`/${q}`}>{t('nav.queue')}</Link>
+                  </p>
+                  <a href={`/api/filings/${ecslData.filing.id}?clientCompanyId=${encodeURIComponent(clientCompanyId ?? '')}&download=1`}>
+                    {t('filings.downloadXml')}
+                  </a>
+                </>
               )}
             </div>
           </div>
