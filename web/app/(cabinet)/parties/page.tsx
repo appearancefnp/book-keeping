@@ -9,10 +9,16 @@ import { EmptyState } from '@/app/components/EmptyState';
 import styles from './page.module.css';
 
 type PartyKind = 'customer' | 'vendor' | 'both';
-interface PartyRow { id: string; kind: PartyKind; name: string; regNo: string | null; vatNo: string | null; paymentTermsDays: number | null; }
-interface FormState { id: string | null; kind: PartyKind; name: string; regNo: string; vatNo: string; paymentTermsDays: string; }
+interface PartyRow {
+  id: string; kind: PartyKind; name: string; regNo: string | null; vatNo: string | null;
+  paymentTermsDays: number | null; countryCode: string;
+}
+interface FormState {
+  id: string | null; kind: PartyKind; name: string; regNo: string; vatNo: string;
+  paymentTermsDays: string; countryCode: string;
+}
 
-const EMPTY_FORM: FormState = { id: null, kind: 'customer', name: '', regNo: '', vatNo: '', paymentTermsDays: '' };
+const EMPTY_FORM: FormState = { id: null, kind: 'customer', name: '', regNo: '', vatNo: '', paymentTermsDays: '', countryCode: 'LV' };
 
 function PartiesInner() {
   const searchParams = useSearchParams();
@@ -58,6 +64,7 @@ function PartiesInner() {
       name: form.name.trim(),
       regNo: form.regNo.trim() || null,
       vatNo: form.vatNo.trim() || null,
+      countryCode: /^[A-Za-z]{2}$/.test(form.countryCode.trim()) ? form.countryCode.trim().toUpperCase() : 'LV',
       paymentTermsDays: form.paymentTermsDays.trim() ? Number(form.paymentTermsDays.trim()) : null,
     };
     try {
@@ -113,6 +120,15 @@ function PartiesInner() {
             <label className={styles.field}>
               <span>{t('parties.vatNo')}</span>
               <input value={form.vatNo} onChange={(e) => setForm({ ...form, vatNo: e.target.value })} />
+            </label>
+            <label className={styles.field}>
+              <span>{t('party.countryCode')}</span>
+              <input
+                value={form.countryCode}
+                maxLength={2}
+                className={styles.countryInput}
+                onChange={(e) => setForm({ ...form, countryCode: e.target.value.toUpperCase() })}
+              />
             </label>
             {(form.kind === 'customer' || form.kind === 'both') && (
               <label className={styles.field}>
@@ -174,6 +190,7 @@ function PartiesInner() {
                             name: p.name,
                             regNo: p.regNo ?? '',
                             vatNo: p.vatNo ?? '',
+                            countryCode: p.countryCode || 'LV',
                             paymentTermsDays: p.paymentTermsDays != null ? String(p.paymentTermsDays) : '',
                           });
                         }}

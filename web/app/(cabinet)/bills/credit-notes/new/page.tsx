@@ -5,12 +5,19 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useMessages } from '@/app/lib/i18n-context';
 import { formatDecimal } from '@/app/lib/format';
 import { SkeletonCard } from '@/app/components/SkeletonCard';
+import { VAT_CATEGORIES, selfAssesses, type VatCategory } from '@domain/tax/categories.js';
 import styles from './page.module.css';
 
 interface Vendor { id: string; kind: 'customer' | 'vendor' | 'both'; name: string; }
-interface Line { description: string; expenseAccount: string; net: string; vatRate: number; vat: string; }
+interface Line {
+  description: string; expenseAccount: string; net: string; vatRate: number; vat: string;
+  vatCategory: VatCategory; vatDeductible: boolean;
+}
 
-const emptyLine = (): Line => ({ description: '', expenseAccount: '7710', net: '0.00', vatRate: 21, vat: '0.00' });
+const emptyLine = (): Line => ({
+  description: '', expenseAccount: '7710', net: '0.00', vatRate: 21, vat: '0.00',
+  vatCategory: 'S', vatDeductible: true,
+});
 function round2(n: number): string { return (Math.round(n * 100) / 100).toFixed(2); }
 
 function NewCreditNoteInner() {
@@ -48,8 +55,17 @@ function NewCreditNoteInner() {
     setLines((ls) => ls.map((l, j) => {
       if (j !== i) return l;
       const next = { ...l, ...patch };
-      if (patch.net !== undefined || patch.vatRate !== undefined) {
-        next.vat = round2((Number(next.net) || 0) * next.vatRate / 100);
+      if (patch.vatCategory !== undefined) {
+        // Purchase side: AE/K keep an editable domestic rate (needed to self-assess);
+        // every other non-standard category invoices no VAT at all, so its rate is 0.
+        if (patch.vatCategory === 'S' || selfAssesses(patch.vatCategory)) {
+          if (!(next.vatRate > 0)) next.vatRate = 21;
+        } else {
+          next.vatRate = 0;
+        }
+      }
+      if (patch.net !== undefined || patch.vatRate !== undefined || patch.vatCategory !== undefined) {
+        next.vat = next.vatCategory === 'S' ? round2((Number(next.net) || 0) * next.vatRate / 100) : '0.00';
       }
       return next;
     }));
@@ -113,8 +129,10 @@ function NewCreditNoteInner() {
               <th scope="col">{t('bills.description')}</th>
               <th scope="col">{t('bills.account')}</th>
               <th scope="col" className={styles.right}>{t('bills.net')}</th>
+              <th scope="col">{t('vat.category')}</th>
               <th scope="col" className={styles.right}>{t('bills.vatRate')}</th>
               <th scope="col" className={styles.right}>{t('bills.vat')}</th>
+              <th scope="col">{t('vat.selfAssessed')}</th>
               <th scope="col"><span className="sr-only">{t('bills.removeLine')}</span></th>
             </tr>
           </thead>
@@ -145,16 +163,42 @@ function NewCreditNoteInner() {
                     className={styles.num}
                   />
                 </td>
+                <td>
+                  <select
+                    aria-label={t('vat.category')}
+                    value={l.vatCategory}
+                    onChange={(e) => setLine(i, { vatCategory: e.target.value as VatCategory })}
+                    className={styles.cat}
+                  >
+                    {VAT_CATEGORIES.map((c) => <option key={c} value={c}>{t(`vat.category.${c}`)}</option>)}
+                  </select>
+                </td>
                 <td className={styles.right}>
                   <input
                     aria-label={t('bills.vatRate')}
                     inputMode="numeric"
                     value={String(l.vatRate)}
                     onChange={(e) => setLine(i, { vatRate: Number(e.target.value) || 0 })}
+                    disabled={l.vatCategory !== 'S' && !selfAssesses(l.vatCategory)}
                     className={styles.num}
                   />
                 </td>
                 <td className={styles.right}>{formatDecimal(l.vat) ?? l.vat}</td>
+                <td>
+                  {selfAssesses(l.vatCategory) && (
+                    <div className={styles.selfAssessed}>
+                      <label className={styles.deductLabel}>
+                        <input
+                          type="checkbox"
+                          checked={l.vatDeductible}
+                          onChange={(e) => setLine(i, { vatDeductible: e.target.checked })}
+                        />
+                        {t('vat.deductible')}
+                      </label>
+                      <span className={styles.right}>{round2((Number(l.net) || 0) * l.vatRate / 100)}</span>
+                    </div>
+                  )}
+                </td>
                 <td>
                   {lines.length > 1 && (
                     <button type="button" className={styles.ghostBtn} onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>
