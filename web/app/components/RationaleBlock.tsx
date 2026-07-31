@@ -61,7 +61,22 @@ function humanizeSourceRefs(
     if (key === 'flags') continue; // surfaced as the "Needs review" chip
     if (raw === null || raw === undefined || raw === '') continue;
     if (/id$/i.test(key)) continue; // opaque UUIDs — not for humans
-    if (typeof raw === 'object') continue; // nested rule/period objects live in the payload
+    // Flatten one level so period/rule objects render as rows instead of vanishing: the ECSL
+    // card's sourceRefs is entirely object-valued, so it previously showed nothing at all.
+    // Arrays and deeper nesting stay dropped — a rows[] dump is not what this panel is for.
+    if (typeof raw === 'object') {
+      if (Array.isArray(raw)) continue;
+      for (const [subKey, subRaw] of Object.entries(raw as Record<string, unknown>)) {
+        if (subRaw === null || subRaw === undefined || subRaw === '') continue;
+        if (typeof subRaw === 'object') continue;
+        if (/id$/i.test(subKey)) continue;
+        rows.push({
+          label: `${humanizeLabel(key, t)} — ${humanizeLabel(subKey, t)}`,
+          value: String(subRaw),
+        });
+      }
+      continue;
+    }
     if (key === 'confidence' && typeof raw === 'number') {
       rows.push({ label: t('rat.confidence'), value: `${Math.round(raw * 100)}%` });
       continue;
