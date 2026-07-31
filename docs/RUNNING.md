@@ -133,7 +133,7 @@ the linked sandbox account(s) and a page of transactions.
 
 ---
 
-## 3. Deploying on Vercel (Neon + Vercel Blob)
+## 3. Deploying on Vercel (Neon + Vercel Blob) — the hosted option
 
 The `web/` Next.js app deploys to Vercel; the backend domain ships with it (route handlers run as
 **Node.js** serverless functions — `pg` needs the Node runtime, not Edge). This is the concrete,
@@ -268,6 +268,281 @@ Neon's free tier includes point-in-time-restore (PITR) with a limited retention 
 a pilot, but add a scheduled `pg_dump` (e.g. a cron hitting a small script, or a manual habit)
 against `ADMIN_DATABASE_URL` **before** real client data volume grows, since free-tier PITR history
 is short.
+
+---
+
+## 4. Deploying on a VPS (Hetzner + Docker Compose)
+
+Full design rationale: `docs/superpowers/specs/2026-07-31-hetzner-pilot-deployment-design.md`.
+This section is the concrete, copy-paste sequence that follows from it — **this is the
+primary path for the pilot**, not a fallback.
+
+### 4.1 Why this is the primary path
+
+Vercel's Hobby tier is contractually restricted to non-commercial personal use — its
+fair-use terms treat any deployment as commercial the moment anyone involved in building it
+is paid, which this app is on its face. Hobby's crons also run at most once a day with up to
+±59 minutes of jitter, which caps the job queue (`GET /api/cron/jobs-drain`, `drainOnce({
+limit: 20 })`) at roughly 20 jobs/day for dunning, recurring invoices, and chain reapers.
+Neon's free tier keeps only a 6-hour point-in-time-restore window. None of these are workable
+for a pilot holding real client books, so this deployment runs on a Hetzner VPS instead — see
+the design doc's §1.2 for the full accounting. §3 above remains the record of the Vercel path
+and stays viable as a **seeded-demo-only** URL; it must never hold real books.
+
+### 4.2 Provision
+
+- Create a **Hetzner CX22** (2 vCPU / 4 GB RAM / 40 GB disk / 20 TB traffic, €3.79/mo),
+  Nuremberg or Helsinki.
+- Harden SSH: key-only auth, a non-root sudo user, `ufw` allowing only 22/80/443.
+- Install Docker and clone the repo:
+
+```bash
+# on the box, as a sudo-capable user
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker "$USER"          # log out and back in for this to take effect
+sudo mkdir -p /opt/bookkeeping && sudo chown "$USER" /opt/bookkeeping
+git clone https://github.com/<owner>/<repo>.git /opt/bookkeeping
+cd /opt/bookkeeping
+```
+
+### 4.3 Configure
+
+`.env.example` mixes all three deployment targets (local, Vercel, VPS) in one file for
+reference — for the VPS, write only the VPS-relevant lines into `/opt/bookkeeping/.env`:
+
+```bash
+# /opt/bookkeeping/.env
+APP_IMAGE=ghcr.io/<owner>/<repo>:latest
+SITE_ADDRESS=books.example.lv
+POSTGRES_USER=bookkeeping_owner
+POSTGRES_PASSWORD=<generate>
+POSTGRES_DB=bookkeeping
+
+ADMIN_DATABASE_URL=postgres://bookkeeping_owner:<same password as POSTGRES_PASSWORD>@db:5432/bookkeeping
+DATABASE_URL=postgres://bookkeeping_app:app_pw@db:5432/bookkeeping
+WORKER_DATABASE_URL=postgres://bookkeeping_worker:worker_pw@db:5432/bookkeeping
+SUPERVISOR_DATABASE_URL=postgres://bookkeeping_supervisor:supervisor_pw@db:5432/bookkeeping
+```
+
+The host is the Compose service name `db`, not `localhost`/`127.0.0.1` — Postgres publishes
+no port to the host at all (`docker-compose.prod.yml`), so every connection string is
+container-local. The three app-role passwords (`app_pw`/`worker_pw`/`supervisor_pw`) are the
+defaults baked into `migrations/000_bootstrap.sql`, `039_jobs.sql`, and
+`041_supervisor_role.sql` — they exist here only so the very first migrate/up succeeds; §4.4
+overwrites all three before go-live. `GOCARDLESS_SECRET_ID`/`GOCARDLESS_SECRET_KEY`,
+`ANTHROPIC_API_KEY`, and `GEMINI_API_KEY` are optional, same meaning as in §3.3.
+
+```bash
+chmod 600 .env
+```
+
+**`DEV_ROUTES_ENABLED` and `BANKFEED_ALLOW_STUB` stay unset** — leave them out of `.env`
+entirely (both commented out in `.env.example`). §4.7's smoke checklist verifies this by
+hitting the routes, not by reading the file back.
+
+Root `package.json`'s `migrate`/`seed`/`provision-admin`/`worker` scripts run under
+`node --env-file-if-exists=.env` (not the old `--env-file=.env`). This matters here because
+none of the three CLI entrypoints run with a `/opt/bookkeeping/.env` file inside the
+*container* — Compose supplies every variable via its own `environment:` block, and the
+`.env` on the host is only ever read by `docker compose --env-file .env` on the host side, to
+fill in `${APP_IMAGE}`/`${DATABASE_URL}`/etc. inside `docker-compose.prod.yml`. With the old
+`--env-file=.env`, a missing file inside the container was a hard, fatal error
+(`node: .env: not found`) before Node ever looked at a single environment variable — which
+would have broken every one of these commands unconditionally, since `.env` is deliberately
+excluded from the image by `.dockerignore`. With `--env-file-if-exists`, a missing file
+degrades to an informational `.env not found. Continuing without it.` line and the process
+proceeds using whatever the container's real environment already has — verified directly
+(Tasks 4 and 5): `npm run migrate` with no `.env` present exits 0 given valid connection
+strings, and fails only on an actual connection error, never on the missing file itself.
+
+### 4.4 First deploy
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env pull
+```
+
+If the GHCR package is private, `docker login ghcr.io -u <owner> --password-stdin` first with
+a PAT that has `read:packages`.
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env up -d db
+docker compose -f docker-compose.prod.yml --env-file .env run --rm web npm run migrate
+```
+
+`npm run migrate` applies all 49 files under `migrations/` in filename order — 48 tracked
+rows land in `schema_migrations`, plus `000_bootstrap.sql`, which is idempotent and re-runs
+on every invocation by design (it creates the app roles if they don't already exist).
+
+Then rotate the three app-role passwords off the migration defaults:
+
+```bash
+./scripts/rotate-db-passwords.sh
+```
+
+It prints fresh `DATABASE_URL` / `WORKER_DATABASE_URL` / `SUPERVISOR_DATABASE_URL` lines —
+paste them into `.env`, replacing the `app_pw`/`worker_pw`/`supervisor_pw` placeholders from
+§4.3. (The script's own defaults — `COMPOSE_FILE=/opt/bookkeeping/docker-compose.prod.yml`,
+`ENV_FILE=/opt/bookkeeping/.env` — already match this layout, so no env overrides are needed
+when run from `/opt/bookkeeping`.)
+
+**To confirm a rotation actually took effect, never check it via `-h 127.0.0.1` from inside
+the `db` container.** Stock Postgres ships a `pg_hba.conf` with `local all all trust` and
+`host all all 127.0.0.1/32 trust` ahead of the `scram-sha-256` rule, so a loopback connection
+succeeds with any password — including one that was never valid — and "confirms" a rotation
+that never happened. `web` and `worker` never connect over loopback; they connect via the
+`db` hostname over the Compose network, which is the path that actually hits
+`scram-sha-256`. If you want to verify by hand, do it the same way they do, e.g. from a
+throwaway client on the same network:
+```bash
+docker run --rm --network <project>_default -e PGPASSWORD=<new password> postgres:16 \
+  psql -U bookkeeping_app -d bookkeeping -h db -p 5432 -c "select 1"
+```
+A failed old password and a working new one over this path are the only trustworthy proof.
+
+Then bring everything up on the rotated credentials:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env up -d --force-recreate
+```
+
+`caddy` has `depends_on: web` with no healthcheck, so it starts before `web`'s Next.js server
+is actually listening — expect a handful of transient 502s in the first few seconds after
+`up`. That is normal startup behaviour, not a failed deploy; give it under a minute and retry.
+
+### 4.5 First admin
+
+Same script and idempotency guarantee as §3.4 — `npm run provision-admin` creates (or
+re-invites) exactly one firm + `firm_admin` user and prints a single-use invite link:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env run --rm \
+  -e PROVISION_FIRM="My Firm" -e PROVISION_EMAIL="me@myfirm.lv" \
+  web npm run provision-admin
+```
+
+Open the printed `https://<your-domain>/invite/<token>` (72h TTL, single use — §3.4), set a
+password, and enrol TOTP before the account activates.
+
+### 4.6 Backups
+
+```bash
+sudo cp deploy/bookkeeping-backup.service deploy/bookkeeping-backup.timer /etc/systemd/system/
+sudo mkdir -p /backups
+```
+
+Write `/opt/bookkeeping/backup.env` (referenced by the service unit's
+`EnvironmentFile=`):
+
+```bash
+# /opt/bookkeeping/backup.env
+COMPOSE_FILE=/opt/bookkeeping/docker-compose.prod.yml
+ENV_FILE=/opt/bookkeeping/.env
+BACKUP_DIR=/backups
+RESTIC_REPOSITORY=s3:https://<account-id>.r2.cloudflarestorage.com/<bucket>
+RESTIC_PASSWORD=<generate — encrypts the offsite repo>
+AWS_ACCESS_KEY_ID=<R2 access key>
+AWS_SECRET_ACCESS_KEY=<R2 secret key>
+```
+
+**`RESTIC_REPOSITORY` is not optional — treat it as a required field, not a nice-to-have.**
+`scripts/backup.sh` prunes local dumps older than 8 days regardless of whether an offsite
+copy exists. If `RESTIC_REPOSITORY` is left unset (or the timer silently stops), backups look
+fine locally for over a week, then quietly age out, and a single disk failure on this one box
+is total, unrecoverable data loss. When it *is* unset, `backup.sh` does print
+`[backup] RESTIC_REPOSITORY unset — LOCAL ONLY, no offsite copy` — but to stderr, from a
+systemd oneshot unit that nobody watches interactively, which is exactly the kind of warning
+that goes unread. Do not go live without a working offsite repository. Note also that this
+restic/R2 configuration was not exercised by any task in this plan — Task 6 verified only the
+"local only" branch (`RESTIC_REPOSITORY` unset); confirm the exact env-var names against
+restic's own S3-compatible-backend documentation and prove one real offsite push-and-pull
+before relying on it.
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now bookkeeping-backup.timer
+```
+
+Runs nightly at 02:30 (`deploy/bookkeeping-backup.timer`, ±15 min jitter), on the host —
+deliberately not in a container, so it survives an application failure. The unit doesn't pin
+a timezone, so that's 02:30 in whatever timezone the box's clock is set to — check with
+`timedatectl` if it matters when the dump lands relative to daytime usage.
+
+**Run the restore drill before the accountant logs in, then quarterly:**
+
+```bash
+BACKUP_DIR=/backups ./scripts/restore-drill.sh
+```
+
+It restores the newest dump into a throwaway `postgres:16` container and asserts
+`journal_entries` has a non-zero row count — the ledger, which is the one table that proves
+the backup is both restorable and populated. (`einvoices` is deliberately *not* checked: the
+Peppol/VID stubs mean that table can legitimately stay empty for an extended stretch in real
+operation, and asserting on it would fail every drill regardless of backup soundness.) It
+honours a `READY_TIMEOUT_SECS` override (default 60s) if the throwaway container needs longer
+to come up on a slower box.
+
+The drill cannot verify one thing on its own: that the restored dump's schema is current with
+`migrations/`. Do that manually, once, alongside the drill: point a throwaway
+`ADMIN_DATABASE_URL` at the restored container and confirm `npm run migrate` applies nothing
+(an empty `Applied: []` — anything else means the dump predates a migration that's since
+landed).
+
+### 4.7 Smoke checklist
+
+Do this against the real, DNS-pointed domain, not `SITE_ADDRESS=localhost`. Every task in
+this plan tested Caddy with `SITE_ADDRESS=localhost`, which routes to Caddy's *internal* CA
+instead of Let's Encrypt — so ACME/TLS issuance against a real public hostname has never been
+exercised before this exact moment. This checklist **is** that first exercise, not a
+formality after the fact:
+
+- [ ] `GET https://<host>/api/health` → `{"ok":true}` (confirms TLS issuance succeeded, DNS
+      is correct, and `web` can reach `db`)
+- [ ] Log in as the provisioned admin: email + password + current TOTP code
+- [ ] Upload a document and confirm extraction runs (Stub unless an AI key is set)
+- [ ] Issue an invoice and confirm it posts and appears in the outbox
+- [ ] `GET /api/dev/bootstrap` → **403**, with `DEV_ROUTES_ENABLED` unset. Verify by hitting
+      the URL, not by reading `.env` back — this route migrates, seeds, and signs the caller
+      in as `accountant@demo.lv` with a known password, so a false negative here is
+      unrecoverable. (If `DEV_ROUTES_ENABLED` were ever set, the route redirects with
+      **307**, not 200 — it ends in `NextResponse.redirect`. 403 is the only answer that
+      belongs in production.)
+- [ ] Confirm the bank-feed provider refuses to auto-link with `BANKFEED_ALLOW_STUB` unset
+      and no GoCardless keys set — connecting a bank on `/bank` should fail, not silently
+      link a fake account into real books
+- [ ] The §3.5 Blob cache-bypass check does **not** apply here — `LocalBlobStore` has no CDN
+      in front of it, so there is no cache to bypass
+
+### 4.8 Deploy and roll back
+
+```bash
+# set APP_IMAGE in .env to the new tag first if pinning a specific sha rather than :latest
+docker compose -f docker-compose.prod.yml --env-file .env pull
+docker compose -f docker-compose.prod.yml --env-file .env run --rm web npm run migrate
+docker compose -f docker-compose.prod.yml --env-file .env up -d
+```
+
+Rollback is the same three commands with the previous tag in `APP_IMAGE`. Migrations are
+forward-only by design — the ledger is append-only, corrections are reversals — so rolling
+back application code never implies rolling back the schema.
+
+### 4.9 Known limitations
+
+Named so they stay visible rather than forgotten, not because they block this pilot:
+
+- **No observability** — no structured logging in `web/app`, no error tracking, no uptime
+  monitor. There is no platform to page; the restore drill in §4.6 is the main safety net.
+- **No disk encryption at rest** (payroll data includes `personas kods`).
+- **No GDPR data export/erasure workflow.** With one pilot client an Art. 15/17 request is
+  answerable by hand; document that in whatever is signed with the accountant.
+- **No audit-log tamper detection** (hash chain).
+- **No email delivery of any kind.** Invites and credential resets are copy-paste URLs
+  (§4.5); dunning creates internal tasks, not emails; there is no self-service password
+  reset — an admin re-invite resets credentials and 2FA.
+- **Peppol `AccessPoint` and VID `VidClient` remain stubs.** Latvia's B2B e-invoicing mandate
+  is **2028-01-01** (voluntary from 2026-03-30), so this is not a legal blocker for a B2B
+  pilot on its own. Mandatory e-invoice data reporting to VID for **B2G/G2G** has been in
+  force since **2026-01-01** — that blocks only clients who invoice budget institutions.
+  Confirm which of the accountant's clients do before onboarding them.
 
 ---
 
