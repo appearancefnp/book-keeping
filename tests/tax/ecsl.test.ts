@@ -66,9 +66,9 @@ test('groups intra-EU supplies by counterparty, country, and supply type', async
   const list = await withTenant(ctx(t), (tx) => ecSalesList(tx, ctx(t), period));
 
   expect(list.rows).toEqual([
-    { countryCode: 'EE', vatNo: 'EE101010101', supplyType: 'goods', netCents: '70000', invoiceCount: 2 },
-    { countryCode: 'EE', vatNo: 'EE101010101', supplyType: 'services', netCents: '30000', invoiceCount: 1 },
-    { countryCode: 'LT', vatNo: 'LT100001', supplyType: 'goods', netCents: '40000', invoiceCount: 1 },
+    { countryCode: 'EE', vatNo: 'EE101010101', supplyType: 'goods', netCents: '70000', documentCount: 2 },
+    { countryCode: 'EE', vatNo: 'EE101010101', supplyType: 'services', netCents: '30000', documentCount: 1 },
+    { countryCode: 'LT', vatNo: 'LT100001', supplyType: 'goods', netCents: '40000', documentCount: 1 },
   ]);
   expect(list.totalNetCents).toBe('140000');   // the domestic line is excluded
   expect(list.issues).toEqual([]);
@@ -98,14 +98,91 @@ test('an outbound credit note against an intra-EU invoice nets against the same 
 
   const list = await withTenant(ctx(t), (tx) => ecSalesList(tx, ctx(t), period));
 
-  // Net: 500 + 300 - 200 = 600 -> 60000 cents. Invoice count: 2 invoices - 1 credit note = 1,
-  // the same sign treatment applied to both the amount and the document count.
+  // Net: 500 + 300 - 200 = 600 -> 60000 cents. Document count: 2 invoices + 1 credit note = 3
+  // (never netted the way the amount is — see EcslRow.documentCount).
   expect(list.rows).toEqual([
-    { countryCode: 'EE', vatNo: 'EE101010101', supplyType: 'goods', netCents: '60000', invoiceCount: 1 },
+    { countryCode: 'EE', vatNo: 'EE101010101', supplyType: 'goods', netCents: '60000', documentCount: 3 },
   ]);
   expect(list.totalNetCents).toBe('60000');
   expect(list.issues).toEqual([]);
 });
+
+test('a credit note whose original invoice falls outside the period nets negative with a positive document count', async () => {
+  const t = await makeFirmAndClient();
+  const p = await seed(t);
+  // The original invoice is issued and reported in an EARLIER period (May), outside the
+  // June `period` under test here. A credit note against it landing in June is entirely
+  // routine — the row for June should show only the credit note's effect: a negative net
+  // and a document count of 1 (one contributing document), never a negative count.
+  await withTenant(ctx(t), (tx) => openPeriod(tx, ctx(t), { year: 2026, month: 5 }));
+  await withTenant(ctx(t), (tx) => sendInvoice(tx, ctx(t), {
+    invoice: { ...inv('E-20', [{ description: 'Goods', net: '500.00', vatRate: 0, vat: '0.00', vatCategory: 'K' }], '500.00', '0.00', '500.00'), issueDate: '2026-05-15' },
+    recipientPeppolId: '0088:x', ap: new StubAccessPoint(), ...salesAccounts, customerPartyId: p.ee,
+  }));
+  const cn: ECreditNote = {
+    invoiceNumber: 'CN-20', issueDate: '2026-06-10', currency: 'EUR', correctedInvoiceNumber: 'E-20',
+    supplier: { name: 'SIA A', regNo: '40100000000', vatNo: 'LV40100000000' },
+    customer: { name: 'C', regNo: '11111111', vatNo: 'EE101010101' },
+    lines: [{ description: 'Return', net: '150.00', vatRate: 0, vat: '0.00', vatCategory: 'K' }],
+    netTotal: '150.00', vatTotal: '0.00', grandTotal: '150.00',
+  };
+  await withTenant(ctx(t), (tx) => sendCreditNote(tx, ctx(t), {
+    creditNote: cn, recipientPeppolId: '0088:x', ap: new StubAccessPoint(), ...salesAccounts,
+  }));
+
+  // Query only the June period: the May invoice is out of range, so the doc CTE never
+  // produces a row for it, but the credit note's counterparty is still resolved through
+  // corrected_invoice_number back to E-20 regardless of E-20's own issue_date.
+  const list = await withTenant(ctx(t), (tx) => ecSalesList(tx, ctx(t), period));
+
+  expect(list.rows).toEqual([
+    { countryCode: 'EE', vatNo: 'EE101010101', supplyType: 'goods', netCents: '-15000', documentCount: 1 },
+  ]);
+  expect(list.rows[0]!.documentCount).toBeGreaterThan(0);
+  expect(list.totalNetCents).toBe('-15000');
+});
+
+test(
+  'a credit note against a duplicated invoice number is subtracted exactly once',
+  async () => {
+    const t = await makeFirmAndClient();
+    const p = await seed(t);
+
+    // (client_company_id, invoice_number) has no unique constraint in the schema
+    // (migrations/015_einvoices.sql, 032_credit_notes.sql) and sendInvoice never checks for
+    // an existing number before inserting, so two outbound invoices CAN legitimately share a
+    // number through the normal application path — no raw SQL trickery needed to produce
+    // the duplicate. Both carry vat_category 'K' so both are on the EC Sales List; the
+    // credit note references the shared number 'DUP-1' and must resolve to exactly ONE of
+    // them, not fan out and get counted twice.
+    await issue(t, inv('DUP-1', [{ description: 'Goods', net: '500.00', vatRate: 0, vat: '0.00', vatCategory: 'K' }], '500.00', '0.00', '500.00'), p.ee);
+    await issue(t, inv('DUP-1', [{ description: 'Goods', net: '300.00', vatRate: 0, vat: '0.00', vatCategory: 'K' }], '300.00', '0.00', '300.00'), p.ee);
+
+    const cn: ECreditNote = {
+      invoiceNumber: 'CN-DUP', issueDate: '2026-06-16', currency: 'EUR', correctedInvoiceNumber: 'DUP-1',
+      supplier: { name: 'SIA A', regNo: '40100000000', vatNo: 'LV40100000000' },
+      customer: { name: 'C', regNo: '11111111', vatNo: 'EE101010101' },
+      lines: [{ description: 'Return', net: '100.00', vatRate: 0, vat: '0.00', vatCategory: 'K' }],
+      netTotal: '100.00', vatTotal: '0.00', grandTotal: '100.00',
+    };
+    await withTenant(ctx(t), (tx) => sendCreditNote(tx, ctx(t), {
+      creditNote: cn, recipientPeppolId: '0088:x', ap: new StubAccessPoint(), ...salesAccounts,
+    }));
+
+    const list = await withTenant(ctx(t), (tx) => ecSalesList(tx, ctx(t), period));
+
+    // If the credit note fanned out across both DUP-1 matches, the plain JOIN would produce
+    // two rows for the SAME credit-note line (one per orig match), so netCents would apply
+    // the 100.00 subtraction twice: 500 + 300 - 100 - 100 = 600 -> 60000. documentCount would
+    // NOT expose the bug (both fanned rows share the credit note's own docId, so the Set
+    // still counts it once) — netCents is the assertion that actually catches the fan-out.
+    // Subtracted exactly once (the fix) gives 500 + 300 - 100 = 700 -> 70000.
+    expect(list.rows).toEqual([
+      { countryCode: 'EE', vatNo: 'EE101010101', supplyType: 'goods', netCents: '70000', documentCount: 3 },
+    ]);
+    expect(list.totalNetCents).toBe('70000');
+  },
+);
 
 test('an intra-EU supply to a party with no VAT number becomes an issue, not a silent drop', async () => {
   const t = await makeFirmAndClient();

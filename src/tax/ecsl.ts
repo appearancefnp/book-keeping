@@ -7,7 +7,14 @@ export interface EcslRow {
   countryCode: string; vatNo: string;
   supplyType: 'goods' | 'services';
   netCents: string;
-  invoiceCount: number;
+  /**
+   * Count of contributing documents (invoices AND credit notes alike), never negative — the
+   * sign of a correction lives on netCents, not here. A credit note issued in a later period
+   * than the invoice it corrects is routine, so this must never be re-derived as invoices
+   * minus credit notes: that reads "-1 invoices" in the UI, which looks like a bug. It is
+   * also not a statutory PVN 2 field; only the net amount is.
+   */
+  documentCount: number;
 }
 
 export interface EcSalesList {
@@ -37,9 +44,11 @@ export interface EcSalesList {
  * Credit notes are stored with POSITIVE net (same convention as bill/vendor-credit-note
  * lines — see vatBreakdown in vat-breakdown.ts) but their ledger posting REVERSES the
  * original sale. An EC Sales List reports the net value of supplies for the period, so a
- * credit note against an intra-EU supply genuinely reduces the reported figure — both the
- * summed net AND the invoice count get the same sign treatment (invoices count +1, credit
- * notes count -1), otherwise a corrected supply would over-report on both axes.
+ * credit note against an intra-EU supply genuinely reduces the reported figure — the
+ * summed net is signed accordingly. documentCount is NOT netted the same way: it is a
+ * plain count of contributing documents (invoices plus credit notes), because a credit
+ * note issued in a later period than the invoice it corrects is routine and would
+ * otherwise make the count negative — see EcslRow.documentCount.
  */
 export async function ecSalesList(
   tx: PoolClient, ctx: TenantContext, period: { fromDate: string; toDate: string },
@@ -49,11 +58,23 @@ export async function ecSalesList(
        SELECT e.id, e.doc_type, e.invoice_number,
               COALESCE(e.customer_party_id, orig.customer_party_id) AS customer_party_id
        FROM einvoices e
-       LEFT JOIN einvoices orig
-         ON orig.client_company_id = e.client_company_id
-        AND orig.direction = 'outbound'
-        AND orig.doc_type = 'invoice'
-        AND orig.invoice_number = e.corrected_invoice_number
+       LEFT JOIN LATERAL (
+         SELECT o.customer_party_id
+         FROM einvoices o
+         WHERE o.client_company_id = e.client_company_id
+           AND o.direction = 'outbound'
+           AND o.doc_type = 'invoice'
+           AND o.invoice_number = e.corrected_invoice_number
+         -- (client_company_id, invoice_number) has no unique constraint anywhere — not in
+         -- migrations/015_einvoices.sql or 032_credit_notes.sql, and sendInvoice
+         -- (src/einvoice/outbound.ts) never checks for an existing number before inserting —
+         -- so more than one outbound invoice could in principle share a number. A plain JOIN
+         -- would then fan out and count the credit note's lines once per match, double- (or
+         -- triple-) counting money on a statutory filing. ORDER BY + LIMIT 1 makes the
+         -- resolution deterministic (oldest match wins) rather than silently arbitrary.
+         ORDER BY o.created_at, o.id
+         LIMIT 1
+       ) orig ON true
        WHERE e.client_company_id = $1
          AND e.direction = 'outbound'
          AND e.issue_date BETWEEN $2 AND $3
@@ -89,8 +110,9 @@ export async function ecSalesList(
     if (!r.vatNo || !r.countryCode) {
       if (!seenIssues.has(r.invoiceNumber)) {
         seenIssues.add(r.invoiceNumber);
+        const label = r.docType === 'credit_note' ? 'Credit note' : 'Invoice';
         issues.push(
-          `Invoice ${r.invoiceNumber}: intra-EU supply to ${r.partyName ?? 'an unlinked customer'} has no counterparty VAT number — it cannot be reported on the EC Sales List`,
+          `${label} ${r.invoiceNumber}: intra-EU supply to ${r.partyName ?? 'an unlinked customer'} has no counterparty VAT number — it cannot be reported on the EC Sales List`,
         );
       }
       continue;
@@ -114,7 +136,8 @@ export async function ecSalesList(
     .map((g) => ({
       countryCode: g.countryCode, vatNo: g.vatNo, supplyType: g.supplyType,
       netCents: g.netCents.toString(),
-      invoiceCount: g.invoiceIds.size - g.creditNoteIds.size,
+      // Contributing documents, invoices and credit notes alike — see EcslRow.documentCount.
+      documentCount: g.invoiceIds.size + g.creditNoteIds.size,
     }));
 
   const totalNetCents = rows.reduce((a, r) => a + BigInt(r.netCents), 0n).toString();
