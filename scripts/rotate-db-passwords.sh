@@ -21,8 +21,12 @@ gen() { LC_ALL=C head -c 32 < <(tr -dc 'A-Za-z0-9' < /dev/urandom); }
 echo "# Paste these into $ENV_FILE, then: docker compose ... up -d --force-recreate"
 for role in app worker supervisor; do
   pw="$(gen)"
-  compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 \
-    -c "ALTER ROLE bookkeeping_$role PASSWORD '$pw';" >/dev/null
+  # Piped via stdin rather than `psql -c`, so the plaintext password never
+  # appears as a command-line argument (visible via `ps`/`docker top` to
+  # anything sharing the host's or container's process namespace).
+  compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 >/dev/null <<SQL
+ALTER ROLE bookkeeping_$role PASSWORD '$pw';
+SQL
   case "$role" in
     app)        var=DATABASE_URL ;;
     worker)     var=WORKER_DATABASE_URL ;;
