@@ -8,6 +8,7 @@ import type { TenantContext } from '@domain/tenancy/context.js';
 import { withTenant } from '@domain/db/pool.js';
 import { assembleVatDeclaration } from '@domain/tax/vat-declaration.js';
 import { createVatDeclarationProposal } from '@domain/tax/vat-proposal.js';
+import { findFilingProposal } from '@domain/tax/filing-lookup.js';
 import { getVatSettings } from '@domain/tax/vat-settings.js';
 import { filingPeriodByLabel, currentFilingPeriod, type FilingPeriod } from '@domain/tax/filing-periods.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
@@ -41,14 +42,17 @@ export async function GET(req: NextRequest) {
 
   try {
     const ctx = await resolveTenantContext(token, clientCompanyId, nowUnix());
-    const { period, declaration } = await withTenant(ctx, async (tx) => {
+    const { period, declaration, filing } = await withTenant(ctx, async (tx) => {
       const period = await resolvePeriod(tx, ctx, label);
       const declaration = await assembleVatDeclaration(tx, ctx, {
         fromDate: period.fromDate, toDate: period.toDate, config: VAT_CONFIG,
       });
-      return { period, declaration };
+      const filing = await findFilingProposal(tx, ctx, {
+        type: 'declaration', fromDate: period.fromDate, toDate: period.toDate,
+      });
+      return { period, declaration, filing };
     });
-    return NextResponse.json({ period, declaration }, { status: 200 });
+    return NextResponse.json({ period, declaration, filing }, { status: 200 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: errorToStatus(msg) });

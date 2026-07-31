@@ -8,6 +8,7 @@ import type { TenantContext } from '@domain/tenancy/context.js';
 import { withTenant } from '@domain/db/pool.js';
 import { ecSalesList } from '@domain/tax/ecsl.js';
 import { createEcslProposal } from '@domain/tax/ecsl-proposal.js';
+import { findFilingProposal } from '@domain/tax/filing-lookup.js';
 import { getVatSettings } from '@domain/tax/vat-settings.js';
 import { filingPeriodByLabel, currentFilingPeriod, type FilingPeriod } from '@domain/tax/filing-periods.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
@@ -34,12 +35,15 @@ export async function GET(req: NextRequest) {
 
   try {
     const ctx = await resolveTenantContext(token, clientCompanyId, nowUnix());
-    const { period, list } = await withTenant(ctx, async (tx) => {
+    const { period, list, filing } = await withTenant(ctx, async (tx) => {
       const period = await resolvePeriod(tx, ctx, label);
       const list = await ecSalesList(tx, ctx, { fromDate: period.fromDate, toDate: period.toDate });
-      return { period, list };
+      const filing = await findFilingProposal(tx, ctx, {
+        type: 'ecsl', fromDate: period.fromDate, toDate: period.toDate,
+      });
+      return { period, list, filing };
     });
-    return NextResponse.json({ period, list }, { status: 200 });
+    return NextResponse.json({ period, list, filing }, { status: 200 });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: errorToStatus(msg) });
