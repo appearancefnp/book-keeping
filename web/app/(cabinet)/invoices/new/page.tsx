@@ -288,10 +288,12 @@ function ComposerInner() {
                   <span>{t('einv.peppolId')}</span>
                   <input value={peppolId} onChange={(e) => setPeppolId(e.target.value)} required />
                 </label>
-                <label className={styles.field}>
-                  <span>{t('inv.dueDate')}</span>
-                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-                </label>
+                {docType !== 'recurring' && (
+                  <label className={styles.field}>
+                    <span>{t('inv.dueDate')}</span>
+                    <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                  </label>
+                )}
                 <label className={styles.field}>
                   <span>{t('inv.paymentTerms')}</span>
                   <input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} />
