@@ -494,8 +494,8 @@ test('groups intra-EU supplies by counterparty, country, and supply type', async
   const t = await makeFirmAndClient();
   const p = await seed(t);
   await issue(t, inv('E-1', [
-    { description: 'Goods', net: '500.00', vatRate: 21, vat: '0.00', vatCategory: 'K' },
-    { description: 'Service', net: '300.00', vatRate: 21, vat: '0.00', vatCategory: 'AE' },
+    { description: 'Goods', net: '500.00', vatRate: 0, vat: '0.00', vatCategory: 'K' },
+    { description: 'Service', net: '300.00', vatRate: 0, vat: '0.00', vatCategory: 'AE' },
     { description: 'Domestic', net: '100.00', vatRate: 21, vat: '21.00', vatCategory: 'S' },
   ], '900.00', '21.00', '921.00'), p.ee);
   await issue(t, inv('E-2', [
@@ -1171,7 +1171,7 @@ Read how it creates its existing customers and invoices.
 
 - [ ] **Step 2: Add one intra-EU customer and supply**
 
-Add a customer with `countryCode: 'EE'`, `vatNo: 'EE101010101'`, and issue one invoice to them with a single `K` line (net 1500.00, `vatRate: 21`, `vat: '0.00'`) dated inside the seeded demo period, plus one vendor bill from an EE vendor with an `AE` line (net 800.00, rate 21, vat 0.00) so the reverse-charge posting and the ECSL both have data. Set the client's `vat_no` via `setVatSettings` so the PVN 2 XML has a declarant.
+Add a customer with `countryCode: 'EE'`, `vatNo: 'EE101010101'`, and issue one invoice to them with a single `K` line (net 1500.00, `vatRate: 0` (sales side: BR-IC-5 forbids stating a rate), `vat: '0.00'`) dated inside the seeded demo period, plus one vendor bill from an EE vendor with an `AE` line (net 800.00, rate 21, vat 0.00) so the reverse-charge posting and the ECSL both have data. Set the client's `vat_no` via `setVatSettings` so the PVN 2 XML has a declarant.
 
 - [ ] **Step 3: Re-seed and verify end to end**
 
