@@ -29,7 +29,9 @@ export type Operation =
   | 'dunning.run' // trigger a dunning run
   | 'expenses.write' // create/edit/submit/delete own (or, firm-side, any) expense claim
   | 'expenses.reimburse' // settle a claim / build a reimbursement payment order — firm-side only
-  | 'expenses.settings.write'; // set the client's mileage rate — firm-side only
+  | 'expenses.settings.write' // set the client's mileage rate — firm-side only
+  | 'filings.prepare' // prepare a VAT return / EC Sales List for approval — firm-side only
+  | 'vat.settings.write'; // set the client's VAT number + filing periodicity — firm-side only
 
 /**
  * Which roles may perform each mutating operation.
@@ -62,6 +64,8 @@ const OPERATION_ROLES: Record<Operation, readonly UserRole[]> = {
   'expenses.write': ['firm_admin', 'accountant', 'owner', 'employee'],
   'expenses.reimburse': ['firm_admin', 'accountant'],
   'expenses.settings.write': ['firm_admin', 'accountant'],
+  'filings.prepare': ['firm_admin', 'accountant'],
+  'vat.settings.write': ['firm_admin', 'accountant'],
 };
 
 /** True if `role` is permitted to perform `op`. Unrecognised roles are denied. */
