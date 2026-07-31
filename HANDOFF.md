@@ -115,11 +115,17 @@ trilingual (LV/RU/EN), responsive, and accessible.
 >   **timing-safe on both cron routes** (closes pre-cutover item 3's first cosmetic above).
 > - AR-aging export parity — CSV/Excel/PDF for the `/reports` AR-aging tab, matching the
 >   other six report tabs (`src/reports/tabular.ts` + `GET /api/reports/export`).
-> Full suite: **559 tests**. Still open: **C-recurring** (recurring/subscription invoices —
-> the job-queue scheduler gate is now resolved; see
+> Full suite: **559 tests**. **C-recurring's backend shipped in this same merge**
+> (`src/recurring/`: migrations **043** (templates table) + **044** (reaper grants), cadence schedule
+> helpers, template CRUD, `generateDueRecurring`, the `recurring_generate` job handler +
+> reaper, `/api/recurring` + `/api/recurring/[id]` routes, six test files) — the scheduler
+> gate tracked in
 > `docs/superpowers/handoffs/2026-07-14-c-infra-shipped-next-c-recurring.md` and
-> `docs/superpowers/handoffs/2026-07-14-slice-c-recurring-invoices.md`), **slice D**
-> (quotes→invoice, customer statements), and the per-client account-mapping settings screen
+> `docs/superpowers/handoffs/2026-07-14-slice-c-recurring-invoices.md` is resolved and the
+> feature itself is not merely gated, it is built. What was still open at this point —
+> approving a `recurring_invoice` proposal actually issuing the invoice, and UI to see/manage
+> templates — was closed 2026-07-31 (see that entry below). Still open: **slice D**
+> (quotes→invoice, customer statements) and the per-client account-mapping settings screen
 > debt (unchanged, see §M2 follow-ups above). Known follow-up (final-review, 2026-07-20):
 > `/api/cron/jobs-drain` drains at most 20 jobs per daily tick (`drainOnce` called once,
 > `limit: 20`) — fine at hobby scale, but loop reap+drain under a time budget before
@@ -300,6 +306,64 @@ trilingual (LV/RU/EN), responsive, and accessible.
 >    export path (`vatReturnTable` feeding `GET /api/reports/export`) still emits the raw enum
 >    value — it would need per-category labels plumbed into `ReportLabels`. Left alone in this
 >    wave (export/report-label plumbing is a separate change, not a UI fix); follow-up.
+>
+> **Headless gaps (recurring-invoice approval + filings UI) — shipped 2026-07-31.** Closes a
+> real correctness bug plus the two known-debt items above that left shipped UI unreachable.
+> `approveHandler` (`src/api/handlers.ts`) previously had no case for a `recurring_invoice`
+> proposal, so it fell through to the `declaration`/`ecsl`/`task` terminal branch and returned
+> `{ entryId: null }` — approving looked like it worked, but no invoice was ever issued, while
+> `generateDueRecurring` had already called `advanceSchedule` and committed the template's next
+> run date in the same transaction that created the proposal. The occurrence was gone: the
+> schedule had moved on, so there was nothing left to regenerate it from, and nothing surfaced
+> the loss to the accountant. This was not an edge case — `resolveAutonomy` is default-closed,
+> so "no autonomy policy row" (the state of every client until one is configured) routes every
+> recurring template through the approval branch, making the silent-drop the *default* path,
+> not a corner one. Fixed by `postApprovedRecurringInvoice` (`src/recurring/post-approved.ts`):
+> validates the proposal is `type === 'recurring_invoice'` and `status === 'approved'`, calls
+> `sendInvoice` with the held UBL `EInvoice` payload, and updates the proposal to `posted` with
+> `resolved_entry_id` — dispatched from `approveHandler` alongside the existing `posting` and
+> `bank_match` cases. A throw here rolls the approval back in the same transaction (mirroring
+> `postApprovedPosting`/`postApprovedBankMatch`), so a failure leaves the proposal
+> `pending_approval` and retryable rather than approved-but-unissued. Along the way,
+> `sendInvoice`'s three call sites (composer issue, credit-note issue, this one) each
+> constructed their own `StubAccessPoint` and repeated the `2310`/`6110`/`5721` account triple;
+> both are now single seams — `getAccessPoint()` (`src/einvoice/access-point-factory.ts`, a
+> lazily-constructed singleton, same pattern as `makeBlobStore()`) and
+> `outboundInvoiceAccounts()` (`src/einvoice/accounts.ts`, env-overridable, same stopgap as the
+> bills/pay-run account constants) — one place to swap in a real Access Point (`HANDOFF.md` #1)
+> or point at different account codes, instead of three. UI: a **Recurring tab on `/invoices`**
+> listing templates (cadence, next-run date, Active/Paused, pause action) alongside the
+> existing Outbox tab, and a **third composer mode** (`/invoices/new` document type
+> "Recurring") that swaps the invoice-number/issue-date fields for cadence fields and surfaces
+> "held in the approval queue" when no autonomy policy is seeded — plus a `formatDecimal` fix
+> found along the way. Separately, **M9 known-debt item 2 is now closed**: `findFilingProposal`
+> (`src/tax/filing-lookup.ts`) reads a filing's prepared/approved status back from
+> `rationale.sourceRefs.period` so `/filings` survives a reload instead of only knowing about a
+> filing it just POSTed; `GET /api/filings/[id]` (`?download=1`) streams the stored XML as an
+> attachment; and `RationaleBlock` (`web/app/components/RationaleBlock.tsx`)'s
+> `humanizeSourceRefs` now flattens one level of object-valued `sourceRefs` entries instead of
+> skipping them outright, fixing both the ECSL card's and the VAT declaration card's
+> previously-empty Sources section (the underlying data was always there; only the renderer
+> dropped it). Verified: full suite **763 tests / 174 files, all passing**, both typechecks
+> clean, web build clean, and — unlike the previous wave, whose walk was deferred and never
+> done (M9 known-debt item 8) — an **interactive browser walk was actually performed**, covering
+> both new surfaces end to end: the `/invoices` Recurring tab (empty state → template listed →
+> pause), the composer's Recurring mode (per-document fields hidden, cadence fields shown,
+> approval-queue autonomy note correct), and `/filings` (prepare → indicator + Download XML →
+> **survives a reload** → XML downloads as real `application/xml`), plus the ECSL and VAT
+> declaration queue cards now rendering a populated Sources section. One caveat recorded rather
+> than glossed: Playwright's synthetic `browser_click` would not fire React `onClick` handlers
+> in that session, so clicks were driven via `el.click()`, and the native `confirm()` on Pause
+> was accepted by stubbing `window.confirm` after separately observing the real dialog's text —
+> verified-by-workaround, not a literal tool-mediated accept. No console errors or failed
+> network requests were seen anywhere in the walk. Known debt this wave
+> does **not** close: reject-skips-the-period is deliberate, not an oversight — rolling a
+> template's schedule back on reject would just re-offer the same occurrence next run and
+> re-bill it forever, so a rejected occurrence is skipped rather than retried, and the next
+> occurrence proceeds on schedule; the per-client account-mapping settings screen is still
+> absent (`getAccessPoint()`/`outboundInvoiceAccounts()` extend the existing env-var stopgap,
+> same bucket as §M2 follow-ups, rather than resolving it); and M9 known-debt items 1, 3, 4, 5,
+> 6, 7, 9, 10, and 11 above all still stand as written.
 >
 > **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`,
 > since merged to `main`; full backend suite **333/333**, root+web typecheck clean, web
