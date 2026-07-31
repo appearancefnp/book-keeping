@@ -76,9 +76,12 @@ Go to **`http://localhost:3000/login`** and enter:
 
 2FA is mandatory. If the printed code expires before you log in, re-run `npm run seed` (it prints a fresh code) or add the `otpauth://` URI to an authenticator app (e.g. Google Authenticator, Aegis) and use that going forward.
 
-Alternatively, hit **`http://localhost:3000/api/dev/bootstrap`** once — a dev-only route that
-migrates, seeds a minimal dataset, signs you in automatically, and redirects to `/`. Handy for
-quick iteration; skip this in production.
+Alternatively, set `DEV_ROUTES_ENABLED=1` in `web/.env.local` and hit
+**`http://localhost:3000/api/dev/bootstrap`** once — a dev-only route that migrates, seeds a
+minimal dataset, signs you in automatically, and redirects to `/`. The route is a positive
+opt-in and 403s without that flag (`src/dev/guard.ts`), because it is unauthenticated and
+signs the caller in as a demo user. Handy for quick iteration; leave the flag unset in
+production.
 
 ### Cabinet navigation
 
@@ -122,7 +125,7 @@ project — see §3.3):
 
 | Env var | Effect |
 |---|---|
-| `GOCARDLESS_SECRET_ID` / `GOCARDLESS_SECRET_KEY` | GoCardless Bank Account Data API credentials; both must be set to use the real provider (`src/bankfeed/factory.ts`) — absent ⇒ falls back to the keyless stub provider |
+| `GOCARDLESS_SECRET_ID` / `GOCARDLESS_SECRET_KEY` | GoCardless Bank Account Data API credentials; both must be set to use the real provider (`src/bankfeed/factory.ts`) — absent ⇒ falls back to the keyless stub provider *outside* production. With `NODE_ENV === 'production'` and no keys, the factory throws instead of falling back, unless `BANKFEED_ALLOW_STUB=1` is set explicitly (`src/bankfeed/stub-allowed.ts`) — the stub auto-links a fake account, which must never happen against real books. |
 | `CRON_SECRET` | Bearer token for `GET /api/cron/bank-sync`. The operator chooses a value and sets it as a project environment variable in Vercel (and locally when testing); Vercel then automatically attaches it as `Authorization: Bearer <CRON_SECRET>` on requests to cron routes. The route fails closed (always 401) when unset. |
 
 To exercise the real GoCardless sandbox end-to-end outside the test suite, run
@@ -166,7 +169,7 @@ DATABASE_URL="postgres://<owner>:<pw>@<pooled-host>/<db>?sslmode=require" \
 npm run migrate
 ```
 
-`npm run migrate` is idempotent (`node --env-file=.env --import tsx src/db/migrate.ts`,
+`npm run migrate` is idempotent (`node --env-file-if-exists=.env --import tsx src/db/migrate.ts`,
 `package.json`) — safe to re-run after every subsequent deploy that adds migrations.
 
 ### 3.3 Create the Vercel project
@@ -186,7 +189,7 @@ npm run migrate
    | `SUPERVISOR_DATABASE_URL` | Neon **pooled** string + `?sslmode=require`, connecting as `bookkeeping_supervisor` (role created by migration `041`). Also required by `GET /api/cron/jobs-drain` (`supervisorPool`) for the reap step. |
    | `BLOB_READ_WRITE_TOKEN` | from the Blob store (auto-set if linked) — enables `VercelBlobStore` (`src/blob/factory.ts` picks it over `LocalBlobStore` whenever this var is present) |
    | `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` | real AI extraction/assistant. Gemini's free tier is **not zero-retention** — don't feed real client documents through it until you're on a paid/zero-retention tier or have switched to `ANTHROPIC_API_KEY` (it takes precedence when both are set). Ollama is local-only; it does not run on Vercel. |
-   | `GOCARDLESS_SECRET_ID` / `GOCARDLESS_SECRET_KEY` | real GoCardless Bank Account Data provider for `/bank` feeds; leave unset to keep the keyless stub provider (auto-links a fake account, fine for a demo deployment) |
+   | `GOCARDLESS_SECRET_ID` / `GOCARDLESS_SECRET_KEY` | real GoCardless Bank Account Data provider for `/bank` feeds. Leaving both unset on a **Production** Vercel deployment (where `NODE_ENV === 'production'`) now makes `makeBankFeedProvider()` throw rather than silently auto-link a fake account — set `BANKFEED_ALLOW_STUB=1` too if this is deliberately a seeded-demo deployment, never for real books |
    | `CRON_SECRET` | required once `web/vercel.json`'s crons are live. The operator chooses a value and sets it as a project environment variable in Vercel; Vercel automatically attaches it as `Authorization: Bearer <CRON_SECRET>` on cron-triggered requests to `GET /api/cron/bank-sync` and `GET /api/cron/jobs-drain` (both checked via the shared `cronAuthorized` helper, `web/app/lib/cron-auth.ts`, timing-safe). Unset ⇒ cron requests fail 401. |
 
    Full var reference: `.env.example` (repo root) — it documents the Neon pooled/direct split and
@@ -201,10 +204,11 @@ npm run migrate
      (non-Vercel) deployments that don't want a cron-triggered HTTP endpoint can run that loop
      instead and skip `WORKER_DATABASE_URL`/`SUPERVISOR_DATABASE_URL` provisioning here (the worker
      process picks up the same env vars from its own environment).
-4. Deploy. `/api/dev/bootstrap` is dead in this environment on purpose — it self-guards on
-   `NODE_ENV === 'production' || process.env.VERCEL_ENV` (`web/app/api/dev/bootstrap/route.ts`),
-   and Vercel always sets `VERCEL_ENV`, so it 403s on every Vercel deployment, preview or
-   production.
+4. Deploy. `/api/dev/bootstrap` is dead in this environment on purpose — `devBootstrapAllowed`
+   (`src/dev/guard.ts`) requires the positive opt-in `DEV_ROUTES_ENABLED=1` first, then vetoes
+   if `NODE_ENV === 'production'` or `VERCEL_ENV` is set. Nobody sets `DEV_ROUTES_ENABLED` on
+   Vercel, and Vercel always sets `VERCEL_ENV` regardless, so it 403s on every Vercel
+   deployment, preview or production, for two independent reasons.
 
 Security posture that ships without any extra config: `web/next.config.ts` sends
 `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and
@@ -259,8 +263,9 @@ Run through all of these against the live deployment before calling it launched:
       exercises `VercelBlobStore.get`'s `useCache: false` read (`src/blob/vercel-blob-store.ts`),
       which exists precisely because the logo key is overwritten in place
       (`allowOverwrite: true`) rather than given a fresh key per upload.
-- [ ] Confirm `/api/dev/bootstrap` returns 403 on the deployed URL (it should — `VERCEL_ENV` is
-      always set on Vercel).
+- [ ] Confirm `/api/dev/bootstrap` returns 403 on the deployed URL (it should — the route
+      requires the positive opt-in `DEV_ROUTES_ENABLED=1`, which nobody sets on Vercel, and
+      `VERCEL_ENV` is always set there too, so both independent guards hold).
 
 ### 3.6 Backups
 
@@ -462,7 +467,8 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now bookkeeping-backup.timer
 ```
 
-Runs nightly at 02:30 (`deploy/bookkeeping-backup.timer`, ±15 min jitter), on the host —
+Runs nightly at 02:30, up to 15 minutes late (`deploy/bookkeeping-backup.timer`,
+`RandomizedDelaySec=15m` only delays a run, never moves it earlier), on the host —
 deliberately not in a container, so it survives an application failure. The unit doesn't pin
 a timezone, so that's 02:30 in whatever timezone the box's clock is set to — check with
 `timedatectl` if it matters when the dump lands relative to daytime usage.

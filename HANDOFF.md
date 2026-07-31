@@ -79,9 +79,13 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > 3. Cosmetics that ride: no confirmation on connection Remove, misleading success toast when
 >    a manual sync finds the consent expired, raw provider error text untranslated in
 >    `last_error`.
-> 4. With GoCardless keys unset in production the stub will "connect" a demo bank and import
->    demo transactions into real books — the real-key cutover must remove stub-imported rows
->    via the normal reversal flow.
+> 4. ~~With GoCardless keys unset in production the stub will "connect" a demo bank and
+>    import demo transactions into real books — the real-key cutover must remove
+>    stub-imported rows via the normal reversal flow.~~ **FIXED 2026-07-31** —
+>    `src/bankfeed/factory.ts` now throws in production when GoCardless keys are absent,
+>    unless `BANKFEED_ALLOW_STUB=1` is set explicitly (see the Hetzner pilot deployment
+>    entry below). The residual note about removing stub-imported rows still applies to
+>    any demo deployment that opts back in via that flag.
 >
 > **M4 (AR lifecycle) + M5 (aged AR/AP) — merged to `main` 2026-07-20.** Slices A (AR
 > money-in loop, shipped 2026-07-13), A-UI (settle/void drawer + payment columns, shipped
