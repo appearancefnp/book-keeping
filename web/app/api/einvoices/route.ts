@@ -10,11 +10,7 @@ import type { EInvoice } from '@domain/einvoice/ubl.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { accessPoint } from '@/app/lib/access-point';
 import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
-
-// Default LV chart-of-accounts codes; override per deployment via env.
-const RECEIVABLE_ACCOUNT = process.env.EINVOICE_RECEIVABLE_ACCOUNT ?? '2310';
-const SALES_ACCOUNT = process.env.EINVOICE_SALES_ACCOUNT ?? '6110';
-const VAT_ACCOUNT = process.env.EINVOICE_VAT_ACCOUNT ?? '5721';
+import { outboundInvoiceAccounts } from '@domain/einvoice/accounts.js';
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
@@ -68,13 +64,14 @@ export async function POST(req: NextRequest) {
           dueDate = dueDateFromTerms(body.invoice!.issueDate, party.paymentTermsDays);
         }
       }
+      const accounts = outboundInvoiceAccounts();
       return sendInvoice(tx, ctx, {
         invoice: body.invoice!,
         recipientPeppolId: body.recipientPeppolId!,
         ap: accessPoint,
-        receivableAccount: RECEIVABLE_ACCOUNT,
-        salesAccount: SALES_ACCOUNT,
-        vatAccount: VAT_ACCOUNT,
+        receivableAccount: accounts.receivable,
+        salesAccount: accounts.sales,
+        vatAccount: accounts.vat,
         customerPartyId: body.customerPartyId ?? null,
         dueDate,
       });
