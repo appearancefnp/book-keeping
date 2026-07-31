@@ -38,12 +38,15 @@ const ADMIN_ITEMS: NavItem[] = [
   ADMIN_ITEM,
 ];
 
+// No '/filings' entry: filings.prepare and vat.settings.write are firm-side-only operations
+// and the page has no role gate, so an owner would land on a VAT-number input, a periodicity
+// select, and a "Prepare for approval" button that all 403 (see HANDOFF.md M9 known-debt #10
+// for the read-only owner filings view this still needs).
 const OWNER_ITEMS: NavItem[] = [
   { key: 'nav.home',          shortKey: 'nav.short.home',          href: '/',              icon: 'overview' },
   { key: 'nav.documents',     shortKey: 'nav.short.documents',     href: '/documents',     icon: 'documents' },
   { key: 'nav.expenses',      shortKey: 'nav.short.expenses',      href: '/expenses',      icon: 'expenses' },
   { key: 'nav.reports',       shortKey: 'nav.short.reports',       href: '/reports',       icon: 'reports' },
-  { key: 'nav.filings',       shortKey: 'nav.short.filings',       href: '/filings',       icon: 'filings' },
   { key: 'nav.notifications', shortKey: 'nav.short.notifications', href: '/notifications', icon: 'notifications' },
 ];
 

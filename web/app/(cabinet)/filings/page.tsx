@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useMessages } from '@/app/lib/i18n-context';
 import { LOCALE_FOR } from '@/app/lib/i18n';
+import type { VatCategory } from '@domain/tax/categories';
 import { SkeletonCard } from '@/app/components/SkeletonCard';
 import { ErrorState } from '@/app/components/ErrorState';
 import { EmptyState } from '@/app/components/EmptyState';
@@ -15,7 +16,7 @@ interface VatSettings { vatNo: string | null; periodicity: Periodicity; }
 interface FilingPeriod { label: string; fromDate: string; toDate: string; dueDate: string; }
 
 interface VatCategoryRow {
-  category: string;
+  category: VatCategory;
   salesNetCents: string; salesVatCents: string;
   purchaseNetCents: string; purchaseVatCents: string;
   selfAssessedVatCents: string;
@@ -338,7 +339,7 @@ function FilingsInner() {
                   <tbody>
                     {vatReturnData.declaration.breakdown.rows.map((r, i) => (
                       <tr key={`${r.category}-${i}`}>
-                        <td>{r.category}</td>
+                        <td>{t(`vat.category.${r.category}`)}</td>
                         <td className={styles.amount}>{fmtCents(r.salesNetCents)}</td>
                         <td className={styles.amount}>{fmtCents(r.salesVatCents)}</td>
                         <td className={styles.amount}>{fmtCents(r.purchaseNetCents)}</td>

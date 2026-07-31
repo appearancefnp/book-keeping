@@ -186,8 +186,15 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > against credit notes, counting only rows with a `journal_entry_id` — i.e. actually posted),
 > and `assembleVatDeclaration` compares that against `computeVat`'s ledger sweep to produce a
 > `reconciles` flag: true means the GL and the documents agree to the cent; false means
-> something reached a VAT account with no document behind it (typically a manual journal
-> entry) — a genuinely useful signal, not a bug indicator. `src/tax/ecsl.ts` builds the EC
+> something reached a VAT account that the breakdown query cannot see — `vatBreakdown` reads
+> only `einvoice_lines`, `bill_lines`, and `vendor_credit_note_lines`. That is routinely
+> **not** a manual journal entry: expense claims (`src/expenses/submit.ts` debits VAT-input
+> for deductible claim VAT on approval) and the OCR/AI document-capture path
+> (`src/intake/map-posting.ts`'s `extractedToJournalEntry`, posted from
+> `POST /api/documents/capture`) both post to VAT-input with no document line behind them, so
+> a client using expense claims or document capture will see `false` here in normal, correct
+> operation — a genuinely useful signal, not a bug indicator, but not a "manual journal entry"
+> indicator either (see known-debt item 9 below for the intended fix). `src/tax/ecsl.ts` builds the EC
 > Sales List (PVN 2) from outbound K/AE lines, grouped by customer country + VAT number +
 > supply type (K→goods, AE→services), netting credit notes (resolved back through
 > `corrected_invoice_number`, since a credit note's own `einvoices` row carries no
@@ -218,15 +225,31 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > 2. **`/filings` doesn't surface the approved state or an XML download**, though the design
 >    spec promised both — no route exposes a proposal's status or its generated XML on that
 >    page, so the i18n keys `filings.downloadXml` and `filings.approved` exist unused. The XML
->    *is* reachable today, just indirectly, through the approval queue's proposal rationale.
->    This is the one place the shipped UI falls short of its own spec.
+>    is **not** reachable through the approval queue's proposal rationale — `RationaleBlock`
+>    (`web/app/components/RationaleBlock.tsx`) destructures only `{ ruleRef, computation,
+>    sourceRefs }`, so the stored `xml` key on the payload is never rendered, and its
+>    `humanizeSourceRefs` helper skips any object-valued `sourceRefs` entry, so the ECSL card's
+>    `sourceRefs` renders as nothing at all. Today the XML is reachable **only** from the raw
+>    `/api/proposals` JSON response or the database directly — there is no UI path to it. This
+>    is the one place the shipped UI falls short of its own spec, and it is not cosmetic: an
+>    accountant cannot get the generated filing XML out of the product without querying the API
+>    or the database by hand.
 > 3. **`5721`/`5722` remain env-overridable route constants, not per-client settings** — the
 >    pre-existing account-mapping debt (§M2 follow-ups above), now also read by the filings and
 >    export routes. A client on a different chart of accounts can't point the VAT return
 >    anywhere else without an env var.
-> 4. **VAT numbers are format-checked only, never validated against VIES** — a mistyped or
->    deregistered EU VAT number on a K/AE counterparty passes through to the EC Sales List
->    silently.
+> 4. **VAT numbers are not validated at all**, at either layer that touches them —
+>    `src/tax/vat-settings.ts` only trims and uppercases the declarant's own VAT number, and
+>    `src/parties/parties.ts` accepts any non-empty string as a counterparty's `vat_no`, with no
+>    format check and no VIES lookup anywhere. A mistyped or deregistered EU VAT number on a
+>    K/AE counterparty is stored as-is. The one exception: `src/tax/ecsl.ts` (this branch, see
+>    known-debt item 9 below for the reconciles-flag issue it's unrelated to) now rejects an
+>    EC-Sales-List row — as an `issues[]` entry, not silently — whose `vat_no` doesn't match
+>    `/^[A-Z]{2}[A-Z0-9]{2,12}$/` or whose two-letter prefix disagrees with the party's
+>    `country_code`. That is a **shape** check at the ECSL boundary only; it still does not
+>    validate that the number is real or currently registered (VIES), and every other VAT-number
+>    field in the app (`vat_settings.vat_no`, `parties.vat_no` used anywhere other than ECSL
+>    generation) remains completely unvalidated.
 > 5. **Intrastat columns `cn_code` / `net_mass_kg`** exist on `bill_lines`, `einvoice_lines`,
 >    and `vendor_credit_note_lines`, but nothing reads or writes them yet — Intrastat itself (a
 >    separate, weight/commodity-code-based filing) is unbuilt.
@@ -246,6 +269,33 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > 8. **Plan 1 Task 11's interactive browser walk was deferred** to the controller and had not
 >    been performed as of this entry — the `/filings` UI has been read and typechecked but not
 >    click-tested end to end in a live browser.
+> 9. **The `reconciles` flag reads `false` in normal, correct operation for two shipped
+>    features, not just for stray manual journal entries** — see the corrected doc comment on
+>    `VatDeclaration.reconciles` in `src/tax/vat-declaration.ts`. `vatBreakdown` reads only
+>    `einvoice_lines`, `bill_lines`, and `vendor_credit_note_lines`; it cannot see expense-claim
+>    VAT-input postings (`src/expenses/submit.ts`) or OCR/AI-intake VAT-input postings
+>    (`src/intake/map-posting.ts`'s `extractedToJournalEntry`, posted from
+>    `POST /api/documents/capture`). Intended fix (not done in this wave — it requires extending
+>    the breakdown query, which was explicitly out of scope): extend `vatBreakdown`'s purchase
+>    `UNION ALL` with `expense_claim_lines` (which already carry `net_cents`/`vat_cents`/
+>    `vat_deductible` and gain a `journal_entry_id` on approval), and separately surface
+>    intake-derived journal entries as a sized, explained delta rather than folding them
+>    silently into "unreconciled."
+> 10. **No owner-facing read-only filings view exists.** `nav.filings` is in `Sidebar.tsx`'s
+>    `OWNER_ITEMS`, but `/filings` calls `filings.prepare` and `vat.settings.write`, both
+>    firm-side-only operations, and the page has no role gate — an owner who follows the nav
+>    link sees the VAT-number input, periodicity select, and "Prepare for approval" button, and
+>    every one of them 403s with a raw server error string. `/filings` was removed from
+>    `OWNER_ITEMS` (firm-side list unchanged) rather than building the read-only view; same
+>    shape as the M6 owner segregation-of-duties debt above — a proper fix is a read-only
+>    `/filings` variant for the owner role (view the return/ECSL and reconciliation state,
+>    without settings or a prepare action), not implemented yet.
+> 11. **VAT category codes (`S`/`AE`/`K`/…) reach the CSV/XLSX/PDF exports untranslated.**
+>    `web/app/(cabinet)/filings/page.tsx`'s on-screen breakdown table now translates the
+>    category via `t(\`vat.category.${c}\`)` (matching `bills/new` and `invoices/new`), but the
+>    export path (`vatReturnTable` feeding `GET /api/reports/export`) still emits the raw enum
+>    value — it would need per-category labels plumbed into `ReportLabels`. Left alone in this
+>    wave (export/report-label plumbing is a separate change, not a UI fix); follow-up.
 >
 > **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`,
 > since merged to `main`; full backend suite **333/333**, root+web typecheck clean, web

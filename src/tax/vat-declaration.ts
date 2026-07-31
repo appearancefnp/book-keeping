@@ -14,8 +14,18 @@ export interface VatDeclaration {
   breakdown: VatBreakdown;
   /**
    * True when the GL totals equal the document-derived totals to the cent. False means
-   * something reached a VAT account without a document behind it (typically a manual
-   * journal entry) — surfaced as an indicator, never an error.
+   * something reached a VAT account that `vatBreakdown` cannot see — it reads only
+   * `einvoice_lines`, `bill_lines`, and `vendor_credit_note_lines`. In practice that is
+   * routinely **not** a manual journal entry: two shipped features post to VAT-input without
+   * a bill/einvoice/credit-note line behind them —
+   *   - expense claims (`src/expenses/submit.ts` debits VAT-input for deductible claim VAT
+   *     on approval), and
+   *   - the OCR/AI document-capture path (`src/intake/map-posting.ts`'s
+   *     `extractedToJournalEntry`, posted as a `posting` proposal from
+   *     `POST /api/documents/capture`).
+   * A client using expense claims or document capture will see `reconciles: false` here in
+   * normal, correct operation, not just when someone posts a raw manual journal entry.
+   * Surfaced as an indicator, never an error.
    */
   reconciles: boolean;
 }

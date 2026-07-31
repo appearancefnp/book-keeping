@@ -118,6 +118,35 @@ export async function ecSalesList(
       continue;
     }
 
+    // Neither field is validated upstream — parties.country_code is only shape-checked
+    // (z.string().length(2), no alpha check) and every pre-existing party was backfilled to
+    // 'LV', while parties.vat_no has no validation at all. So a row can have both fields
+    // non-null and still be nonsense: a pre-existing EU customer left at the 'LV' backfill
+    // default, or a VAT number that was never a real EU VAT number to begin with. VID
+    // rejects such a row outright, and unlike the "no VAT number" case above, non-null values
+    // would otherwise sail through undetected onto a statutory filing.
+    const vatNoUpper = r.vatNo.toUpperCase();
+    if (!/^[A-Z]{2}[A-Z0-9]{2,12}$/.test(vatNoUpper)) {
+      if (!seenIssues.has(r.invoiceNumber)) {
+        seenIssues.add(r.invoiceNumber);
+        const label = r.docType === 'credit_note' ? 'Credit note' : 'Invoice';
+        issues.push(
+          `${label} ${r.invoiceNumber}: counterparty VAT number "${r.vatNo}" for ${r.partyName ?? 'an unlinked customer'} is not a valid EU VAT number format — it cannot be reported on the EC Sales List`,
+        );
+      }
+      continue;
+    }
+    if (vatNoUpper.slice(0, 2) !== r.countryCode.toUpperCase()) {
+      if (!seenIssues.has(r.invoiceNumber)) {
+        seenIssues.add(r.invoiceNumber);
+        const label = r.docType === 'credit_note' ? 'Credit note' : 'Invoice';
+        issues.push(
+          `${label} ${r.invoiceNumber}: counterparty VAT number "${r.vatNo}" does not match the recorded country "${r.countryCode}" for ${r.partyName ?? 'an unlinked customer'} — it cannot be reported on the EC Sales List`,
+        );
+      }
+      continue;
+    }
+
     const key = `${r.countryCode}|${r.vatNo}|${r.supplyType}`;
     let g = groups.get(key);
     if (!g) {

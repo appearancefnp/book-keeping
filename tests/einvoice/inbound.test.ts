@@ -65,6 +65,27 @@ test('a mixed inbound invoice keeps VAT off the reverse-charge line', async () =
   expect(bill.lines.map((l) => [l.vatCategory, l.vatCents])).toEqual([['AE', '0'], ['S', '2100']]);
 });
 
+test('an inbound invoice where every line is reverse-charge but the declared VAT total is non-zero is rejected', async () => {
+  const t = await makeFirmAndClient();
+  // Every line is AE (reverse charge) so none of them charges VAT — but the document still
+  // declares a non-zero vatTotal, with grandTotal = net + vat so the two existing
+  // reconciliation guards both pass. Nothing should book: the declared VAT would otherwise
+  // silently vanish from the bill's grand total (underpaying the vendor) while the einvoices
+  // row (written from the same declared grandTotal) keeps it.
+  const xml = buildUblInvoice({
+    invoiceNumber: 'IN-BAD-VAT-1', issueDate: '2026-06-12', currency: 'EUR',
+    supplier: { name: 'OU Vendor', regNo: '11111111', vatNo: 'EE101010101' },
+    customer: { name: 'SIA Us', regNo: '40100000000', vatNo: 'LV40100000000' },
+    lines: [{ description: 'EU service', net: '200.00', vatRate: 0, vat: '0.00', vatCategory: 'AE' }],
+    netTotal: '200.00', vatTotal: '42.00', grandTotal: '242.00',
+  });
+  const ap = new StubAccessPoint([{ ublXml: xml }]);
+
+  await expect(withTenant(ctx(t), (tx) => receiveInboundInvoices(tx, ctx(t), {
+    ap, template, accounts: { vatInputAccount: '5722', vatOutputAccount: '5721', payablesAccount: '5310' },
+  }))).rejects.toThrow(/manual review required/);
+});
+
 test('an inbound reverse-charge line is stored at the domestic rate so it self-assesses', async () => {
   const t = await makeFirmAndClient();
   const xml = buildUblInvoice({

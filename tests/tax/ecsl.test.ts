@@ -196,6 +196,25 @@ test('an intra-EU supply to a party with no VAT number becomes an issue, not a s
   expect(list.issues[0]).toContain('E-4');
 });
 
+test('an intra-EU supply to a customer whose VAT-number prefix disagrees with its recorded country is reported as an issue, not a mismatched filing row', async () => {
+  const t = await makeFirmAndClient();
+  await seed(t);
+  // A pre-existing party backfilled to 'LV' (the migration default) that actually holds an
+  // Estonian VAT number — country_code has no alpha validation and vat_no has none at all, so
+  // this combination is reachable in real data even though both fields are non-null.
+  const mismatched = await withTenant(ctx(t), (tx) => createParty(tx, ctx(t), {
+    kind: 'customer', name: 'OU Mismatched', regNo: '44444444', vatNo: 'EE101234567', countryCode: 'LV',
+  }));
+  await issue(t, inv('E-6', [{ description: 'Goods', net: '120.00', vatRate: 0, vat: '0.00', vatCategory: 'K' }], '120.00', '0.00', '120.00'), mismatched.id);
+
+  const list = await withTenant(ctx(t), (tx) => ecSalesList(tx, ctx(t), period));
+  expect(list.rows).toEqual([]);
+  expect(list.issues.length).toBe(1);
+  expect(list.issues[0]).toContain('E-6');
+  expect(list.issues[0]).toContain('EE101234567');
+  expect(list.issues[0]).toContain('LV');
+});
+
 test('a supply with no linked customer party is reported as an issue', async () => {
   const t = await makeFirmAndClient();
   await seed(t);
