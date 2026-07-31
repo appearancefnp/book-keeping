@@ -8,7 +8,7 @@ import { listEinvoices } from '@domain/einvoice/query.js';
 import { sendInvoice } from '@domain/einvoice/outbound.js';
 import type { EInvoice } from '@domain/einvoice/ubl.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
-import { accessPoint } from '@/app/lib/access-point';
+import { getAccessPoint } from '@/app/lib/access-point';
 import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
 import { outboundInvoiceAccounts } from '@domain/einvoice/accounts.js';
 
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       return sendInvoice(tx, ctx, {
         invoice: body.invoice!,
         recipientPeppolId: body.recipientPeppolId!,
-        ap: accessPoint,
+        ap: getAccessPoint(),
         receivableAccount: accounts.receivable,
         salesAccount: accounts.sales,
         vatAccount: accounts.vat,

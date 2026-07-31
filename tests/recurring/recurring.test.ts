@@ -69,6 +69,20 @@ test('createTemplate rejects a payload whose totals do not reconcile', async () 
   })).rejects.toThrow(/BR-CO-15|payload/i);
 });
 
+test('createTemplate + getTemplate round-trips a non-standard vatCategory (AE, zero rate)', async () => {
+  const t = ctx(await makeFirmAndClient());
+  const aePayload: RecurringInvoicePayload = {
+    ...PAYLOAD,
+    lines: [{ description: 'EU service', net: '100.00', vatRate: 0, vat: '0.00', vatCategory: 'AE' }],
+    vatTotal: '0.00', grandTotal: '100.00',
+  };
+  const { id } = await make(t, { invoicePayload: aePayload });
+  const row = await withTenant(t, (tx) => getTemplate(tx, t, id));
+  const [line] = row.invoicePayload.lines;
+  expect(line?.vatCategory).toBe('AE');
+  expect(line?.vatRate).toBe(0);
+});
+
 test('createTemplate rejects a payload with no invoice lines', async () => {
   const t = ctx(await makeFirmAndClient());
   await expect(withTenant(t, async (tx) => {

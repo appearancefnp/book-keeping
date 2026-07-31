@@ -7,7 +7,7 @@ import { withTenant } from '@domain/db/pool.js';
 import { sendCreditNote } from '@domain/einvoice/outbound.js';
 import type { ECreditNote } from '@domain/einvoice/ubl.js';
 import { getSessionToken, nowUnix } from '@/app/lib/session';
-import { accessPoint } from '@/app/lib/access-point';
+import { getAccessPoint } from '@/app/lib/access-point';
 import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
 
 // Default LV chart-of-accounts codes; override per deployment via env.
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       sendCreditNote(tx, ctx, {
         creditNote: body.creditNote!,
         recipientPeppolId: body.recipientPeppolId!,
-        ap: accessPoint,
+        ap: getAccessPoint(),
         receivableAccount: RECEIVABLE_ACCOUNT,
         salesAccount: SALES_ACCOUNT,
         vatAccount: VAT_ACCOUNT,

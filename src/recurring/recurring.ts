@@ -4,6 +4,7 @@ import type { TenantContext } from '../tenancy/context.js';
 import type { EInvoice } from '../einvoice/ubl.js';
 import { appendAudit } from '../audit/audit.js';
 import { validateEn16931 } from '../einvoice/validate.js';
+import { type VatCategory, VAT_CATEGORIES } from '../tax/categories.js';
 
 export type RecurringInvoicePayload = Omit<EInvoice, 'invoiceNumber' | 'issueDate' | 'dueDate'>;
 
@@ -25,7 +26,12 @@ export interface RecurringTemplateRow {
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD');
 
 const invoicePartySchema = z.object({ name: z.string().min(1), regNo: z.string(), vatNo: z.string() });
-const invoiceLineSchema = z.object({ description: z.string(), net: z.string(), vatRate: z.number(), vat: z.string() });
+const invoiceLineSchema = z.object({
+  description: z.string(), net: z.string(), vatRate: z.number(), vat: z.string(),
+  /** BT-151; absent means 'S'. Runtime schema must carry this or it's silently stripped
+   * before assertPayloadValid ever sees it — see categoryIssues in ../tax/categories.js. */
+  vatCategory: z.enum(VAT_CATEGORIES as unknown as [VatCategory, ...VatCategory[]]).optional(),
+});
 const invoicePayloadSchema = z.object({
   currency: z.string(),
   supplier: invoicePartySchema,
