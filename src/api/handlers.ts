@@ -6,6 +6,7 @@ import { listProposals, getProposal } from '../proposals/proposals.js';
 import { approveProposal, rejectProposal } from '../proposals/lifecycle.js';
 import { postApprovedPosting } from '../proposals/post-proposal.js';
 import { postApprovedBankMatch } from '../banking/confirm-match.js';
+import { postApprovedRecurringInvoice } from '../recurring/post-approved.js';
 import { trialBalance } from '../ledger/balances.js';
 
 /** Wraps a handler: resolves auth+RBAC, maps errors to 401/403, else runs the body with a TenantContext. */
@@ -51,7 +52,10 @@ export function approveHandler(req: AuthedRequest): Promise<ApiResponse> {
       // Dispatch to the correct post function by type.
       if (prop.type === 'posting') return postApprovedPosting(tx, ctx, id);
       if (prop.type === 'bank_match') return postApprovedBankMatch(tx, ctx, id);
-      return { entryId: null }; // declaration/task: approval only, no ledger post here
+      if (prop.type === 'recurring_invoice') return postApprovedRecurringInvoice(tx, ctx, id);
+      // declaration / ecsl / task terminate at approval by design: a filing must never
+      // auto-submit (HANDOFF.md M9 known-debt 1), and a task has no ledger effect.
+      return { entryId: null };
     });
     return { status: 200, body: result };
   });

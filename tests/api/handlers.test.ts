@@ -180,3 +180,48 @@ test('financialsHandler returns 401 for bogus token', async () => {
   const res = await financialsHandler({ token: 'bogus-token', clientCompanyId: clientId, atUnixSeconds: NOW });
   expect(res.status).toBe(401);
 });
+
+// Task 3 — recurring_invoice approve dispatch
+test('approving a recurring_invoice proposal issues the invoice', async () => {
+  const firm = await createFirm('FirmRec');
+  const client = await createClientCompany(firm.id, { name: 'SIA Rec', regNo: '40100000003' });
+  const { id: userId, totpSecret } = await createUser({ firmId: firm.id, email: 'rec@b.lv', password: 'password123', role: 'accountant' });
+  await assignUserToClient(userId, client.id);
+  const { sessionToken } = await login('rec@b.lv', 'password123', totpCodeFor(totpSecret, NOW), NOW);
+  const cid = { firmId: firm.id, clientCompanyId: client.id, actorId: userId, actorRole: 'accountant' };
+
+  // Park an invoice in a pending_approval recurring_invoice proposal, the same shape
+  // generateDueRecurring writes when autonomy is not 'auto'.
+  const invoice = {
+    invoiceNumber: 'INV-2026-05-abcdef12', issueDate: '2026-05-10', currency: 'EUR',
+    supplier: { name: 'SIA Pārdevējs', regNo: '40100000000', vatNo: 'LV40100000000' },
+    customer: { name: 'SIA Klients', regNo: '40200000000', vatNo: 'LV40200000000' },
+    lines: [{ description: 'Abonēšana', net: '100.00', vatRate: 21, vat: '21.00' }],
+    netTotal: '100.00', vatTotal: '21.00', grandTotal: '121.00',
+  };
+
+  const proposalId = await withTenant(cid, async (tx) => {
+    await createAccount(tx, cid, { code: '2310', name: 'Debtors', type: 'asset' });
+    await createAccount(tx, cid, { code: '6110', name: 'Sales', type: 'income' });
+    await createAccount(tx, cid, { code: '5721', name: 'Output VAT', type: 'liability' });
+    await openPeriod(tx, cid, { year: 2026, month: 5 });
+    const { id } = await createProposal(tx, cid, {
+      type: 'recurring_invoice',
+      payload: { invoice, recipientPeppolId: '0088:test', customerPartyId: null, dueDate: null },
+      rationale: { computation: 'recurring invoice for 2026-05' },
+      status: 'pending_approval',
+    });
+    return id;
+  });
+
+  const res = await approveHandler({
+    token: sessionToken, clientCompanyId: client.id, params: { id: proposalId }, atUnixSeconds: NOW,
+  });
+
+  expect(res.status).toBe(200);
+  expect((res.body as { entryId: string | null }).entryId).toBeTruthy();
+
+  const inv = await withTenant(cid, (tx) => tx.query(
+    `SELECT invoice_number FROM einvoices WHERE direction = 'outbound'`));
+  expect(inv.rows[0].invoice_number).toBe('INV-2026-05-abcdef12');
+});
