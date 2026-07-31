@@ -45,7 +45,7 @@ function ComposerInner() {
   const [defaultRate, setDefaultRate] = useState<number>(21);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [docType, setDocType] = useState<'invoice' | 'credit_note'>('invoice');
+  const [docType, setDocType] = useState<'invoice' | 'credit_note' | 'recurring'>('invoice');
   const [correctedInvoiceNumber, setCorrectedInvoiceNumber] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [issueDate, setIssueDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -59,6 +59,14 @@ function ComposerInner() {
   const [offsetDays, setOffsetDays] = useState<number | null>(null);
   const [issuing, setIssuing] = useState(false);
   const [issueError, setIssueError] = useState<string | null>(null);
+
+  const [anchorDay, setAnchorDay] = useState('1');
+  const [intervalMonths, setIntervalMonths] = useState('1');
+  const [firstRunDate, setFirstRunDate] = useState('');
+  const [recTermsDays, setRecTermsDays] = useState('');
+  const [recEndDate, setRecEndDate] = useState('');
+  const [recOccurrences, setRecOccurrences] = useState('');
+  const [autonomyMode, setAutonomyMode] = useState<'auto' | 'approval'>('approval');
 
   const load = useCallback(async (id: string) => {
     setLoadError(null);
@@ -117,12 +125,24 @@ function ComposerInner() {
     setDueDate(base.toISOString().slice(0, 10));
   }, [issueDate, offsetDays]);
 
+  useEffect(() => {
+    if (!clientCompanyId) return;
+    fetch(`/api/autonomy?clientCompanyId=${encodeURIComponent(clientCompanyId)}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b: { policies?: { operationType: string; mode: 'auto' | 'approval' }[] } | null) => {
+        const p = b?.policies?.find((x) => x.operationType === 'recurring_invoice');
+        setAutonomyMode(p?.mode === 'auto' ? 'auto' : 'approval'); // default-closed
+      })
+      .catch(() => setAutonomyMode('approval'));
+  }, [clientCompanyId]);
+
   const netTotalCents = lines.reduce((acc, l) => acc + toCents(l.net), 0);
   const vatTotalCents = lines.reduce((acc, l) => acc + lineVatCents(l), 0);
   const grandTotalCents = netTotalCents + vatTotalCents;
 
   const canIssue =
-    !!clientCompanyId && !!company && !!customer && !!invoiceNumber.trim() && !!peppolId.trim() &&
+    !!clientCompanyId && !!company && !!customer && !!peppolId.trim() &&
+    (docType === 'recurring' ? !!firstRunDate : !!invoiceNumber.trim()) &&
     lines.length > 0 && lines.every((l) => l.description.trim() && toCents(l.net) > 0);
 
   async function issue() {
@@ -151,6 +171,31 @@ function ComposerInner() {
       ...(docType === 'credit_note' && correctedInvoiceNumber.trim() && { correctedInvoiceNumber: correctedInvoiceNumber.trim() }),
     };
     try {
+      if (docType === 'recurring') {
+        const { invoiceNumber: _n, issueDate: _d, dueDate: _due, ...invoicePayload } = invoice;
+        const res = await fetch('/api/recurring', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientCompanyId,
+            template: {
+              customerPartyId: customer.id,
+              recipientPeppolId: peppolId.trim(),
+              invoicePayload,
+              anchorDay: Number(anchorDay),
+              intervalMonths: Number(intervalMonths),
+              firstRunDate,
+              ...(recTermsDays !== '' ? { paymentTermsDays: Number(recTermsDays) } : {}),
+              ...(recEndDate !== '' ? { endDate: recEndDate } : {}),
+              ...(recOccurrences !== '' ? { occurrencesRemaining: Number(recOccurrences) } : {}),
+            },
+          }),
+        });
+        const body = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+        if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+        router.push(`/invoices?client=${encodeURIComponent(clientCompanyId)}`);
+        return;
+      }
       const endpoint = docType === 'credit_note' ? '/api/credit-notes' : '/api/einvoices';
       const payload =
         docType === 'credit_note'
@@ -197,7 +242,11 @@ function ComposerInner() {
     <div className={styles.page}>
       <main className={styles.main}>
         <h1 className={styles.pageHeading}>
-          {docType === 'credit_note' ? t('einv.composeCreditNote') : t('einv.compose')}
+          {docType === 'credit_note'
+            ? t('einv.composeCreditNote')
+            : docType === 'recurring'
+              ? t('einv.rec.new')
+              : t('einv.compose')}
         </h1>
 
         {customers.length === 0 ? (
@@ -208,19 +257,24 @@ function ComposerInner() {
               <div className={styles.fieldGrid}>
                 <label className={styles.field}>
                   <span>{t('einv.docType')}</span>
-                  <select value={docType} onChange={(e) => setDocType(e.target.value as 'invoice' | 'credit_note')}>
+                  <select value={docType} onChange={(e) => setDocType(e.target.value as 'invoice' | 'credit_note' | 'recurring')}>
                     <option value="invoice">{t('einv.mode.invoice')}</option>
                     <option value="credit_note">{t('einv.mode.creditNote')}</option>
+                    <option value="recurring">{t('einv.mode.recurring')}</option>
                   </select>
                 </label>
-                <label className={styles.field}>
-                  <span>{t('einv.number')}</span>
-                  <input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} required />
-                </label>
-                <label className={styles.field}>
-                  <span>{t('einv.issueDate')}</span>
-                  <input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} required />
-                </label>
+                {docType !== 'recurring' && (
+                  <>
+                    <label className={styles.field}>
+                      <span>{t('einv.number')}</span>
+                      <input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} required />
+                    </label>
+                    <label className={styles.field}>
+                      <span>{t('einv.issueDate')}</span>
+                      <input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} required />
+                    </label>
+                  </>
+                )}
                 <label className={styles.field}>
                   <span>{t('einv.customer')}</span>
                   <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} required>
@@ -252,7 +306,47 @@ function ComposerInner() {
                     <input value={correctedInvoiceNumber} onChange={(e) => setCorrectedInvoiceNumber(e.target.value)} />
                   </label>
                 )}
+                {docType === 'recurring' && (
+                  <>
+                    <label className={styles.field}>
+                      <span>{t('einv.rec.firstRunDate')}</span>
+                      <input type="date" value={firstRunDate} required
+                             onChange={(e) => setFirstRunDate(e.target.value)} />
+                    </label>
+                    <label className={styles.field}>
+                      <span>{t('einv.rec.anchorDay')}</span>
+                      <input type="number" inputMode="numeric" min={1} max={31} value={anchorDay} required
+                             onChange={(e) => setAnchorDay(e.target.value)} />
+                    </label>
+                    <label className={styles.field}>
+                      <span>{t('einv.rec.intervalMonths')}</span>
+                      <input type="number" inputMode="numeric" min={1} value={intervalMonths} required
+                             onChange={(e) => setIntervalMonths(e.target.value)} />
+                    </label>
+                    <label className={styles.field}>
+                      <span>{t('einv.rec.paymentTermsDays')}</span>
+                      <input type="number" inputMode="numeric" min={0} max={365} value={recTermsDays}
+                             onChange={(e) => setRecTermsDays(e.target.value)} />
+                    </label>
+                    <label className={styles.field}>
+                      <span>{t('einv.rec.endDate')}</span>
+                      <input type="date" value={recEndDate} onChange={(e) => setRecEndDate(e.target.value)} />
+                    </label>
+                    <label className={styles.field}>
+                      <span>{t('einv.rec.occurrences')}</span>
+                      <input type="number" inputMode="numeric" min={1} value={recOccurrences}
+                             onChange={(e) => setRecOccurrences(e.target.value)} />
+                    </label>
+                  </>
+                )}
               </div>
+              {docType === 'recurring' && (
+                // resolveAutonomy is default-closed, so with no autonomy policy set these queue for
+                // approval. Stating it here means the accountant is not surprised by queue items.
+                <p className={styles.notice}>
+                  {t(autonomyMode === 'auto' ? 'einv.rec.autoNote' : 'einv.rec.approvalNote')}
+                </p>
+              )}
             </section>
 
             <section className={styles.card}>
@@ -375,7 +469,9 @@ function ComposerInner() {
                   ? t('einv.issuing')
                   : docType === 'credit_note'
                     ? t('einv.issueCreditNote')
-                    : t('einv.issue')}
+                    : docType === 'recurring'
+                      ? t('einv.rec.create')
+                      : t('einv.issue')}
               </button>
             </section>
           </form>
