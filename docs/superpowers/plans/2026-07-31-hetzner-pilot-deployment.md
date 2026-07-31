@@ -506,7 +506,17 @@ docker rm -f bk-smoke
 ```
 Expected: `200` for `/login` — it is the one static page and needs no database. A non-200 means the server did not start; read the logs before continuing.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 8: Typecheck gate**
+
+Step 1 edited `web/next.config.ts`, which is TypeScript, so the Global Constraints gate applies:
+
+```bash
+cd web && npx tsc --noEmit && cd ..
+npx tsc --noEmit
+```
+Expected: both report no errors. `npm test` is not required here — no file under `src/` or `tests/` changed.
+
+- [ ] **Step 9: Commit**
 
 ```bash
 git add Dockerfile .dockerignore web/next.config.ts
@@ -825,7 +835,7 @@ job publishes the image to GHCR from main."
 - [ ] **Step 5: Push and read the result**
 
 ```bash
-git push -u origin m9-vat-completeness
+git push -u origin worktree-deploy-hetzner-pilot
 gh run watch
 ```
 
