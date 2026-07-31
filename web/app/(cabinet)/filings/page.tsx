@@ -25,9 +25,14 @@ interface VatDeclaration {
   outputVat: string; inputVat: string; netPayable: string;
   breakdown: { rows: VatCategoryRow[] };
   /**
-   * False means postings reached a VAT account without a document behind them (typically a
-   * manual journal entry) — surfaced so the operator can look into it, never treated as a
-   * failure of the filing itself.
+   * False means postings reached a VAT account without a document row behind them, surfaced so
+   * the operator can look into it — never treated as a failure of the filing itself. Three
+   * causes, and the first two are routine rather than exceptional: approved expense claims
+   * (src/expenses/submit.ts debits VAT-input), OCR/AI document intake
+   * (src/intake/map-posting.ts), and manual journal entries. vatBreakdown reads only
+   * einvoice_lines / bill_lines / vendor_credit_note_lines, so it cannot see the first two —
+   * a client using expense claims or document capture will see false in normal, correct
+   * operation. See the M9 follow-up in HANDOFF.md.
    */
   reconciles: boolean;
 }
@@ -352,8 +357,10 @@ function FilingsInner() {
               </div>
             )}
 
-            {/* reconciles === false means postings reached a VAT account without a document behind
-                them (typically a manual journal entry) — worth investigating, not a failure. */}
+            {/* reconciles === false means postings reached a VAT account with no document row behind
+                them — worth investigating, not a failure. Routinely caused by approved expense
+                claims or OCR intake, which vatBreakdown cannot see, as well as by manual journal
+                entries; see the interface doc comment above and the M9 follow-up in HANDOFF.md. */}
             <div className={vatReturnData.declaration.reconciles ? styles.balanced : styles.unbalanced}>
               {t(vatReturnData.declaration.reconciles ? 'filings.reconciled' : 'filings.notReconciled')}
             </div>
