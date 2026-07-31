@@ -94,3 +94,21 @@ export function isLatvianHoliday(date: string): boolean {
   }
   return set.has(date);
 }
+
+/**
+ * `date` itself if it is a working day, else the next one. Distinct from
+ * addWorkingDays(date, n), which always advances at least one day — statutory filing
+ * deadlines ("the 20th, or the next working day") need this form.
+ */
+export function nextWorkingDay(
+  date: string, isHoliday: (d: string) => boolean = isLatvianHoliday,
+): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const dt = new Date(Date.UTC(y!, m! - 1, d!));
+  for (;;) {
+    const iso = dt.toISOString().slice(0, 10);
+    const day = dt.getUTCDay();
+    if (day !== 0 && day !== 6 && !isHoliday(iso)) return iso;
+    dt.setUTCDate(dt.getUTCDate() + 1);
+  }
+}

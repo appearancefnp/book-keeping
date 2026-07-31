@@ -19,6 +19,10 @@ afterAll(async () => { await closeDb(); });
  * lines. Aging buckets by `grand_total_cents` only, so the net/VAT split is otherwise
  * irrelevant. Built via `opts.invoice` full-override on `issueOpenReceivable` — no helper
  * change needed.
+ *
+ * `vatRate: 21` matches SAMPLE_INVOICE's standard rate (see helpers.ts) so the line satisfies
+ * BR-S-5 (a standard-rated line needs rate > 0); it does not need to match the `vat` amount
+ * above, which is deliberately a token 1.00 to keep grand totals round, not a real 21% VAT calc.
  */
 function invoiceWithTotal(invoiceNumber: string, grand: string): EInvoice {
   const vat = '1.00';
@@ -26,7 +30,7 @@ function invoiceWithTotal(invoiceNumber: string, grand: string): EInvoice {
   return {
     ...SAMPLE_INVOICE,
     invoiceNumber,
-    lines: [{ description: 'Prece', net, vatRate: 0, vat }],
+    lines: [{ description: 'Prece', net, vatRate: 21, vat }],
     netTotal: net, vatTotal: vat, grandTotal: grand,
   };
 }

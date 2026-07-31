@@ -1,4 +1,4 @@
-export type ProposalType = 'posting' | 'bank_match' | 'declaration' | 'task';
+export type ProposalType = 'posting' | 'bank_match' | 'declaration' | 'task' | 'ecsl' | 'recurring_invoice';
 
 export interface Rationale {
   ruleRef?: string;

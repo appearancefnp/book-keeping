@@ -7,7 +7,7 @@ import { createParty } from '../../src/parties/parties.js';
 import { getProposal } from '../../src/proposals/proposals.js';
 import { createBill, listBills, getBill, voidBill, buildBillEntry } from '../../src/payables/bills.js';
 
-const ACCTS = { vatInputAccount: '5721', payablesAccount: '5310' };
+const ACCTS = { vatInputAccount: '5721', vatOutputAccount: '5721', payablesAccount: '5310' };
 
 beforeAll(async () => { await resetDb(); });
 beforeEach(async () => { await resetDb(); });

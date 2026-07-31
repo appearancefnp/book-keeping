@@ -12,7 +12,7 @@ import { createBill, getBill } from '../../src/payables/bills.js';
 import { createPayRun } from '../../src/payables/pay-run.js';
 import { accountBalances } from '../../src/ledger/balances.js';
 
-const ACCTS = { vatInputAccount: '5721', payablesAccount: '5310' };
+const ACCTS = { vatInputAccount: '5721', vatOutputAccount: '5721', payablesAccount: '5310' };
 const AP_MATCH = { payablesAccount: '5310', bankAccount: '2620', bankClearingAccount: '2699' };
 
 beforeAll(async () => { await resetDb(); });
@@ -34,7 +34,7 @@ async function openBill(t: { firmId: string; clientCompanyId: string }, num: str
     const v = await createParty(tx, ctx(t), { kind: 'vendor', name: num, iban });
     const b = await createBill(tx, ctx(t), {
       vendorPartyId: v.id, billNumber: num, issueDate: '2026-03-01', dueDate: '2026-03-31', currency: 'EUR',
-      lines: [{ description: 'x', expenseAccount: '7710', net: '100.00', vatRate: 0, vat: '0.00' }],
+      lines: [{ description: 'x', expenseAccount: '7710', net: '100.00', vatRate: 0, vat: '0.00', vatCategory: 'Z' }],
     }, ACCTS);
     await approveProposal(tx, ctx(t), b.proposalId);
     await postApprovedPosting(tx, ctx(t), b.proposalId);
@@ -48,7 +48,7 @@ async function openBillAmount(
     const v = await createParty(tx, ctx(t), { kind: 'vendor', name: num, iban });
     const b = await createBill(tx, ctx(t), {
       vendorPartyId: v.id, billNumber: num, issueDate: '2026-03-01', dueDate: '2026-03-31', currency: 'EUR',
-      lines: [{ description: 'x', expenseAccount: '7710', net, vatRate: 0, vat: '0.00' }],
+      lines: [{ description: 'x', expenseAccount: '7710', net, vatRate: 0, vat: '0.00', vatCategory: 'Z' }],
     }, ACCTS);
     await approveProposal(tx, ctx(t), b.proposalId);
     await postApprovedPosting(tx, ctx(t), b.proposalId);

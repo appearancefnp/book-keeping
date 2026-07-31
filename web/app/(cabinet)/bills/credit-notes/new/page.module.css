@@ -8,8 +8,13 @@
 .table th { text-align: left; font-size: .75rem; color: var(--muted, #6b7280); padding: .375rem .5rem; }
 .table td { padding: .25rem .5rem; }
 .table input { font: inherit; width: 100%; padding: .3125rem .5rem; border: 1px solid var(--border, #e5e7eb); border-radius: .375rem; }
+.table select { font: inherit; padding: .3125rem .5rem; border: 1px solid var(--border, #e5e7eb); border-radius: .375rem; }
 .num { text-align: right; font-variant-numeric: tabular-nums; max-width: 6rem; }
+.num:disabled { opacity: .5; }
 .acct { max-width: 7rem; }
+.cat { min-width: 9rem; }
+.selfAssessed { display: flex; flex-direction: column; gap: .1875rem; font-size: .75rem; color: var(--muted, #6b7280); white-space: nowrap; }
+.deductLabel { display: flex; align-items: center; gap: .3125rem; }
 .right { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ghostBtn { appearance: none; cursor: pointer; font: inherit; font-size: .8125rem; padding: .25rem .5rem; border: 1px solid var(--border, #e5e7eb); border-radius: .375rem; background: none; }
 .addLine { margin: .5rem 0 1.5rem; appearance: none; cursor: pointer; font: inherit; font-size: .8125rem; padding: .375rem .625rem; border: 1px solid var(--border, #e5e7eb); border-radius: .375rem; background: none; }

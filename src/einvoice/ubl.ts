@@ -1,8 +1,14 @@
 import { XMLParser } from 'fast-xml-parser';
 import { escapeXml } from '../xml/escape.js';
+import { type VatCategory, exemptionReasonFor, isVatCategory } from '../tax/categories.js';
+import { toCents, fromCents } from '../db/money.js';
 
 export interface InvoiceParty { name: string; regNo: string; vatNo: string; }
-export interface InvoiceLineIn { description: string; net: string; vatRate: number; vat: string; }
+export interface InvoiceLineIn {
+  description: string; net: string; vatRate: number; vat: string;
+  /** BT-151. Optional so stored recurring-template payloads stay valid; absent means 'S'. */
+  vatCategory?: VatCategory;
+}
 export interface EInvoice {
   invoiceNumber: string; issueDate: string; currency: string;
   supplier: InvoiceParty; customer: InvoiceParty; lines: InvoiceLineIn[];
@@ -23,6 +29,44 @@ function party(tag: string, p: InvoiceParty, cur: string): string {
   ].join('\n');
 }
 
+export interface CategoryTotal { category: VatCategory; rate: number; taxableCents: bigint; taxCents: bigint }
+
+/** Group lines by (category, rate) into BG-23 tax subtotals, preserving first-seen order. */
+export function categoryTotals(lines: InvoiceLineIn[]): CategoryTotal[] {
+  const order: string[] = [];
+  const acc = new Map<string, CategoryTotal>();
+  for (const l of lines) {
+    const category = l.vatCategory ?? 'S';
+    const key = `${category}|${l.vatRate}`;
+    let row = acc.get(key);
+    if (!row) {
+      row = { category, rate: l.vatRate, taxableCents: 0n, taxCents: 0n };
+      acc.set(key, row);
+      order.push(key);
+    }
+    row.taxableCents += toCents(l.net);
+    row.taxCents += toCents(l.vat);
+  }
+  return order.map((k) => acc.get(k)!);
+}
+
+function taxSubtotal(t: CategoryTotal, cur: string): string {
+  const reason = exemptionReasonFor(t.category);
+  return [
+    `    <cac:TaxSubtotal>`,
+    `      <cbc:TaxableAmount currencyID="${cur}">${fromCents(t.taxableCents)}</cbc:TaxableAmount>`,
+    `      <cbc:TaxAmount currencyID="${cur}">${fromCents(t.taxCents)}</cbc:TaxAmount>`,
+    `      <cac:TaxCategory>`,
+    `        <cbc:ID>${t.category}</cbc:ID>`,
+    `        <cbc:Percent>${t.rate}</cbc:Percent>`,
+    reason?.code ? `        <cbc:TaxExemptionReasonCode>${escapeXml(reason.code)}</cbc:TaxExemptionReasonCode>` : null,
+    reason ? `        <cbc:TaxExemptionReason>${escapeXml(reason.text)}</cbc:TaxExemptionReason>` : null,
+    `        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>`,
+    `      </cac:TaxCategory>`,
+    `    </cac:TaxSubtotal>`,
+  ].filter(Boolean).join('\n');
+}
+
 export function buildUblInvoice(inv: EInvoice): string {
   const cur = inv.currency;
   const lines = inv.lines.map((l, i) => [
@@ -30,7 +74,7 @@ export function buildUblInvoice(inv: EInvoice): string {
     `    <cbc:ID>${i + 1}</cbc:ID>`,
     `    <cbc:LineExtensionAmount currencyID="${cur}">${l.net}</cbc:LineExtensionAmount>`,
     `    <cac:Item><cbc:Name>${escapeXml(l.description)}</cbc:Name>`,
-    `      <cac:ClassifiedTaxCategory><cbc:Percent>${l.vatRate}</cbc:Percent><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:ClassifiedTaxCategory></cac:Item>`,
+    `      <cac:ClassifiedTaxCategory><cbc:ID>${l.vatCategory ?? 'S'}</cbc:ID><cbc:Percent>${l.vatRate}</cbc:Percent><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:ClassifiedTaxCategory></cac:Item>`,
     `  </cac:InvoiceLine>`,
   ].join('\n')).join('\n');
 
@@ -47,7 +91,10 @@ export function buildUblInvoice(inv: EInvoice): string {
     party('AccountingSupplierParty', inv.supplier, cur),
     party('AccountingCustomerParty', inv.customer, cur),
     inv.paymentTerms ? `  <cac:PaymentTerms><cbc:Note>${escapeXml(inv.paymentTerms)}</cbc:Note></cac:PaymentTerms>` : null,
-    `  <cac:TaxTotal><cbc:TaxAmount currencyID="${cur}">${inv.vatTotal}</cbc:TaxAmount></cac:TaxTotal>`,
+    `  <cac:TaxTotal>`,
+    `    <cbc:TaxAmount currencyID="${cur}">${inv.vatTotal}</cbc:TaxAmount>`,
+    categoryTotals(inv.lines).map((t) => taxSubtotal(t, cur)).join('\n'),
+    `  </cac:TaxTotal>`,
     `  <cac:LegalMonetaryTotal>`,
     `    <cbc:LineExtensionAmount currencyID="${cur}">${inv.netTotal}</cbc:LineExtensionAmount>`,
     `    <cbc:TaxExclusiveAmount currencyID="${cur}">${inv.netTotal}</cbc:TaxExclusiveAmount>`,
@@ -88,12 +135,17 @@ export function parseUblInvoice(xml: string): EInvoice {
     }),
     supplier: readParty(sup),
     customer: readParty(cus),
-    lines: asArray(inv.InvoiceLine).map((l: Record<string, unknown>) => ({
-      description: String((l.Item as { Name?: string })?.Name ?? ''),
-      net: txt(l.LineExtensionAmount),
-      vatRate: Number((((l.Item as { ClassifiedTaxCategory?: { Percent?: unknown } })?.ClassifiedTaxCategory)?.Percent) ?? 0),
-      vat: '0',
-    })),
+    lines: asArray(inv.InvoiceLine).map((l: Record<string, unknown>) => {
+      const ctc = (l.Item as { ClassifiedTaxCategory?: { Percent?: unknown; ID?: unknown } })?.ClassifiedTaxCategory;
+      const rawCat = ctc?.ID === undefined ? '' : String(ctc.ID);
+      return {
+        description: String((l.Item as { Name?: string })?.Name ?? ''),
+        net: txt(l.LineExtensionAmount),
+        vatRate: Number(ctc?.Percent ?? 0),
+        vat: '0',
+        vatCategory: isVatCategory(rawCat) ? rawCat : ('S' as const),
+      };
+    }),
     netTotal: txt(mon.LineExtensionAmount),
     vatTotal: txt(inv.TaxTotal?.TaxAmount),
     grandTotal: txt(mon.PayableAmount),
@@ -108,7 +160,7 @@ export function buildUblCreditNote(cn: ECreditNote): string {
     `    <cbc:CreditedQuantity unitCode="C62">1</cbc:CreditedQuantity>`,
     `    <cbc:LineExtensionAmount currencyID="${cur}">${l.net}</cbc:LineExtensionAmount>`,
     `    <cac:Item><cbc:Name>${escapeXml(l.description)}</cbc:Name>`,
-    `      <cac:ClassifiedTaxCategory><cbc:Percent>${l.vatRate}</cbc:Percent><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:ClassifiedTaxCategory></cac:Item>`,
+    `      <cac:ClassifiedTaxCategory><cbc:ID>${l.vatCategory ?? 'S'}</cbc:ID><cbc:Percent>${l.vatRate}</cbc:Percent><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:ClassifiedTaxCategory></cac:Item>`,
     `  </cac:CreditNoteLine>`,
   ].join('\n')).join('\n');
 
@@ -126,7 +178,10 @@ export function buildUblCreditNote(cn: ECreditNote): string {
       : null,
     party('AccountingSupplierParty', cn.supplier, cur),
     party('AccountingCustomerParty', cn.customer, cur),
-    `  <cac:TaxTotal><cbc:TaxAmount currencyID="${cur}">${cn.vatTotal}</cbc:TaxAmount></cac:TaxTotal>`,
+    `  <cac:TaxTotal>`,
+    `    <cbc:TaxAmount currencyID="${cur}">${cn.vatTotal}</cbc:TaxAmount>`,
+    categoryTotals(cn.lines).map((t) => taxSubtotal(t, cur)).join('\n'),
+    `  </cac:TaxTotal>`,
     `  <cac:LegalMonetaryTotal>`,
     `    <cbc:LineExtensionAmount currencyID="${cur}">${cn.netTotal}</cbc:LineExtensionAmount>`,
     `    <cbc:TaxExclusiveAmount currencyID="${cur}">${cn.netTotal}</cbc:TaxExclusiveAmount>`,
@@ -161,12 +216,17 @@ export function parseUblCreditNote(xml: string): ECreditNote {
     ...(correctedInvoiceNumber !== undefined && { correctedInvoiceNumber: String(correctedInvoiceNumber) }),
     supplier: readParty(sup),
     customer: readParty(cus),
-    lines: asArray(cn.CreditNoteLine).map((l: Record<string, unknown>) => ({
-      description: String((l.Item as { Name?: string })?.Name ?? ''),
-      net: txt(l.LineExtensionAmount),
-      vatRate: Number((((l.Item as { ClassifiedTaxCategory?: { Percent?: unknown } })?.ClassifiedTaxCategory)?.Percent) ?? 0),
-      vat: '0',
-    })),
+    lines: asArray(cn.CreditNoteLine).map((l: Record<string, unknown>) => {
+      const ctc = (l.Item as { ClassifiedTaxCategory?: { Percent?: unknown; ID?: unknown } })?.ClassifiedTaxCategory;
+      const rawCat = ctc?.ID === undefined ? '' : String(ctc.ID);
+      return {
+        description: String((l.Item as { Name?: string })?.Name ?? ''),
+        net: txt(l.LineExtensionAmount),
+        vatRate: Number(ctc?.Percent ?? 0),
+        vat: '0',
+        vatCategory: isVatCategory(rawCat) ? rawCat : ('S' as const),
+      };
+    }),
     netTotal: txt(mon.LineExtensionAmount),
     vatTotal: txt(cn.TaxTotal?.TaxAmount),
     grandTotal: txt(mon.PayableAmount),

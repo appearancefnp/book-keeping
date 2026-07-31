@@ -9,7 +9,7 @@ import { postApprovedPosting } from '../../src/proposals/post-proposal.js';
 import { getEntry } from '../../src/ledger/posting.js';
 import { createBill, getBill } from '../../src/payables/bills.js';
 
-const ACCTS = { vatInputAccount: '5721', payablesAccount: '5310' };
+const ACCTS = { vatInputAccount: '5721', vatOutputAccount: '5721', payablesAccount: '5310' };
 
 beforeAll(async () => { await resetDb(); });
 beforeEach(async () => { await resetDb(); });

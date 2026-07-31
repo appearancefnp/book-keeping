@@ -40,7 +40,7 @@ export async function listMaterialApprovals(
   );
 
   return pending.filter((row) => {
-    if (row.type === 'declaration') return true; // always material
+    if (row.type === 'declaration' || row.type === 'ecsl') return true; // filings are always material
     const amount = proposalAmountCents(row);
     if (amount === null) return false;
     const threshold = thresholds.get(row.type) ?? DEFAULT_THRESHOLD_CENTS;

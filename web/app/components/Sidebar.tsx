@@ -7,9 +7,9 @@ import { NavIcon, type NavIconName } from './NavIcon';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
-  key: 'nav.home' | 'nav.queue' | 'nav.documents' | 'nav.overview' | 'nav.tasks' | 'nav.notifications' | 'nav.admin' | 'nav.parties' | 'nav.invoices' | 'nav.bills' | 'nav.bank' | 'nav.journal' | 'nav.payroll' | 'nav.settings' | 'nav.reports' | 'nav.expenses';
+  key: 'nav.home' | 'nav.queue' | 'nav.documents' | 'nav.overview' | 'nav.tasks' | 'nav.notifications' | 'nav.admin' | 'nav.parties' | 'nav.invoices' | 'nav.bills' | 'nav.bank' | 'nav.journal' | 'nav.payroll' | 'nav.settings' | 'nav.reports' | 'nav.expenses' | 'nav.filings';
   /** Compact label for the mobile bottom tab bar, where six full-length LV/RU labels can't fit. */
-  shortKey: 'nav.short.home' | 'nav.short.queue' | 'nav.short.documents' | 'nav.short.overview' | 'nav.short.tasks' | 'nav.short.notifications' | 'nav.short.admin' | 'nav.short.parties' | 'nav.short.invoices' | 'nav.short.bills' | 'nav.short.bank' | 'nav.short.journal' | 'nav.short.payroll' | 'nav.short.settings' | 'nav.short.reports' | 'nav.short.expenses';
+  shortKey: 'nav.short.home' | 'nav.short.queue' | 'nav.short.documents' | 'nav.short.overview' | 'nav.short.tasks' | 'nav.short.notifications' | 'nav.short.admin' | 'nav.short.parties' | 'nav.short.invoices' | 'nav.short.bills' | 'nav.short.bank' | 'nav.short.journal' | 'nav.short.payroll' | 'nav.short.settings' | 'nav.short.reports' | 'nav.short.expenses' | 'nav.short.filings';
   href: string;
   icon: NavIconName;
 }
@@ -23,6 +23,7 @@ const BASE_ITEMS: NavItem[] = [
   { key: 'nav.bank',           shortKey: 'nav.short.bank',           href: '/bank',          icon: 'bank' },
   { key: 'nav.journal',        shortKey: 'nav.short.journal',        href: '/journal',       icon: 'journal' },
   { key: 'nav.reports',        shortKey: 'nav.short.reports',        href: '/reports',       icon: 'reports' },
+  { key: 'nav.filings',        shortKey: 'nav.short.filings',        href: '/filings',       icon: 'filings' },
   { key: 'nav.overview',       shortKey: 'nav.short.overview',       href: '/overview',      icon: 'overview' },
   { key: 'nav.tasks',          shortKey: 'nav.short.tasks',          href: '/tasks',         icon: 'tasks' },
   { key: 'nav.notifications',  shortKey: 'nav.short.notifications',  href: '/notifications', icon: 'notifications' },
@@ -37,6 +38,10 @@ const ADMIN_ITEMS: NavItem[] = [
   ADMIN_ITEM,
 ];
 
+// No '/filings' entry: filings.prepare and vat.settings.write are firm-side-only operations
+// and the page has no role gate, so an owner would land on a VAT-number input, a periodicity
+// select, and a "Prepare for approval" button that all 403 (see HANDOFF.md M9 known-debt #10
+// for the read-only owner filings view this still needs).
 const OWNER_ITEMS: NavItem[] = [
   { key: 'nav.home',          shortKey: 'nav.short.home',          href: '/',              icon: 'overview' },
   { key: 'nav.documents',     shortKey: 'nav.short.documents',     href: '/documents',     icon: 'documents' },

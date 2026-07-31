@@ -29,8 +29,11 @@
 .notice { color: var(--ink-soft); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-5); }
 .colAmount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .table td input { width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-1) var(--space-2); }
+.table td select { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-1) var(--space-2); }
 .amountInput { max-width: 8rem; text-align: right; }
 .rateInput { max-width: 4.5rem; text-align: right; }
+.rateInput:disabled { opacity: 0.5; }
+.catInput { min-width: 9rem; }
 .totals { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; }
 .totals div { display: flex; justify-content: space-between; gap: var(--space-4); }
 .totals dt { color: var(--ink-soft); }

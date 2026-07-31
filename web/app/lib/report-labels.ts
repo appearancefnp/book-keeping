@@ -21,6 +21,14 @@ export function reportLabels(lang: ExportLang): ReportLabels & { print: string }
     date: m['reports.col.date'], memo: m['reports.col.memo'], description: m['reports.col.description'], debit: m['reports.col.debit'], credit: m['reports.col.credit'],
     balance: m['reports.col.balance'], opening: m['reports.gl.opening'], closing: m['reports.gl.closing'], total: m['reports.aging.total'],
     bucketCurrent: m['reports.aging.current'], d1_30: m['reports.aging.d1_30'], d31_60: m['reports.aging.d31_60'], d61_90: m['reports.aging.d61_90'], d90plus: m['reports.aging.d90plus'],
+    vatReturn: m['filings.tab.vatreturn'], ecsl: m['filings.tab.ecsl'],
+    category: m['filings.col.category'], salesNet: m['filings.col.salesNet'], salesVat: m['filings.col.salesVat'],
+    purchaseNet: m['filings.col.purchaseNet'], purchaseVat: m['filings.col.purchaseVat'], selfAssessedVat: m['filings.col.selfAssessedVat'],
+    country: m['filings.col.country'], vatNo: m['filings.col.vatNo'], supplyType: m['filings.col.supplyType'],
+    goods: m['filings.goods'], services: m['filings.services'], invoices: m['filings.col.invoices'],
+    outputVat: m['filings.outputVat'], inputVat: m['filings.inputVat'], netPayable: m['filings.netPayable'],
+    reconciled: m['filings.reconciled'], notReconciled: m['filings.notReconciled'],
+    issues: m['filings.issues'],
     print: m['export.print'],
   };
 }

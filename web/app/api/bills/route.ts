@@ -11,7 +11,8 @@ import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
 // Representative LR chart defaults — accountant to confirm. Input VAT is 5722
 // (5721 is Output VAT per seed.ts / vat-compute.ts; posting input VAT to 5721
 // would corrupt the VAT declaration). Payables 5310.
-const AP_ACCOUNTS = { vatInputAccount: '5722', payablesAccount: '5310' };
+const VAT_OUTPUT_ACCOUNT = process.env.BILL_VAT_OUTPUT_ACCOUNT ?? '5721';
+const AP_ACCOUNTS = { vatInputAccount: '5722', vatOutputAccount: VAT_OUTPUT_ACCOUNT, payablesAccount: '5310' };
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();

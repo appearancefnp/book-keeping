@@ -7,6 +7,9 @@ import type { StatementOfEquity } from './equity.js';
 import type { DatedBalanceRow } from '../ledger/balances.js';
 import type { ApAging } from '../payables/aging.js';
 import type { ArAging } from '../receivables/aging.js';
+import type { VatDeclaration } from '../tax/vat-declaration.js';
+import type { EcSalesList } from '../tax/ecsl.js';
+import { centsToDecimal } from '../tax/money-format.js';
 
 export type CellKind = 'data' | 'subtotal' | 'section' | 'opening' | 'closing';
 export interface ReportColumn { key: string; label: string; align: 'left' | 'right' }
@@ -24,6 +27,14 @@ export interface ReportLabels {
   code: string; account: string; amount: string; current: string; comparison: string; variance: string; variancePct: string;
   date: string; memo: string; description: string; debit: string; credit: string; balance: string; opening: string; closing: string; total: string;
   bucketCurrent: string; d1_30: string; d31_60: string; d61_90: string; d90plus: string;
+  vatReturn: string; ecsl: string;
+  category: string; salesNet: string; salesVat: string; purchaseNet: string; purchaseVat: string; selfAssessedVat: string;
+  country: string; vatNo: string; supplyType: string; goods: string; services: string;
+  /** Column header for a per-counterparty document count (invoices AND credit notes) — displayed
+   *  text intentionally says "documents", not "invoices", even though the field is named `invoices`. */
+  invoices: string;
+  outputVat: string; inputVat: string; netPayable: string; reconciled: string; notReconciled: string;
+  issues: string;
 }
 
 const PCT = (v: string | null): string => (v === null ? '—' : v);
@@ -242,5 +253,68 @@ export function arAgingTable(aging: ArAging, labels: ReportLabels): ReportTable 
       { key: 'total', label: labels.total, align: 'right' },
     ],
     rows: [{ cells: [aging.current, aging.d1_30, aging.d31_60, aging.d61_90, aging.d90plus, aging.total], kind: 'data' }],
+  };
+}
+
+// ---- VAT return ----
+export function vatReturnTable(d: VatDeclaration, labels: ReportLabels): ReportTable {
+  return {
+    title: labels.vatReturn,
+    meta: [
+      { label: labels.period, value: `${d.period.fromDate} – ${d.period.toDate}` },
+      { label: labels.outputVat, value: d.outputVat },
+      { label: labels.inputVat, value: d.inputVat },
+      { label: labels.netPayable, value: d.netPayable },
+      { label: d.reconciles ? labels.reconciled : labels.notReconciled, value: '' },
+    ],
+    columns: [
+      { key: 'category', label: labels.category, align: 'left' },
+      { key: 'salesNet', label: labels.salesNet, align: 'right' },
+      { key: 'salesVat', label: labels.salesVat, align: 'right' },
+      { key: 'purchaseNet', label: labels.purchaseNet, align: 'right' },
+      { key: 'purchaseVat', label: labels.purchaseVat, align: 'right' },
+      { key: 'selfAssessedVat', label: labels.selfAssessedVat, align: 'right' },
+    ],
+    rows: d.breakdown.rows.map((r) => ({
+      kind: 'data' as const,
+      cells: [
+        r.category,
+        centsToDecimal(r.salesNetCents), centsToDecimal(r.salesVatCents),
+        centsToDecimal(r.purchaseNetCents), centsToDecimal(r.purchaseVatCents),
+        centsToDecimal(r.selfAssessedVatCents),
+      ],
+    })),
+  };
+}
+
+// ---- EC Sales List ----
+export function ecslTable(list: EcSalesList, labels: ReportLabels): ReportTable {
+  const rows: ReportRow[] = list.rows.map((r) => ({
+    kind: 'data' as const,
+    cells: [
+      r.countryCode, r.vatNo,
+      r.supplyType === 'goods' ? labels.goods : labels.services,
+      String(r.documentCount), centsToDecimal(r.netCents),
+    ],
+  }));
+  rows.push({ kind: 'subtotal', cells: ['', '', '', labels.total, centsToDecimal(list.totalNetCents)] });
+  // Supplies VID would reject outright (no linked party, or a party with no VAT number) — surfaced
+  // in the exported table body itself, after the total, so every format (CSV/XLSX/PDF) warns the
+  // bookkeeper without needing renderer changes. Omitted entirely when there's nothing to report.
+  if (list.issues.length > 0) {
+    rows.push({ kind: 'section', cells: [labels.issues, '', '', '', ''] });
+    for (const issue of list.issues) rows.push({ kind: 'data', cells: [issue, '', '', '', ''] });
+  }
+  return {
+    title: labels.ecsl,
+    meta: [{ label: labels.period, value: `${list.period.fromDate} – ${list.period.toDate}` }],
+    columns: [
+      { key: 'country', label: labels.country, align: 'left' },
+      { key: 'vatNo', label: labels.vatNo, align: 'left' },
+      { key: 'supplyType', label: labels.supplyType, align: 'left' },
+      { key: 'invoices', label: labels.invoices, align: 'right' },
+      { key: 'net', label: labels.amount, align: 'right' },
+    ],
+    rows,
   };
 }

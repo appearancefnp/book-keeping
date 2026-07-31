@@ -8,7 +8,7 @@ import { getProposal } from '../../src/proposals/proposals.js';
 import { getVendorCreditNote } from '../../src/payables/credit-notes.js';
 
 const template = { expenseAccount: '7710', vatInputAccount: '5722', payablesAccount: '5310' };
-const accounts = { vatInputAccount: '5722', payablesAccount: '5310' };
+const accounts = { vatInputAccount: '5722', vatOutputAccount: '5721', payablesAccount: '5310' };
 const cn: ECreditNote = {
   invoiceNumber: 'SUP-CN-3', issueDate: '2026-03-18', currency: 'EUR',
   correctedInvoiceNumber: 'SUP-INV-9',

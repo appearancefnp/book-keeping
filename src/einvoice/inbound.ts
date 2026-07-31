@@ -7,6 +7,8 @@ import { createBill, type BillAccounts } from '../payables/bills.js';
 import { createVendorCreditNote } from '../payables/credit-notes.js';
 import { listParties, createParty } from '../parties/parties.js';
 import { toCents, fromCents, sumCents } from '../db/money.js';
+import { chargesVat, selfAssesses, type VatCategory } from '../tax/categories.js';
+import { getTaxRate } from '../tax/rules.js';
 
 /** Add whole days to a YYYY-MM-DD date, returning YYYY-MM-DD (UTC-safe). */
 function addDays(iso: string, days: number): string {
@@ -17,18 +19,50 @@ function addDays(iso: string, days: number): string {
 
 // UBL invoice lines carry a VAT *rate* (Percent) but not a per-line VAT amount, so
 // parseUblInvoice cannot fill it in (it always reports '0'). Derive per-line VAT from
-// net × rate (or every Peppol bill would post with zero VAT), THEN reconcile the sum
-// to the vendor's declared vatTotal: per-line rounding can drift a cent or two from
-// the vendor's total-level rounding, and the bill's totals (Σ net + Σ vat) must match
-// the einvoice row we write from toCents(ubl.grandTotal). We absorb the whole rounding
-// remainder into the last line's VAT so Σ(line vat) == toCents(ubl.vatTotal) exactly.
-function reconciledLineVatCents(lines: { net: string; vatRate: number }[], vatTotal: string): bigint[] {
-  const per = lines.map((l) => (toCents(l.net) * BigInt(Math.round(l.vatRate * 100)) + 5000n) / 10000n);
-  if (per.length === 0) return per;
-  const declared = toCents(vatTotal);
-  const remainder = declared - per.reduce((a, c) => a + c, 0n);
-  per[per.length - 1] = per[per.length - 1]! + remainder;
+// net × rate for the lines that actually charge VAT — a reverse-charge, exempt, or
+// intra-Community line carries none, and the buyer self-assesses it at posting time
+// instead (see buildBillEntry). THEN reconcile the sum to the vendor's declared
+// vatTotal: per-line rounding can drift a cent or two from the vendor's total-level
+// rounding, and the bill's totals (Σ net + Σ vat) must match the einvoice row we write
+// from toCents(ubl.grandTotal). The whole remainder lands on the LAST CHARGING line, so
+// Σ(line vat) == toCents(ubl.vatTotal) exactly without polluting a zero-VAT category.
+function reconciledLineVatCents(
+  lines: { net: string; vatRate: number; vatCategory?: VatCategory }[], vatTotal: string,
+  invoiceNumber: string,
+): bigint[] {
+  const charging = lines.map((l) => chargesVat(l.vatCategory ?? 'S'));
+  const per = lines.map((l, i) =>
+    charging[i] ? (toCents(l.net) * BigInt(Math.round(l.vatRate * 100)) + 5000n) / 10000n : 0n);
+  const lastCharging = charging.lastIndexOf(true);
+  if (lastCharging === -1) {
+    // Nothing charges VAT (every line is AE/K/E/Z/G/O) — the declared total must be zero.
+    // Nothing upstream enforces that: the two guards in the caller only check that
+    // net + VAT = grand and Σ(line net) = declared net, both of which a document with a
+    // non-zero vatTotal and grandTotal = net + vat still satisfies. Trusting a zero here
+    // would silently drop the declared VAT from the bill's grand_total_cents while the
+    // einvoices row (written from the same declared grandTotal) keeps it — underpaying the
+    // vendor in the pay run and, if the lines are AE/K, fabricating a self-assessed pair
+    // that was never actually charged.
+    if (toCents(vatTotal) !== 0n) {
+      throw new Error(
+        `Inbound invoice ${invoiceNumber}: no line charges VAT but the declared VAT total is ${vatTotal} (expected 0); manual review required`,
+      );
+    }
+    return per;
+  }
+  const remainder = toCents(vatTotal) - per.reduce((a, c) => a + c, 0n);
+  per[lastCharging] = per[lastCharging]! + remainder;
   return per;
+}
+
+/**
+ * The VAT rate to STORE for a parsed line. A conformant supplier states no rate on an
+ * AE/K line (BR-AE-5 / BR-IC-5) because the buyer applies their own — so we substitute
+ * the client's domestic standard rate, which is what buildBillEntry self-assesses at.
+ * Every other category keeps the rate the supplier stated.
+ */
+function storedVatRate(line: { vatRate: number; vatCategory?: VatCategory }, domesticRate: number): number {
+  return selfAssesses(line.vatCategory ?? 'S') ? domesticRate : line.vatRate;
 }
 
 export async function receiveInboundInvoices(
@@ -71,13 +105,17 @@ export async function receiveInboundInvoices(
       const einvoiceId = rec.rows[0].id as string;
 
       const vendorPartyId = await resolveOrCreateVendor(tx, ctx, cn.supplier);
-      const lineVat = reconciledLineVatCents(cn.lines, cn.vatTotal);
+      const lineVat = reconciledLineVatCents(cn.lines, cn.vatTotal, cn.invoiceNumber);
+      // Read once per document — the rate is date-effective and this branch's own
+      // issue date governs which one applied.
+      const domesticRate = Number((await getTaxRate(tx, 'vat_standard_rate', cn.issueDate)).value);
       const { creditNoteId, proposalId } = await createVendorCreditNote(tx, ctx, {
         vendorPartyId, creditNoteNumber: cn.invoiceNumber, issueDate: cn.issueDate, currency: cn.currency,
         correctedBillNumber: cn.correctedInvoiceNumber ?? null,
         lines: cn.lines.map((l, i) => ({
           description: l.description, expenseAccount: args.template.expenseAccount,
-          net: l.net, vatRate: l.vatRate, vat: fromCents(lineVat[i]!),
+          net: l.net, vatRate: storedVatRate(l, domesticRate), vat: fromCents(lineVat[i]!),
+          vatCategory: l.vatCategory ?? 'S',
         })),
         source: 'peppol', einvoiceId,
       }, args.accounts);
@@ -120,14 +158,18 @@ export async function receiveInboundInvoices(
     // The customer has no per-line expense mapping from the vendor's UBL, so all
     // lines post to the template's single expense account (accountant can re-map later).
     const vendorPartyId = await resolveOrCreateVendor(tx, ctx, ubl.supplier);
-    const lineVat = reconciledLineVatCents(ubl.lines, ubl.vatTotal);
+    const lineVat = reconciledLineVatCents(ubl.lines, ubl.vatTotal, ubl.invoiceNumber);
+    // Read once per document — the rate is date-effective and this branch's own issue
+    // date governs which one applied.
+    const domesticRate = Number((await getTaxRate(tx, 'vat_standard_rate', ubl.issueDate)).value);
     const { billId, proposalId } = await createBill(tx, ctx, {
       vendorPartyId,
       billNumber: ubl.invoiceNumber, issueDate: ubl.issueDate, dueDate: addDays(ubl.issueDate, args.dueDays ?? 30),
       currency: ubl.currency,
       lines: ubl.lines.map((l, i) => ({
         description: l.description, expenseAccount: args.template.expenseAccount,
-        net: l.net, vatRate: l.vatRate, vat: fromCents(lineVat[i]!),
+        net: l.net, vatRate: storedVatRate(l, domesticRate), vat: fromCents(lineVat[i]!),
+        vatCategory: l.vatCategory ?? 'S',
       })),
       source: 'peppol', einvoiceId,
     }, args.accounts);

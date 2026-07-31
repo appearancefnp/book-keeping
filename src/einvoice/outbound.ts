@@ -7,6 +7,7 @@ import { postEntry } from '../ledger/posting.js';
 import { toCents } from '../db/money.js';
 import { appendAudit } from '../audit/audit.js';
 import { applyCreditNoteToInvoice } from '../receivables/apply-credit-note.js';
+import { insertEinvoiceLines } from './lines.js';
 
 export async function sendInvoice(
   tx: PoolClient, ctx: TenantContext,
@@ -46,6 +47,7 @@ export async function sendInvoice(
     [ctx.clientCompanyId, inv.invoiceNumber, inv.issueDate, toCents(inv.grandTotal).toString(), inv.currency, ubl, messageId, entryId, args.customerPartyId ?? null, args.dueDate ?? inv.dueDate ?? null],
   );
   const einvoiceId = res.rows[0].id as string;
+  await insertEinvoiceLines(tx, ctx, einvoiceId, inv.lines);
   await appendAudit(tx, ctx, { action: 'send', entityType: 'einvoice', entityId: einvoiceId, before: null, after: { invoiceNumber: inv.invoiceNumber, messageId, entryId } });
   return { einvoiceId, entryId, messageId };
 }
@@ -88,6 +90,7 @@ export async function sendCreditNote(
     [ctx.clientCompanyId, cn.invoiceNumber, cn.correctedInvoiceNumber ?? null, cn.issueDate, toCents(cn.grandTotal).toString(), cn.currency, ubl, messageId, entryId],
   );
   const einvoiceId = res.rows[0].id as string;
+  await insertEinvoiceLines(tx, ctx, einvoiceId, cn.lines);
   await appendAudit(tx, ctx, { action: 'send', entityType: 'einvoice', entityId: einvoiceId, before: null, after: { docType: 'credit_note', invoiceNumber: cn.invoiceNumber, messageId, entryId } });
 
   // 6. If this credit note references an open invoice, apply it like a payment so the

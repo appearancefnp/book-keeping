@@ -6,10 +6,11 @@ import { useMessages } from '@/app/lib/i18n-context';
 import { fetchClients, type ClientCompany } from '@/app/lib/api-client';
 import { ErrorState } from '@/app/components/ErrorState';
 import { SkeletonCard } from '@/app/components/SkeletonCard';
+import { VAT_CATEGORIES, chargesVat, type VatCategory } from '@domain/tax/categories.js';
 import styles from './page.module.css';
 
 interface PartyRow { id: string; kind: 'customer' | 'vendor' | 'both'; name: string; regNo: string | null; vatNo: string | null; }
-interface LineDraft { description: string; net: string; vatRate: number; }
+interface LineDraft { description: string; net: string; vatRate: number; vatCategory: VatCategory; }
 interface InvoiceProfileLine { description: string; net: string; vatRate: number; }
 interface InvoiceProfileDTO {
   paymentTerms: string | null;
@@ -27,6 +28,9 @@ function fromCents(c: number): string {
   return (c / 100).toFixed(2);
 }
 function lineVatCents(l: LineDraft): number {
+  // Sales side: only 'S' charges VAT. Every other category (including AE/K, whose rate
+  // must be 0 per BR-AE-5/BR-IC-5) invoices zero VAT — the customer self-assesses.
+  if (!chargesVat(l.vatCategory)) return 0;
   return Math.round((toCents(l.net) * l.vatRate) / 100);
 }
 
@@ -48,7 +52,7 @@ function ComposerInner() {
   const [customerId, setCustomerId] = useState('');
   const [peppolId, setPeppolId] = useState('');
   const [supplierVatNo, setSupplierVatNo] = useState('');
-  const [lines, setLines] = useState<LineDraft[]>([{ description: '', net: '', vatRate: 21 }]);
+  const [lines, setLines] = useState<LineDraft[]>([{ description: '', net: '', vatRate: 21, vatCategory: 'S' }]);
   const [note, setNote] = useState('');
   const [paymentTerms, setPaymentTerms] = useState('');
   const [dueDate, setDueDate] = useState('');
@@ -75,7 +79,7 @@ function ComposerInner() {
         const body = (await rRes.json()) as { rate?: number };
         if (typeof body.rate === 'number' && Number.isFinite(body.rate)) {
           setDefaultRate(body.rate);
-          setLines((ls) => ls.map((l) => ({ ...l, vatRate: body.rate! })));
+          setLines((ls) => ls.map((l) => ({ ...l, vatRate: chargesVat(l.vatCategory) ? body.rate! : 0 })));
         }
       }
       if (pfRes.ok) {
@@ -83,7 +87,7 @@ function ComposerInner() {
         if (profile) {
           if (profile.numberPrefix && !invoiceNumber.trim()) setInvoiceNumber(profile.numberPrefix);
           if (profile.defaultLines?.length) {
-            setLines(profile.defaultLines.map((l) => ({ description: l.description, net: l.net, vatRate: l.vatRate })));
+            setLines(profile.defaultLines.map((l) => ({ description: l.description, net: l.net, vatRate: l.vatRate, vatCategory: 'S' })));
           }
           setNote(profile.note ?? '');
           setPaymentTerms(profile.paymentTerms ?? '');
@@ -136,6 +140,7 @@ function ComposerInner() {
         net: fromCents(toCents(l.net)),
         vatRate: l.vatRate,
         vat: fromCents(lineVatCents(l)),
+        vatCategory: l.vatCategory,
       })),
       netTotal: fromCents(netTotalCents),
       vatTotal: fromCents(vatTotalCents),
@@ -276,6 +281,7 @@ function ComposerInner() {
                     <tr>
                       <th scope="col">{t('einv.line.description')}</th>
                       <th scope="col" className={styles.colAmount}>{t('einv.line.net')}</th>
+                      <th scope="col">{t('vat.category')}</th>
                       <th scope="col" className={styles.colAmount}>{t('einv.line.vatRate')}</th>
                       <th scope="col" className={styles.colAmount}>{t('einv.line.vat')}</th>
                       <th scope="col"><span className="sr-only">{t('einv.line.remove')}</span></th>
@@ -300,12 +306,32 @@ function ComposerInner() {
                             onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, net: e.target.value } : x)))}
                           />
                         </td>
+                        <td>
+                          <select
+                            aria-label={t('vat.category')}
+                            className={styles.catInput}
+                            value={l.vatCategory}
+                            onChange={(e) => {
+                              const vatCategory = e.target.value as VatCategory;
+                              setLines(lines.map((x, j) => (j === i ? {
+                                ...x,
+                                vatCategory,
+                                // Sales side: only 'S' carries a rate — AE/K must state 0
+                                // (BR-AE-5 / BR-IC-5), and every other category is zero-rated too.
+                                vatRate: vatCategory === 'S' ? (x.vatRate > 0 ? x.vatRate : defaultRate) : 0,
+                              } : x)));
+                            }}
+                          >
+                            {VAT_CATEGORIES.map((c) => <option key={c} value={c}>{t(`vat.category.${c}`)}</option>)}
+                          </select>
+                        </td>
                         <td className={styles.colAmount}>
                           <input
                             aria-label={t('einv.line.vatRate')}
                             inputMode="numeric"
                             className={styles.rateInput}
                             value={String(l.vatRate)}
+                            disabled={l.vatCategory !== 'S'}
                             onChange={(e) => {
                               const v = Number(e.target.value);
                               setLines(lines.map((x, j) => (j === i ? { ...x, vatRate: Number.isFinite(v) ? v : defaultRate } : x)));
@@ -331,7 +357,7 @@ function ComposerInner() {
               <button
                 type="button"
                 className={styles.ghostBtn}
-                onClick={() => setLines([...lines, { description: '', net: '', vatRate: defaultRate }])}
+                onClick={() => setLines([...lines, { description: '', net: '', vatRate: defaultRate, vatCategory: 'S' }])}
               >
                 {t('einv.line.add')}
               </button>

@@ -5,14 +5,21 @@ import { createProposal, type Rationale } from '../proposals/proposals.js';
 import type { NewJournalEntry } from '../ledger/posting.js';
 import { toCents, fromCents, sumCents } from '../db/money.js';
 import { appendAudit } from '../audit/audit.js';
+import { type VatCategory, VAT_CATEGORIES, selfAssesses, selfAssessedVatCents, categoryIssues } from '../tax/categories.js';
 
-export interface NewVendorCreditNoteLine { description: string; expenseAccount: string; net: string; vatRate: number; vat: string; }
+export interface NewVendorCreditNoteLine {
+  description: string; expenseAccount: string; net: string; vatRate: number; vat: string;
+  /** BT-151; absent means 'S'. */
+  vatCategory?: VatCategory;
+  /** Self-assessed VAT on an AE/K line is deductible unless this is explicitly false. */
+  vatDeductible?: boolean;
+}
 export interface NewVendorCreditNote {
   vendorPartyId: string; creditNoteNumber: string; issueDate: string; currency: string;
   lines: NewVendorCreditNoteLine[]; correctedBillNumber?: string | null;
   source?: 'manual' | 'peppol'; documentId?: string | null; einvoiceId?: string | null;
 }
-export interface CreditNoteAccounts { vatInputAccount: string; payablesAccount: string; }
+export interface CreditNoteAccounts { vatInputAccount: string; vatOutputAccount: string; payablesAccount: string; }
 
 export interface VendorCreditNoteRow {
   id: string; vendorPartyId: string; vendorName: string; creditNoteNumber: string; issueDate: string;
@@ -20,7 +27,11 @@ export interface VendorCreditNoteRow {
   status: string; source: string; postingProposalId: string | null; journalEntryId: string | null;
 }
 export interface VendorCreditNoteDetail extends VendorCreditNoteRow {
-  lines: { lineNo: number; description: string; expenseAccount: string; netCents: string; vatRate: string; vatCents: string }[];
+  lines: {
+    lineNo: number; description: string; expenseAccount: string;
+    netCents: string; vatRate: string; vatCents: string;
+    vatCategory: VatCategory; vatDeductible: boolean;
+  }[];
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -35,7 +46,15 @@ const schema = z.object({
     net: z.string().regex(/^\d+(\.\d{1,2})?$/),   // non-negative magnitudes only
     vatRate: z.number(),
     vat: z.string().regex(/^\d+(\.\d{1,2})?$/),
-  })).min(1),
+    vatCategory: z.enum(VAT_CATEGORIES as unknown as [VatCategory, ...VatCategory[]]).optional(),
+    vatDeductible: z.boolean().optional(),
+  }).refine(
+    // 'purchase': a vendor credit note is our own purchase-side record — the vendor invoiced
+    // 0% on an AE/K line, so it must carry the domestic rate we self-assess at. The sales
+    // side (Peppol BR-AE-5 / BR-IC-5) requires the opposite (rate 0).
+    (l) => categoryIssues({ vatCategory: l.vatCategory ?? 'S', vatRate: l.vatRate, vatCents: toCents(l.vat) }, 'purchase').length === 0,
+    (l) => ({ message: categoryIssues({ vatCategory: l.vatCategory ?? 'S', vatRate: l.vatRate, vatCents: toCents(l.vat) }, 'purchase').join('; ') }),
+  )).min(1),
   correctedBillNumber: z.string().nullable().optional(),
   source: z.enum(['manual', 'peppol']).optional(),
   documentId: z.string().uuid().nullable().optional(),
@@ -49,13 +68,45 @@ const ROW_COLS = `
   c.corrected_bill_number AS "correctedBillNumber", c.status, c.source,
   c.posting_proposal_id AS "postingProposalId", c.journal_entry_id AS "journalEntryId"`;
 
-/** Reverse the bill: CR each expense line (net), CR VAT-input (Σvat, if > 0), DR payables (grand). */
+/**
+ * Reverse the bill with every amount on the opposite side of buildBillEntry: CR each
+ * line's expense account, CR VAT-input (invoiced + deductible self-assessed), DR payables
+ * (net + *invoiced* VAT), and DR VAT-output for self-assessed reverse-charge / intra-
+ * Community VAT that the original bill credited.
+ *
+ * A non-deductible self-assessed line credits its expense account with net + the
+ * self-assessed VAT instead of crediting VAT-input, mirroring buildBillEntry's treatment
+ * of non-deductible VAT as part of the cost.
+ */
 export function buildCreditNoteEntry(cn: NewVendorCreditNote, accounts: CreditNoteAccounts): NewJournalEntry {
-  const vat = sumCents(cn.lines.map((l) => l.vat));
-  const grand = sumCents(cn.lines.map((l) => l.net)) + vat;
-  const lines = cn.lines.map((l) => ({ accountCode: l.expenseAccount, debit: '0', credit: l.net, description: l.description }));
-  if (vat > 0n) lines.push({ accountCode: accounts.vatInputAccount, debit: '0', credit: fromCents(vat), description: 'VAT input reversal' });
+  const invoicedVat = sumCents(cn.lines.map((l) => l.vat));
+  const grand = sumCents(cn.lines.map((l) => l.net)) + invoicedVat;
+
+  const lines: { accountCode: string; debit: string; credit: string; description: string }[] = [];
+  let selfAssessedTotal = 0n;
+  let selfAssessedDeductible = 0n;
+
+  for (const l of cn.lines) {
+    const category = l.vatCategory ?? 'S';
+    if (!selfAssesses(category)) {
+      lines.push({ accountCode: l.expenseAccount, debit: '0', credit: l.net, description: l.description });
+      continue;
+    }
+    const assessed = selfAssessedVatCents(toCents(l.net), l.vatRate);
+    selfAssessedTotal += assessed;
+    if (l.vatDeductible === false) {
+      lines.push({ accountCode: l.expenseAccount, debit: '0', credit: fromCents(toCents(l.net) + assessed), description: l.description });
+    } else {
+      selfAssessedDeductible += assessed;
+      lines.push({ accountCode: l.expenseAccount, debit: '0', credit: l.net, description: l.description });
+    }
+  }
+
+  const inputVat = invoicedVat + selfAssessedDeductible;
+  if (inputVat > 0n) lines.push({ accountCode: accounts.vatInputAccount, debit: '0', credit: fromCents(inputVat), description: 'VAT input reversal' });
   lines.push({ accountCode: accounts.payablesAccount, debit: fromCents(grand), credit: '0', description: 'Payable reduction' });
+  if (selfAssessedTotal > 0n) lines.push({ accountCode: accounts.vatOutputAccount, debit: fromCents(selfAssessedTotal), credit: '0', description: 'Reverse-charge output VAT reversal' });
+
   return { date: cn.issueDate, memo: `Vendor credit note ${cn.creditNoteNumber}`, currency: cn.currency, lines };
 }
 
@@ -81,9 +132,11 @@ export async function createVendorCreditNote(
   for (let i = 0; i < cn.lines.length; i++) {
     const l = cn.lines[i]!;
     await tx.query(
-      `INSERT INTO vendor_credit_note_lines(client_company_id, credit_note_id, line_no, description, expense_account, net_cents, vat_rate, vat_cents)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [ctx.clientCompanyId, creditNoteId, i + 1, l.description, l.expenseAccount, toCents(l.net).toString(), l.vatRate, toCents(l.vat).toString()],
+      `INSERT INTO vendor_credit_note_lines(client_company_id, credit_note_id, line_no, description, expense_account, net_cents, vat_rate, vat_cents, vat_category, vat_deductible)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [ctx.clientCompanyId, creditNoteId, i + 1, l.description, l.expenseAccount,
+        toCents(l.net).toString(), l.vatRate, toCents(l.vat).toString(),
+        l.vatCategory ?? 'S', l.vatDeductible ?? true],
     );
   }
 
@@ -128,7 +181,8 @@ export async function getVendorCreditNote(tx: PoolClient, ctx: TenantContext, id
   if (!c.rowCount) throw new Error(`Vendor credit note not found: ${id}`);
   const lines = await tx.query(
     `SELECT line_no AS "lineNo", description, expense_account AS "expenseAccount",
-            net_cents::text AS "netCents", vat_rate::text AS "vatRate", vat_cents::text AS "vatCents"
+            net_cents::text AS "netCents", vat_rate::text AS "vatRate", vat_cents::text AS "vatCents",
+            vat_category AS "vatCategory", vat_deductible AS "vatDeductible"
      FROM vendor_credit_note_lines WHERE credit_note_id = $1 AND client_company_id = $2 ORDER BY line_no`,
     [id, ctx.clientCompanyId],
   );
