@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'vitest';
 import { resetDb, closeDb, makeFirmAndClient, ctx } from '../helpers/db.js';
-import { withTenant, appPool } from '../../src/db/pool.js';
+import { withTenant } from '../../src/db/pool.js';
 import { createParty, getParty, updateParty } from '../../src/parties/parties.js';
 
 beforeAll(async () => { await resetDb(); });
@@ -76,10 +76,10 @@ test('creating a party with no country audits countryCode: LV', async () => {
   const t = await makeFirmAndClient();
   const p = await withTenant(ctx(t), (tx) => createParty(tx, ctx(t), { kind: 'customer', name: 'NoCountry', regNo: '40100000009' }));
 
-  const auditRows = await appPool.query(
+  const auditRows = await withTenant(ctx(t), (tx) => tx.query(
     `SELECT after FROM audit_log WHERE client_company_id = $1 AND entity_type = 'party' AND entity_id = $2 AND action = 'create'`,
     [t.clientCompanyId, p.id]
-  );
+  ));
 
   expect(auditRows.rowCount).toBe(1);
   const after = auditRows.rows[0].after;
