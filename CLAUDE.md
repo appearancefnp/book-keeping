@@ -21,8 +21,9 @@ cd web && npx tsc --noEmit  # type-check web separately
 ```
 
 Always run `npm test` (root) **and** `npx tsc --noEmit` in both root and `web/` before
-declaring work done. Quick dev login: `GET /api/dev/bootstrap` (dev-only; migrates,
-seeds, signs in).
+declaring work done. Quick dev login: `GET /api/dev/bootstrap` (migrates, seeds, signs in).
+Requires `DEV_ROUTES_ENABLED=1` in `web/.env.local` — the route is a positive opt-in and is
+closed by default, because it is unauthenticated and signs the caller in as a demo user.
 
 ## Architecture
 

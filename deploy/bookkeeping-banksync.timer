@@ -1,0 +1,16 @@
+[Unit]
+Description=Run the bookkeeping bank-feed sync daily, before the nightly backup
+
+[Timer]
+# Before bookkeeping-backup.timer's 02:30 run, so the day's newly-synced transactions
+# land in that night's dump instead of waiting for the following backup. Mirrors the old
+# Vercel schedule's relative ordering (bank-sync at 05:00 ran before jobs-drain at
+# 06:00) by keeping sync ahead of the next thing that depends on fresh data — here,
+# the backup rather than jobs-drain. RandomizedDelaySec is kept well under the ~1h gap
+# to backup so a late run never overlaps it.
+OnCalendar=*-*-* 01:30:00
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target

@@ -10,6 +10,7 @@
  * Requires Postgres up (docker compose up -d db) and .env with DATABASE_URL + ADMIN_DATABASE_URL.
  */
 import { adminPool, appPool, withTenant } from '../db/pool.js';
+import { requireEnv } from '../db/require-env.js';
 import { runMigrations } from '../db/migrate.js';
 import { createFirm, createClientCompany } from '../tenancy/firms.js';
 import type { TenantContext } from '../tenancy/context.js';
@@ -191,6 +192,7 @@ async function seedClient(ctx: TenantContext, client: { name: string; regNo: str
 }
 
 async function main(): Promise<void> {
+  requireEnv(['ADMIN_DATABASE_URL', 'DATABASE_URL']);
   console.log('⚠️  Resetting the database (drop + migrate), then seeding demo data…');
   await adminPool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
   await runMigrations();

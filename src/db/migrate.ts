@@ -2,6 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { adminPool } from './pool.js';
+import { requireEnv } from './require-env.js';
 
 const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../migrations');
 
@@ -46,6 +47,7 @@ export async function runMigrations(): Promise<string[]> {
 
 // Allow `npm run migrate`
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  requireEnv(['ADMIN_DATABASE_URL']);
   runMigrations()
     .then((a) => { console.log('Applied:', a); return adminPool.end(); })
     .catch((e) => { console.error(e); process.exit(1); });

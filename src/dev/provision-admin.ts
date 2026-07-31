@@ -1,4 +1,5 @@
 import { appPool, adminPool } from '../db/pool.js';
+import { requireEnv } from '../db/require-env.js';
 import { runMigrations } from '../db/migrate.js';
 import { createFirm } from '../tenancy/firms.js';
 import { createUser, findUserByEmail } from '../auth/users.js';
@@ -11,6 +12,7 @@ import { randomBytes } from 'node:crypto';
  * Usage: PROVISION_FIRM="My Firm" PROVISION_EMAIL=me@firm.lv npm run provision-admin
  */
 async function main() {
+  requireEnv(['ADMIN_DATABASE_URL', 'DATABASE_URL']);
   const firmName = process.env.PROVISION_FIRM;
   const email = process.env.PROVISION_EMAIL;
   if (!firmName || !email) throw new Error('Set PROVISION_FIRM and PROVISION_EMAIL');

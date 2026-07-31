@@ -1,0 +1,9 @@
+[Unit]
+Description=Bookkeeping nightly backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/opt/bookkeeping/backup.env
+ExecStart=/opt/bookkeeping/scripts/backup.sh

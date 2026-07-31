@@ -81,9 +81,13 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > 3. Cosmetics that ride: no confirmation on connection Remove, misleading success toast when
 >    a manual sync finds the consent expired, raw provider error text untranslated in
 >    `last_error`.
-> 4. With GoCardless keys unset in production the stub will "connect" a demo bank and import
->    demo transactions into real books — the real-key cutover must remove stub-imported rows
->    via the normal reversal flow.
+> 4. ~~With GoCardless keys unset in production the stub will "connect" a demo bank and
+>    import demo transactions into real books — the real-key cutover must remove
+>    stub-imported rows via the normal reversal flow.~~ **FIXED 2026-07-31** —
+>    `src/bankfeed/factory.ts` now throws in production when GoCardless keys are absent,
+>    unless `BANKFEED_ALLOW_STUB=1` is set explicitly (see the Hetzner pilot deployment
+>    entry below). The residual note about removing stub-imported rows still applies to
+>    any demo deployment that opts back in via that flag.
 >
 > **M4 (AR lifecycle) + M5 (aged AR/AP) — merged to `main` 2026-07-20.** Slices A (AR
 > money-in loop, shipped 2026-07-13), A-UI (settle/void drawer + payment columns, shipped
@@ -571,6 +575,60 @@ quarterly periodicity logic.
 > **e-signature**, and a real **password-reset UI** (today an admin re-invites
 > the user via Admin → Users, which resets credentials + 2FA — there's no
 > self-service "forgot password" flow).
+
+> **Hetzner pilot deployment — shipped 2026-07-31** (see
+> `docs/superpowers/specs/2026-07-31-hetzner-pilot-deployment-design.md` and
+> `docs/RUNNING.md` §4 for the runbook this unblocked): the app now has a real place to
+> run with one pilot accountant's actual books, not just a Vercel demo URL. Vercel Hobby
+> turned out to be contractually off-limits for this app (its fair-use terms make any
+> deployment "commercial" the moment anyone paid is involved in building it) and its
+> crons cap the job queue at ~20/day; a **Hetzner CX22 + Docker Compose** stack is now the
+> primary path, with §3 (Vercel + Neon) kept only as a seeded-demo-only fallback. Shipped:
+> - Two fail-open guard fixes, both found by tracing what a misconfigured container would
+>   actually do, not by inspection: `src/bankfeed/factory.ts` now throws in production
+>   when GoCardless keys are absent instead of silently auto-linking a fake bank account
+>   into real books (opt back in with `BANKFEED_ALLOW_STUB=1`, seeded-demo deployments
+>   only); `src/dev/guard.ts`'s `devBootstrapAllowed` is now a positive opt-in
+>   (`DEV_ROUTES_ENABLED=1`) rather than resting on `NODE_ENV`/`VERCEL_ENV` alone — off
+>   Vercel there is no second belt, so a misconfigured `NODE_ENV` used to be enough to let
+>   an unauthenticated `GET /api/dev/bootstrap` migrate, seed, and sign the caller in
+>   against real data.
+> - **Container stack**: one `Dockerfile` (multi-stage, `node:24-slim`) serving `next
+>   start`, `npm run worker`, and `npm run migrate` from a single image;
+>   `docker-compose.prod.yml` (`db`/`web`/`worker`/`caddy`, named volumes, no published
+>   Postgres port); `deploy/Caddyfile` for auto-TLS (security headers stay in
+>   `web/next.config.ts`, not duplicated in Caddy).
+> - **CI** (`.github/workflows/ci.yml`): a `postgres:16` service container, migrate → test
+>   → both typechecks → web build, serially (the suite requires it — see below), then a
+>   `main`-only image job pushing `ghcr.io/<owner>/<repo>` by sha and `:latest`. This is
+>   what makes "is the suite green?" have an authoritative answer for the first time: a
+>   local run hangs at 36/156 files for reasons diagnosed as machine-local (no DB-side
+>   wait, no test timeout fired), while the same code ran clean in CI — **157 files / 648
+>   tests, 0 failures**.
+> - **Backups + restore drill**: a host-level systemd timer (`scripts/backup.sh`,
+>   `pg_dump -Fc` + the blob volume, offsite via restic) and `scripts/restore-drill.sh`,
+>   which needed two real fixes before it could ever pass on this app's own dumps (missing
+>   app roles broke `pg_restore` unconditionally; a `pg_isready`-only wait raced the
+>   official Postgres image's internal restart) — both now fixed and drilled to a real
+>   PASS/FAIL against seeded data. The drill asserts `journal_entries` only; `einvoices` is
+>   deliberately excluded because the Peppol/VID stubs mean it can legitimately stay empty
+>   for a long stretch of real operation.
+> - **Password rotation** (`scripts/rotate-db-passwords.sh`) — found while writing this
+>   plan, not scoped in the original design: `bookkeeping_app`/`_worker`/`_supervisor` have
+>   fixed passwords hardcoded in the migrations (`app_pw`/`worker_pw`/`supervisor_pw`),
+>   security-relevant on a box that will hold real books. Verifying a rotation actually
+>   took effect must go through the `db`-hostname path (what `web`/`worker` use), never
+>   `psql -h 127.0.0.1` — stock Postgres trusts all loopback connections regardless of
+>   password, so a loopback check "confirms" a rotation whether or not it happened.
+>
+> Still open, deliberately deferred rather than silently dropped (design §8): no
+> observability (no structured logging, no error tracking, no uptime monitor — the
+> highest-value gap now that there's no platform to page), no disk encryption at rest, no
+> GDPR data export/erasure, no audit-log tamper detection (hash chain), no email of any
+> kind (invites/resets are copy-paste URLs, dunning is internal tasks only), and Peppol
+> `AccessPoint`/VID `VidClient` remain stubs (not a legal blocker for B2B until the
+> 2028-01-01 mandate, but B2G/G2G VID reporting has been mandatory since 2026-01-01 for
+> clients who invoice budget institutions).
 
 - **GDPR (§7/§9)** — data export + erasure workflows; none exist.
 - **E-signature (§6.7)** — document signing; not implemented.

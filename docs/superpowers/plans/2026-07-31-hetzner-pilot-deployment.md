@@ -506,7 +506,17 @@ docker rm -f bk-smoke
 ```
 Expected: `200` for `/login` — it is the one static page and needs no database. A non-200 means the server did not start; read the logs before continuing.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 8: Typecheck gate**
+
+Step 1 edited `web/next.config.ts`, which is TypeScript, so the Global Constraints gate applies:
+
+```bash
+cd web && npx tsc --noEmit && cd ..
+npx tsc --noEmit
+```
+Expected: both report no errors. `npm test` is not required here — no file under `src/` or `tests/` changed.
+
+- [ ] **Step 9: Commit**
 
 ```bash
 git add Dockerfile .dockerignore web/next.config.ts
@@ -525,10 +535,35 @@ resolve the workspace-root ambiguity the build was warning about."
 **Files:**
 - Create: `docker-compose.prod.yml`
 - Create: `deploy/Caddyfile`
+- Modify: `package.json` (the four `--env-file=.env` scripts — see Step 0)
 
 **Interfaces:**
 - Consumes: the image from Task 3 (built locally as `bookkeeping:test`, published by Task 5 as `ghcr.io/<owner>/bookkeeping:<sha>`).
 - Produces: a `docker compose -f docker-compose.prod.yml` stack with services named `db`, `web`, `worker`, `caddy`, a named volume `pgdata`, and a named volume `blobdata` mounted at `/app/.blob-store` in `web`. Task 6's backup script depends on those exact service and volume names.
+
+- [ ] **Step 0: Stop requiring an on-disk `.env` (carried forward from Task 3)**
+
+Task 3's implementer and reviewer both reproduced this: root `package.json`'s `migrate`, `worker`, `provision-admin`, and `seed` scripts all run `node --env-file=.env …`, and Node treats a **missing** `.env` as fatal — `docker run … npm run migrate` dies with `node: .env: not found` before it ever reads `DATABASE_URL`. `.dockerignore` correctly excludes `.env`, so the image has none. Compose's `environment:` sets process variables but does **not** put a file at `/app/.env`, so the stack would fail on its first migrate.
+
+Fix it at the source rather than shipping a secrets file into the image or bind-mounting one. Node 24 supports `--env-file-if-exists`, which loads the file when present and is a no-op when absent. In root `package.json`, change all four scripts from `--env-file=.env` to `--env-file-if-exists=.env`:
+
+```json
+    "migrate": "node --env-file-if-exists=.env --import tsx src/db/migrate.ts",
+    "seed": "node --env-file-if-exists=.env --import tsx src/dev/seed.ts",
+    "provision-admin": "node --env-file-if-exists=.env --import tsx src/dev/provision-admin.ts",
+    "worker": "node --env-file-if-exists=.env --import tsx src/jobs/worker.ts"
+```
+
+Local development is unaffected — `.env` still exists and is still loaded. This also unblocks Task 5, where CI has no `.env` at all.
+
+Verify both directions before moving on:
+
+```bash
+npm run migrate                        # still works locally, .env present
+mv .env .env.bak && npm run migrate ; echo "exit=$?" ; mv .env.bak .env
+```
+
+Expected: the first succeeds. The second must fail on a *connection* error (no `DATABASE_URL` set), **not** on `node: .env: not found` — that distinction is the whole point. Restore `.env` either way; it holds this worktree's private-DB credentials on port 5434.
 
 - [ ] **Step 1: Write the Caddyfile**
 
@@ -620,7 +655,7 @@ volumes:
   caddyconfig:
 ```
 
-Note: `npm run worker` runs `node --env-file=.env --import tsx src/jobs/worker.ts`, and there is no `.env` in the image. Verify in Step 4 whether Node 24 treats a missing `--env-file` as fatal; if it does, the fix is an empty `/app/.env` added in the Dockerfile runtime stage (`RUN touch .env`) so the flag resolves while all real configuration still comes from the container environment.
+Note: the `worker` service runs `npm run worker`, and there is no `.env` in the image. Step 0 already resolved that — `--env-file-if-exists` makes the missing file a no-op, so every value above arrives purely through the container environment. No `.env` is bind-mounted and no empty placeholder file is created.
 
 - [ ] **Step 3: Validate the Compose file parses**
 
@@ -681,7 +716,7 @@ Leave the volumes in place; Task 6 uses this stack again.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add docker-compose.prod.yml deploy/Caddyfile .gitignore
+git add docker-compose.prod.yml deploy/Caddyfile package.json .gitignore
 git commit -m "build: production compose stack with Caddy
 
 Four services on one Compose network: caddy holds the only public ports, db
@@ -719,6 +754,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # The suite is known to hang on this branch (36 of 156 files, in tests/payroll/*).
+    # Without this, a hang burns the 360-minute default instead of failing. Deciding
+    # whether that hang is real and pre-existing is exactly what this job is for, so it
+    # must fail loudly and quickly rather than time out silently.
+    timeout-minutes: 30
     services:
       db:
         image: postgres:16
@@ -784,25 +824,23 @@ jobs:
           cache-to: type=gha,mode=max
 ```
 
-Note `npm run migrate` and `npm run seed` use `node --env-file=.env`, and CI has no `.env`. Step 2 establishes whether that is fatal.
+CI has no `.env`, which would have been fatal before Task 4's Step 0 switched the four root scripts to `--env-file-if-exists=.env`. Step 2 confirms that fix holds for the exact CI sequence.
 
 - [ ] **Step 2: Reproduce the CI sequence locally, without a `.env` file**
 
-The workflow's correctness hinges on `--env-file=.env` tolerating a missing file, so prove it before pushing:
+CI runs with no `.env` at all, so prove `npm run migrate` survives that before pushing. Run this from the worktree, against the worktree-private Postgres on port **5434**:
 
 ```bash
-cd /home/karlis/git/book-keeping
-docker compose up -d db
 mv .env .env.bak
-ADMIN_DATABASE_URL=postgres://admin:admin@localhost:5433/bookkeeping \
-DATABASE_URL=postgres://bookkeeping_app:app_pw@localhost:5433/bookkeeping \
-WORKER_DATABASE_URL=postgres://bookkeeping_worker:worker_pw@localhost:5433/bookkeeping \
-SUPERVISOR_DATABASE_URL=postgres://bookkeeping_supervisor:supervisor_pw@localhost:5433/bookkeeping \
+ADMIN_DATABASE_URL=postgres://admin:admin@localhost:5434/bookkeeping \
+DATABASE_URL=postgres://bookkeeping_app:app_pw@localhost:5434/bookkeeping \
+WORKER_DATABASE_URL=postgres://bookkeeping_worker:worker_pw@localhost:5434/bookkeeping \
+SUPERVISOR_DATABASE_URL=postgres://bookkeeping_supervisor:supervisor_pw@localhost:5434/bookkeeping \
 npm run migrate; echo "migrate exit=$?"
 mv .env.bak .env
 ```
 
-Expected: exits 0. If it fails with an env-file error, change both `package.json` scripts to `node --env-file-if-exists=.env …` (Node 20.12+) and re-run. Record which outcome occurred — Task 8 documents it.
+Expected: exits 0, with no `node: .env: not found`. Restore `.env` either way — it holds this worktree's private-DB credentials. If this fails, stop: Task 4's Step 0 regressed and the workflow cannot work.
 
 - [ ] **Step 3: Validate the workflow YAML**
 
@@ -825,7 +863,7 @@ job publishes the image to GHCR from main."
 - [ ] **Step 5: Push and read the result**
 
 ```bash
-git push -u origin m9-vat-completeness
+git push -u origin worktree-deploy-hetzner-pilot
 gh run watch
 ```
 
