@@ -26,6 +26,13 @@ import { createProposal, type Rationale } from '../proposals/proposals.js';
 import { importStatement } from '../banking/import.js';
 import { proposeArMatches } from '../banking/match.js';
 import { createVatDeclarationProposal } from '../tax/vat-proposal.js';
+import { setVatSettings } from '../tax/vat-settings.js';
+import { sendInvoice } from '../einvoice/outbound.js';
+import { StubAccessPoint } from '../einvoice/access-point.js';
+import type { EInvoice } from '../einvoice/ubl.js';
+import { createBill } from '../payables/bills.js';
+import { approveProposal } from '../proposals/lifecycle.js';
+import { postApprovedPosting } from '../proposals/post-proposal.js';
 import { createTask, resolveTask } from '../collab/tasks.js';
 import { addComment } from '../collab/comments.js';
 import { notify } from '../collab/notifications.js';
@@ -44,7 +51,8 @@ const ACCOUNTS: { code: string; name: string; type: 'asset' | 'liability' | 'equ
   { code: '7710', name: 'Saimnieciskās darbības izdevumi (Expense)', type: 'expense' },
 ];
 
-async function seedClient(ctx: TenantContext, clientName: string): Promise<void> {
+async function seedClient(ctx: TenantContext, client: { name: string; regNo: string }): Promise<void> {
+  const clientName = client.name;
   await withTenant(ctx, async (tx) => {
     for (const a of ACCOUNTS) await createAccount(tx, ctx, a);
     await openPeriod(tx, ctx, { year: 2026, month: 2 });
@@ -55,6 +63,55 @@ async function seedClient(ctx: TenantContext, clientName: string): Promise<void>
     await createParty(tx, ctx, { kind: 'customer', name: 'SIA Beta Tirdzniecība', regNo: '40200000012' });
     await createParty(tx, ctx, { kind: 'vendor', name: 'SIA Piegādātājs Gamma', regNo: '40300000021', vatNo: 'LV40300000021' });
     await createParty(tx, ctx, { kind: 'vendor', name: 'AS Enerģija', regNo: '40300000022' });
+
+    // --- M9: VAT categories + EC Sales List demo data. --------------------------------
+    // The client needs a VAT number on file so the PVN 2 (EC Sales List) XML has a
+    // declarant, and both the K sale and the AE bill quote it as the LV supplier/self.
+    const clientVatNo = `LV${client.regNo}`;
+    await setVatSettings(tx, ctx, { vatNo: clientVatNo, periodicity: 'monthly' });
+
+    // Dated in February 2026 — a period the seed already opens (see openPeriod above) but
+    // otherwise leaves empty, unlike March, which carries the raw postEntry credit sale
+    // below. That sale has no document behind it, so it would make the ledger-vs-documents
+    // reconciliation indicator disagree for reasons that have nothing to do with this data
+    // (see the design note in src/tax/vat-breakdown.ts) — using a clean period keeps the
+    // K/AE demo self-contained and genuinely reconciling.
+    const eeCustomer = await createParty(tx, ctx, {
+      kind: 'customer', name: 'Baltic Wood OÜ', regNo: '10345678', vatNo: 'EE101234567', countryCode: 'EE',
+    });
+    const euVendor = await createParty(tx, ctx, {
+      kind: 'vendor', name: 'Nordwind Logistik GmbH', regNo: 'HRB123456', vatNo: 'DE123456789', countryCode: 'DE',
+    });
+
+    // Intra-EU goods sale: K line carries vatRate 0 / vat 0.00 — the customer self-assesses
+    // at their own domestic rate, so no rate may be stated on the wire document (BR-IC-5).
+    const eeInvoice: EInvoice = {
+      invoiceNumber: 'INV-2026-EE-001', issueDate: '2026-02-10', currency: 'EUR',
+      supplier: { name: clientName, regNo: client.regNo, vatNo: clientVatNo },
+      customer: { name: 'Baltic Wood OÜ', regNo: '10345678', vatNo: 'EE101234567' },
+      lines: [{ description: 'Koka izstrādājumu piegāde (intra-ES)', net: '1500.00', vatRate: 0, vat: '0.00', vatCategory: 'K' }],
+      netTotal: '1500.00', vatTotal: '0.00', grandTotal: '1500.00',
+    };
+    await sendInvoice(tx, ctx, {
+      invoice: eeInvoice, recipientPeppolId: '0037:10345678', ap: new StubAccessPoint(),
+      receivableAccount: '2310', salesAccount: '6110', vatAccount: '5721', customerPartyId: eeCustomer.id,
+    });
+
+    // Reverse-charge purchase: AE line carries the DOMESTIC rate (21) — that is what we
+    // self-assess by, since the vendor invoiced 0%. Approved + posted (not left
+    // awaiting_approval) so it has a journal_entry_id and counts in the VAT breakdown.
+    const { proposalId: euBillProposalId } = await createBill(
+      tx, ctx,
+      {
+        vendorPartyId: euVendor.id, billNumber: 'NORD-2026-002', issueDate: '2026-02-12', dueDate: '2026-03-14',
+        currency: 'EUR', source: 'manual',
+        lines: [{ description: 'Loģistikas pakalpojumi (reverse charge)', expenseAccount: '7710', net: '800.00', vatRate: 21, vat: '0.00', vatCategory: 'AE' }],
+      },
+      { vatInputAccount: '5722', vatOutputAccount: '5721', payablesAccount: '5310' },
+    );
+    await approveProposal(tx, ctx, euBillProposalId);
+    await postApprovedPosting(tx, ctx, euBillProposalId);
+    // --- end M9 demo data. -------------------------------------------------------------
 
     // A credit sale in March: DR debtors 121 / CR sales 100 / CR output VAT 21.
     // This creates an open receivable (for bank matching) and output VAT (for the declaration).
@@ -151,8 +208,8 @@ async function main(): Promise<void> {
   await assignUserToClient(owner.id, clientA.id);
 
   const ctxFor = (clientCompanyId: string): TenantContext => ({ firmId: firm.id, clientCompanyId, actorId: accountant.id, actorRole: 'accountant' });
-  await seedClient(ctxFor(clientA.id), 'SIA Ziemeļvējs');
-  await seedClient(ctxFor(clientB.id), 'SIA Baltic Coffee');
+  await seedClient(ctxFor(clientA.id), { name: clientA.name, regNo: clientA.regNo });
+  await seedClient(ctxFor(clientB.id), { name: clientB.name, regNo: clientB.regNo });
 
   const now = Math.floor(Date.now() / 1000);
   console.log('\n✅  Seed complete.\n');

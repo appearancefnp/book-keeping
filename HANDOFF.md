@@ -20,6 +20,8 @@ trilingual (LV/RU/EN), responsive, and accessible.
 > invoices/quotes/reminders), aged AR/AP, expense claims.
 >
 > **Progress:** M6 (expense claims) — **done, shipped 2026-07-20**, see entry below.
+> M9 (VAT completeness) — **slice A+B shipped 2026-07-31**, see entry below — still 🔶,
+> not ✅ (Intrastat, OSS, cash-accounting scheme, VIES validation remain out of scope).
 > M1 (financial statements) — **done, shipped 2026-07-29** — P&L + Balance Sheet
 > (2026-07-10), then **Cash-Flow statement + Statement of Equity (2026-07-29)** completing
 > the set. `src/reports/cash-flow.ts` (indirect method) + `src/reports/equity.ts`, read-only
@@ -165,6 +167,85 @@ trilingual (LV/RU/EN), responsive, and accessible.
 >   pain.001 payment order can be generated twice; a double-pay is caught today by
 >   `expense_direct` bank-match dedup (only one debit can settle a claim) — add an
 >   order-generated marker once real bank sends land.
+>
+> **M9 (VAT completeness) slice A+B — shipped 2026-07-31.** `src/tax/categories.ts`: the EN
+> 16931 VAT category model (`S` standard, `Z` zero-rated, `E` exempt, `AE` reverse charge, `K`
+> intra-Community, `G` export, `O` out of scope — BT-151) plus `categoryIssues`, shared by the
+> zod schemas and `validateEn16931`, holding a sales document and a purchase bill to opposite
+> rate rules on the same category: a sales AE/K line must invoice **zero** rate (BR-AE-5 /
+> BR-IC-5 — the customer accounts for VAT at their own domestic rate) while a purchase AE/K
+> line must carry **our own domestic rate**, the one `selfAssessedVatCents` multiplies by.
+> `vat_category` columns landed on `einvoice_lines`, `bill_lines`, and
+> `vendor_credit_note_lines`; a real bug was caught along the way — the category wasn't
+> actually round-tripping through the UBL wire document (BT-151), so a K/AE invoice read back
+> as plain `S` — and fixed. Reverse-charge self-assessment now posts on both bills
+> (`buildBillEntry`) and vendor credit notes (`buildCreditNoteEntry`): DR/CR VAT-input and
+> VAT-output for the self-assessed amount, with non-deductible self-assessed VAT rolled into
+> the expense line instead of VAT-input. `src/tax/vat-breakdown.ts` aggregates sales/purchase
+> net + VAT per category from the documents (einvoice/bill/vendor-credit-note lines, netted
+> against credit notes, counting only rows with a `journal_entry_id` — i.e. actually posted),
+> and `assembleVatDeclaration` compares that against `computeVat`'s ledger sweep to produce a
+> `reconciles` flag: true means the GL and the documents agree to the cent; false means
+> something reached a VAT account with no document behind it (typically a manual journal
+> entry) — a genuinely useful signal, not a bug indicator. `src/tax/ecsl.ts` builds the EC
+> Sales List (PVN 2) from outbound K/AE lines, grouped by customer country + VAT number +
+> supply type (K→goods, AE→services), netting credit notes (resolved back through
+> `corrected_invoice_number`, since a credit note's own `einvoices` row carries no
+> `customer_party_id`), and surfacing an issues list for rows with no reportable VAT number
+> instead of silently dropping them. `src/tax/filing-periods.ts` adds monthly/quarterly
+> periodicity (`vat_settings.periodicity`) with due dates rolled to the next working day.
+> Routes: `GET`/`POST /api/filings/vat-return` and `/api/filings/ecsl` — approval-gated,
+> preparing a filing creates a `declaration`/`ecsl` proposal and never auto-submits — plus
+> `/api/vat-settings`. UI: `/filings` — VAT-return + ECSL tabs, period picker, reconciliation
+> indicator, issues list, CSV/Excel/PDF export via the existing report machinery. Design:
+> `docs/superpowers/specs/2026-07-29-vat-completeness-design.md`. Plans:
+> `docs/superpowers/plans/2026-07-29-vat-categories.md` (categories + self-assessment) and
+> `docs/superpowers/plans/2026-07-29-ec-sales-list.md` (breakdown/reconciliation + ECSL +
+> `/filings`). Demo seed (`src/dev/seed.ts`) now exercises the category model on both demo
+> clients: an EE customer with a `K` intra-Community goods sale (net 1500.00, zero rate/VAT on
+> the wire per BR-IC-5) and an EU vendor with an `AE` reverse-charge bill (net 800.00,
+> self-assessed at the domestic 21% → 168.00), approved and posted so it counts in the
+> breakdown. Dated February 2026 rather than March deliberately, to keep the demo's
+> reconciliation indicator clean of the pre-existing March raw journal entry that credits
+> output VAT with no document behind it (see the design note in `vat-breakdown.ts` above) —
+> that entry's own non-reconciliation is unrelated pre-existing seed behaviour, not something
+> this task introduced or was asked to fix.
+> M9 known debt, documented rather than silently dropped:
+> 1. **No filing-submission path.** Approving a filing proposal marks it approved and stops
+>    there — `submitToVid` takes an einvoice id, not a filing, so there is nothing to wire it
+>    to yet. The lifecycle ends at "approved, ready to file." Deliberate — see the real EDS
+>    integration work in `HANDOFF §2`; a filing must never auto-submit regardless.
+> 2. **`/filings` doesn't surface the approved state or an XML download**, though the design
+>    spec promised both — no route exposes a proposal's status or its generated XML on that
+>    page, so the i18n keys `filings.downloadXml` and `filings.approved` exist unused. The XML
+>    *is* reachable today, just indirectly, through the approval queue's proposal rationale.
+>    This is the one place the shipped UI falls short of its own spec.
+> 3. **`5721`/`5722` remain env-overridable route constants, not per-client settings** — the
+>    pre-existing account-mapping debt (§M2 follow-ups above), now also read by the filings and
+>    export routes. A client on a different chart of accounts can't point the VAT return
+>    anywhere else without an env var.
+> 4. **VAT numbers are format-checked only, never validated against VIES** — a mistyped or
+>    deregistered EU VAT number on a K/AE counterparty passes through to the EC Sales List
+>    silently.
+> 5. **Intrastat columns `cn_code` / `net_mass_kg`** exist on `bill_lines`, `einvoice_lines`,
+>    and `vendor_credit_note_lines`, but nothing reads or writes them yet — Intrastat itself (a
+>    separate, weight/commodity-code-based filing) is unbuilt.
+> 6. **`einvoices.invoice_number` has no uniqueness constraint.** The ECSL resolves a credit
+>    note's counterparty by joining on that column; it guards against a fan-out with
+>    `LEFT JOIN LATERAL … ORDER BY created_at, id LIMIT 1` (oldest match wins, deterministic
+>    rather than silently arbitrary) so duplicates can't double-count a filing — but the
+>    underlying data still has no constraint stopping a duplicate invoice number from being
+>    created in the first place.
+> 7. **Migration `046` was amended in place** after already being applied to some developer
+>    databases (it originally shipped without the `vendor_credit_note_lines` category
+>    columns). `schema_migrations` keys purely on filename, with no content hash, so a database
+>    that recorded `046` before the amendment silently lacks those columns until its schema is
+>    reset. Tests always rebuild the schema, so this only bites a stale local database — reset
+>    it (`DROP SCHEMA public CASCADE` + `npm run migrate`, or `npm run seed`) if VAT-category
+>    queries error on a machine that had `046` applied before the amendment.
+> 8. **Plan 1 Task 11's interactive browser walk was deferred** to the controller and had not
+>    been performed as of this entry — the `/filings` UI has been read and typechecked but not
+>    click-tested end to end in a live browser.
 >
 > **M2 branch status & follow-ups (2026-07-13):** shipped on branch `m2-accounts-payable`,
 > since merged to `main`; full backend suite **333/333**, root+web typecheck clean, web

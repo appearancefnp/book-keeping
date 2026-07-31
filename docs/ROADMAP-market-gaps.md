@@ -55,7 +55,7 @@ Already in our spec / `HANDOFF §5`; ordering reflects how visibly each hurts ag
 | # | Gap | Status | Notes |
 |---|-----|--------|-------|
 | M8 | **Multi-currency + FX revaluation** | ⛔ | `HANDOFF §5` (§6.1). Any client with one EU/USD invoice hits this wall. |
-| M9 | **VAT completeness** — reverse charge, intra-EU, **EC Sales List + Intrastat** (legally required for EU cross-border), OSS for digital services, exemptions, cash-accounting scheme, monthly-vs-quarterly logic | 🔶 | Partly noted in `HANDOFF §5`. EC Sales List / Intrastat as *filings* are compliance-mandatory, not nice-to-have, and are not named in the spec. Extend `src/tax/`. |
+| M9 | **VAT completeness** — reverse charge, intra-EU, **EC Sales List + Intrastat** (legally required for EU cross-border), OSS for digital services, exemptions, cash-accounting scheme, monthly-vs-quarterly logic | 🔶 | **Slice A+B shipped 2026-07-31.** Shipped: the EN 16931 VAT category model (`S`/`Z`/`E`/`AE`/`K`/`G`/`O`, BT-151) on `einvoice_lines`/`bill_lines`/`vendor_credit_note_lines`, plus a fix so the category actually rides the wire UBL document correctly; reverse-charge self-assessment on bills and vendor credit notes (`selfAssessedVatCents`, posted both sides — VAT-input and VAT-output — by `buildBillEntry`/`buildCreditNoteEntry`); a category-aware VAT return (`src/tax/vat-breakdown.ts`, `VatDeclaration.breakdown`) with a ledger-vs-documents **reconciliation flag** (`reconciles`) that surfaces a manual journal entry hitting a VAT account with no document behind it; the **EC Sales List / PVN 2** (`src/tax/ecsl.ts` — goods/services split derived from the category, an issues list for unreportable rows, representative XML); filing **periodicity** (`src/tax/vat-settings.ts`, `src/tax/filing-periods.ts`, monthly/quarterly, due-date-to-next-working-day); and the **`/filings` page** (VAT-return + ECSL tabs, period picker, CSV/Excel/PDF export via the existing report machinery). **Still 🔶, not ✅ — out of scope and undone: Intrastat, OSS for digital services, the cash-accounting scheme, and VIES validation of VAT numbers** (format-checked only). No filing-submission path either — approval is the terminus (see `HANDOFF.md` known debt). Design: `docs/superpowers/specs/2026-07-29-vat-completeness-design.md`. Plans: `docs/superpowers/plans/2026-07-29-vat-categories.md` (categories + self-assessment) and `docs/superpowers/plans/2026-07-29-ec-sales-list.md` (breakdown/reconciliation + ECSL + `/filings`). |
 | M10 | **Online payment collection** — "Pay now" links on invoices (Stripe / GoCardless) | ⛔ | Drives the get-paid-faster pitch Xero/FreshBooks lead with. Not in spec. |
 | M11 | **Fixed assets & depreciation** | ⛔ | `HANDOFF §5` (§6.5). |
 | M12 | **Inventory / warehouse** | ⛔ | `HANDOFF §5` (§6.4). |
@@ -112,9 +112,14 @@ The three that decide a head-to-head demo, do first, in order:
 M7 (credit notes) is done (✅, shipped 2026-07-17); M6 (expense claims) is done (✅, shipped
 2026-07-20); M1 (financial statements) is now done (✅ — Cash-Flow + Statement of Equity shipped
 2026-07-29, completing the set). M4 (AR lifecycle, 🔶) rounds out invoicing — C-recurring and
-slice D (quotes→invoice, customer statements) remain. **With all six Tier-1 rows shipped, the
-credibility floor is cleared;** the next unblocked work is M4's remaining slices, then M8–M13 in
-the spec's Phase 2–3 order (Tiers 3–4 opportunistic). Every item follows
+slice D (quotes→invoice, customer statements) remain. M9 (VAT completeness) is no longer
+unstarted either — slice A+B shipped 2026-07-31 (VAT categories, reverse-charge
+self-assessment, the category-aware VAT return with its reconciliation flag, the EC Sales
+List, filing periodicity, and `/filings`), leaving it 🔶 with Intrastat, OSS for digital
+services, the cash-accounting scheme, and VIES validation as the remaining scope. **With all
+six Tier-1 rows shipped, the credibility floor is cleared;** the next unblocked work is M4's
+remaining slices, then M9's remaining scope alongside M8/M10–M13 in the spec's Phase 2–3 order
+(Tiers 3–4 opportunistic). Every item follows
 the house convention:
 **migration + domain (`src/<module>/`) + tests + API route + page**, external systems behind an
 adapter interface with a stub (`HANDOFF.md` Conventions).
