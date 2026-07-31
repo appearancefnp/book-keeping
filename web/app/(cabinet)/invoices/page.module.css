@@ -4,6 +4,14 @@
 .pageHeading { font-size: 1.375rem; font-weight: 600; color: var(--ink); margin: 0; }
 .skeletons { display: flex; flex-direction: column; gap: var(--space-4); }
 
+.tabs { display: flex; gap: .5rem; border-bottom: 1px solid var(--border, #e5e7eb); margin-bottom: 1rem; }
+.tab, .tabActive {
+  appearance: none; background: none; border: none; cursor: pointer;
+  padding: .5rem .75rem; font: inherit; color: var(--muted, #6b7280);
+  border-bottom: 2px solid transparent;
+}
+.tabActive { color: var(--fg, #111827); border-bottom-color: currentColor; font-weight: 600; }
+
 .primaryBtn { background: var(--primary); color: var(--primary-ink); border: none; border-radius: var(--radius-sm); padding: var(--space-2) var(--space-4); font: inherit; font-weight: 500; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
 .primaryBtn:disabled { opacity: 0.55; cursor: default; }
 .ghostBtn { background: transparent; color: var(--primary-deep); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-1) var(--space-3); font: inherit; cursor: pointer; }

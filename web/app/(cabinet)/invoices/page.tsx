@@ -23,6 +23,14 @@ interface EinvoiceRow {
   amountPaidCents: string | null; outstandingCents: string | null;
 }
 
+interface RecurringRow {
+  id: string; customerPartyId: string; recipientPeppolId: string;
+  anchorDay: number; intervalMonths: number; nextRunDate: string;
+  paymentTermsDays: number | null; endDate: string | null;
+  occurrencesRemaining: number | null; active: boolean;
+  invoicePayload: { customer: { name: string }; grandTotal: string; currency: string };
+}
+
 function InvoicesInner() {
   const searchParams = useSearchParams();
   const { t, lang } = useMessages();
@@ -31,6 +39,10 @@ function InvoicesInner() {
   const [rows, setRows] = useState<EinvoiceRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [tab, setTab] = useState<'outbox' | 'recurring'>('outbox');
+  const [templates, setTemplates] = useState<RecurringRow[] | null>(null);
+  const [recError, setRecError] = useState<string | null>(null);
 
   const [settleRow, setSettleRow] = useState<EinvoiceRow | null>(null);
   const [amount, setAmount] = useState('');
@@ -59,6 +71,48 @@ function InvoicesInner() {
   useEffect(() => {
     if (clientCompanyId) load(clientCompanyId);
   }, [clientCompanyId, load]);
+
+  const loadTemplates = useCallback(async (id: string) => {
+    setRecError(null);
+    try {
+      const res = await fetch(`/api/recurring?clientCompanyId=${encodeURIComponent(id)}`, { cache: 'no-store' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+      }
+      const body = (await res.json()) as { templates: RecurringRow[] };
+      setTemplates(body.templates);
+    } catch (err) {
+      setRecError((err as Error).message ?? t('state.error'));
+    }
+  }, [t]);
+
+  useEffect(() => {
+    if (clientCompanyId && tab === 'recurring' && templates === null) loadTemplates(clientCompanyId);
+  }, [clientCompanyId, tab, templates, loadTemplates]);
+
+  const pauseTemplate = async (id: string) => {
+    if (!clientCompanyId) return;
+    if (!confirm(t('einv.rec.pauseConfirm'))) return;
+    setRecError(null);
+    try {
+      const res = await fetch(`/api/recurring/${id}?clientCompanyId=${encodeURIComponent(clientCompanyId)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+      }
+      setTemplates(null); // force a refetch through the effect above
+    } catch (err) {
+      setRecError((err as Error).message ?? t('state.error'));
+    }
+  };
+
+  const cadenceLabel = (r: RecurringRow) =>
+    r.intervalMonths === 1
+      ? t('einv.rec.monthly').replace('{day}', String(r.anchorDay))
+      : t('einv.rec.everyNMonths').replace('{n}', String(r.intervalMonths)).replace('{day}', String(r.anchorDay));
 
   const openSettle = (r: EinvoiceRow) => {
     setSettleRow(r);
@@ -132,6 +186,21 @@ function InvoicesInner() {
           </Link>
         </div>
 
+        <div className={styles.tabs} role="tablist">
+          <button role="tab" aria-selected={tab === 'outbox'}
+                  className={tab === 'outbox' ? styles.tabActive : styles.tab}
+                  onClick={() => setTab('outbox')}>
+            {t('einv.tab.outbox')}
+          </button>
+          <button role="tab" aria-selected={tab === 'recurring'}
+                  className={tab === 'recurring' ? styles.tabActive : styles.tab}
+                  onClick={() => setTab('recurring')}>
+            {t('einv.tab.recurring')}
+          </button>
+        </div>
+
+        {tab === 'outbox' && (
+          <>
         {error && <ErrorState message={error} onRetry={() => clientCompanyId && load(clientCompanyId)} />}
         {!error && loading && <div className={styles.skeletons}><SkeletonCard /><SkeletonCard /></div>}
         {!error && !loading && rows && rows.length === 0 && (
@@ -194,6 +263,52 @@ function InvoicesInner() {
               </tbody>
             </table>
           </div>
+        )}
+          </>
+        )}
+
+        {tab === 'recurring' && (
+          <>
+            {recError && <ErrorState message={recError} onRetry={() => clientCompanyId && loadTemplates(clientCompanyId)} />}
+            {!recError && templates === null && <SkeletonCard />}
+            {!recError && templates?.length === 0 && (
+              <EmptyState message={t('einv.rec.empty')} detail={t('einv.rec.emptyDetail')} />
+            )}
+            {!recError && templates && templates.length > 0 && (
+              <div className={styles.tableWrapper}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th scope="col">{t('einv.rec.customer')}</th>
+                      <th scope="col">{t('einv.rec.cadence')}</th>
+                      <th scope="col">{t('einv.rec.nextRun')}</th>
+                      <th scope="col" className={styles.colAmount}>{t('reports.col.amount')}</th>
+                      <th scope="col">{t('einv.rec.state')}</th>
+                      <th scope="col"><span className="sr-only">{t('einv.rec.pause')}</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {templates.map((r) => (
+                      <tr key={r.id}>
+                        <td>{r.invoicePayload.customer.name}</td>
+                        <td>{cadenceLabel(r)}</td>
+                        <td>{r.active ? fmtDate(r.nextRunDate) : '—'}</td>
+                        <td className={styles.colAmount}>{r.invoicePayload.grandTotal} {r.invoicePayload.currency}</td>
+                        <td>{t(r.active ? 'einv.rec.active' : 'einv.rec.paused')}</td>
+                        <td>
+                          {r.active && (
+                            <button type="button" className={styles.linkBtn} onClick={() => pauseTemplate(r.id)}>
+                              {t('einv.rec.pause')}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
 
         {settleRow && (
