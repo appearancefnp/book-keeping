@@ -754,6 +754,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # The suite is known to hang on this branch (36 of 156 files, in tests/payroll/*).
+    # Without this, a hang burns the 360-minute default instead of failing. Deciding
+    # whether that hang is real and pre-existing is exactly what this job is for, so it
+    # must fail loudly and quickly rather than time out silently.
+    timeout-minutes: 30
     services:
       db:
         image: postgres:16
@@ -819,25 +824,23 @@ jobs:
           cache-to: type=gha,mode=max
 ```
 
-Note `npm run migrate` and `npm run seed` use `node --env-file=.env`, and CI has no `.env`. Step 2 establishes whether that is fatal.
+CI has no `.env`, which would have been fatal before Task 4's Step 0 switched the four root scripts to `--env-file-if-exists=.env`. Step 2 confirms that fix holds for the exact CI sequence.
 
 - [ ] **Step 2: Reproduce the CI sequence locally, without a `.env` file**
 
-The workflow's correctness hinges on `--env-file=.env` tolerating a missing file, so prove it before pushing:
+CI runs with no `.env` at all, so prove `npm run migrate` survives that before pushing. Run this from the worktree, against the worktree-private Postgres on port **5434**:
 
 ```bash
-cd /home/karlis/git/book-keeping
-docker compose up -d db
 mv .env .env.bak
-ADMIN_DATABASE_URL=postgres://admin:admin@localhost:5433/bookkeeping \
-DATABASE_URL=postgres://bookkeeping_app:app_pw@localhost:5433/bookkeeping \
-WORKER_DATABASE_URL=postgres://bookkeeping_worker:worker_pw@localhost:5433/bookkeeping \
-SUPERVISOR_DATABASE_URL=postgres://bookkeeping_supervisor:supervisor_pw@localhost:5433/bookkeeping \
+ADMIN_DATABASE_URL=postgres://admin:admin@localhost:5434/bookkeeping \
+DATABASE_URL=postgres://bookkeeping_app:app_pw@localhost:5434/bookkeeping \
+WORKER_DATABASE_URL=postgres://bookkeeping_worker:worker_pw@localhost:5434/bookkeeping \
+SUPERVISOR_DATABASE_URL=postgres://bookkeeping_supervisor:supervisor_pw@localhost:5434/bookkeeping \
 npm run migrate; echo "migrate exit=$?"
 mv .env.bak .env
 ```
 
-Expected: exits 0. If it fails with an env-file error, change both `package.json` scripts to `node --env-file-if-exists=.env …` (Node 20.12+) and re-run. Record which outcome occurred — Task 8 documents it.
+Expected: exits 0, with no `node: .env: not found`. Restore `.env` either way — it holds this worktree's private-DB credentials. If this fails, stop: Task 4's Step 0 regressed and the workflow cannot work.
 
 - [ ] **Step 3: Validate the workflow YAML**
 
