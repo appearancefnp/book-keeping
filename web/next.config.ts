@@ -1,6 +1,10 @@
+import path from 'node:path';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  // The domain lives at ../src via experimental.externalDir, and the repo has two
+  // lockfiles, so Next cannot infer the workspace root. Say it explicitly.
+  outputFileTracingRoot: path.join(__dirname, '..'),
   experimental: {
     externalDir: true,
   },
