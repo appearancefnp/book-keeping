@@ -5,6 +5,7 @@ import { StubAccessPoint } from '../../src/einvoice/access-point.js';
 import { buildUblInvoice, type EInvoice } from '../../src/einvoice/ubl.js';
 import { receiveInboundInvoices } from '../../src/einvoice/inbound.js';
 import { getProposal } from '../../src/proposals/proposals.js';
+import { getBill } from '../../src/payables/bills.js';
 
 const template = { expenseAccount: '7710', vatInputAccount: '5722', payablesAccount: '5310' };
 const accounts = { vatInputAccount: '5722', vatOutputAccount: '5721', payablesAccount: '5310' };
@@ -39,4 +40,48 @@ test('no inbound invoices yields no bills or proposals', async () => {
   const { billIds, proposalIds } = await withTenant(ctx(t), (tx) => receiveInboundInvoices(tx, ctx(t), { ap, template, accounts }));
   expect(billIds).toHaveLength(0);
   expect(proposalIds).toHaveLength(0);
+});
+
+test('a mixed inbound invoice keeps VAT off the reverse-charge line', async () => {
+  const t = await makeFirmAndClient();
+  const xml = buildUblInvoice({
+    invoiceNumber: 'IN-MIX-1', issueDate: '2026-06-12', currency: 'EUR',
+    supplier: { name: 'OU Vendor', regNo: '11111111', vatNo: 'EE101010101' },
+    customer: { name: 'SIA Us', regNo: '40100000000', vatNo: 'LV40100000000' },
+    lines: [
+      // The vendor states no rate on the reverse-charge line — that is the conformant form.
+      { description: 'EU service', net: '200.00', vatRate: 0, vat: '0.00', vatCategory: 'AE' },
+      { description: 'Domestic goods', net: '100.00', vatRate: 21, vat: '21.00', vatCategory: 'S' },
+    ],
+    netTotal: '300.00', vatTotal: '21.00', grandTotal: '321.00',
+  });
+  const ap = new StubAccessPoint([{ ublXml: xml }]);
+
+  const { billIds } = await withTenant(ctx(t), (tx) => receiveInboundInvoices(tx, ctx(t), {
+    ap, template, accounts: { vatInputAccount: '5722', vatOutputAccount: '5721', payablesAccount: '5310' },
+  }));
+
+  const bill = await withTenant(ctx(t), (tx) => getBill(tx, ctx(t), billIds[0]!));
+  expect(bill.lines.map((l) => [l.vatCategory, l.vatCents])).toEqual([['AE', '0'], ['S', '2100']]);
+});
+
+test('an inbound reverse-charge line is stored at the domestic rate so it self-assesses', async () => {
+  const t = await makeFirmAndClient();
+  const xml = buildUblInvoice({
+    invoiceNumber: 'IN-RC-1', issueDate: '2026-06-12', currency: 'EUR',
+    supplier: { name: 'OU Vendor', regNo: '11111111', vatNo: 'EE101010101' },
+    customer: { name: 'SIA Us', regNo: '40100000000', vatNo: 'LV40100000000' },
+    lines: [{ description: 'EU service', net: '1000.00', vatRate: 0, vat: '0.00', vatCategory: 'AE' }],
+    netTotal: '1000.00', vatTotal: '0.00', grandTotal: '1000.00',
+  });
+  const { billIds } = await withTenant(ctx(t), (tx) => receiveInboundInvoices(tx, ctx(t), {
+    ap: new StubAccessPoint([{ ublXml: xml }]),
+    template, accounts: { vatInputAccount: '5722', vatOutputAccount: '5721', payablesAccount: '5310' },
+  }));
+
+  const bill = await withTenant(ctx(t), (tx) => getBill(tx, ctx(t), billIds[0]!));
+  // Stored at the LV standard rate (21 from tax_rules), not the vendor's 0.
+  expect(bill.lines[0]!.vatRate).toBe('21');
+  expect(bill.lines[0]!.vatCents).toBe('0');       // nothing was invoiced
+  expect(bill.grandTotalCents).toBe('100000');     // the vendor is paid net
 });
