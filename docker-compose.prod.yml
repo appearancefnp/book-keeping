@@ -3,9 +3,9 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -15,17 +15,17 @@ services:
       retries: 20
 
   web:
-    image: ${APP_IMAGE}
+    image: ${APP_IMAGE:?APP_IMAGE is required}
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL}
-      ADMIN_DATABASE_URL: ${ADMIN_DATABASE_URL}
-      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL}
-      SUPERVISOR_DATABASE_URL: ${SUPERVISOR_DATABASE_URL}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      ADMIN_DATABASE_URL: ${ADMIN_DATABASE_URL:?ADMIN_DATABASE_URL is required}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}
+      SUPERVISOR_DATABASE_URL: ${SUPERVISOR_DATABASE_URL:?SUPERVISOR_DATABASE_URL is required}
       BLOB_DIR: /app/.blob-store
       # Required so /api/cron/bank-sync (called by the bookkeeping-banksync.timer, not by
       # `npm run worker`) doesn't 401 unconditionally — see docs/RUNNING.md §4.6.
@@ -38,7 +38,7 @@ services:
       - blobdata:/app/.blob-store
 
   worker:
-    image: ${APP_IMAGE}
+    image: ${APP_IMAGE:?APP_IMAGE is required}
     restart: unless-stopped
     command: ["npm", "run", "worker"]
     depends_on:
@@ -46,9 +46,9 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL}
-      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL}
-      SUPERVISOR_DATABASE_URL: ${SUPERVISOR_DATABASE_URL}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      WORKER_DATABASE_URL: ${WORKER_DATABASE_URL:?WORKER_DATABASE_URL is required}
+      SUPERVISOR_DATABASE_URL: ${SUPERVISOR_DATABASE_URL:?SUPERVISOR_DATABASE_URL is required}
       BLOB_DIR: /app/.blob-store
     volumes:
       - blobdata:/app/.blob-store
@@ -59,7 +59,7 @@ services:
     depends_on:
       - web
     environment:
-      SITE_ADDRESS: ${SITE_ADDRESS}
+      SITE_ADDRESS: ${SITE_ADDRESS:?SITE_ADDRESS is required}
     ports:
       - "80:80"
       - "443:443"
