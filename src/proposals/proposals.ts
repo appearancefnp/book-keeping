@@ -3,7 +3,7 @@ import type { PoolClient } from 'pg';
 import type { TenantContext } from '../tenancy/context.js';
 import { appendAudit } from '../audit/audit.js';
 
-export type ProposalType = 'posting' | 'bank_match' | 'declaration' | 'task' | 'recurring_invoice';
+export type ProposalType = 'posting' | 'bank_match' | 'declaration' | 'task' | 'recurring_invoice' | 'ecsl';
 export type ProposalStatus = 'suggested' | 'pending_approval' | 'approved' | 'rejected' | 'posted';
 export interface Rationale { ruleRef?: string; computation?: string; sourceRefs?: unknown; }
 export interface ProposalRow {
@@ -12,7 +12,7 @@ export interface ProposalRow {
 }
 
 const newProposalSchema = z.object({
-  type: z.enum(['posting', 'bank_match', 'declaration', 'task', 'recurring_invoice']),
+  type: z.enum(['posting', 'bank_match', 'declaration', 'task', 'recurring_invoice', 'ecsl']),
   payload: z.unknown(),
   rationale: z.object({ ruleRef: z.string().optional(), computation: z.string().optional(), sourceRefs: z.unknown().optional() }).passthrough(),
   documentId: z.string().uuid().nullable().optional(),
