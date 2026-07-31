@@ -42,7 +42,7 @@ test('a period VAT return nets AR and AP credit notes', async () => {
     await approveProposal(tx, ctx(t), bill.proposalId);
     await postApprovedPosting(tx, ctx(t), bill.proposalId);
     // AP credit note: −input VAT 4.20.
-    const vcn = await createVendorCreditNote(tx, ctx(t), { vendorPartyId: vendor.id, creditNoteNumber: 'VCN-1', issueDate: '2026-03-08', currency: 'EUR', lines: [{ description: 'r', expenseAccount: '7710', net: '20.00', vatRate: 21, vat: '4.20' }] }, { vatInputAccount: '5722', payablesAccount: '5310' });
+    const vcn = await createVendorCreditNote(tx, ctx(t), { vendorPartyId: vendor.id, creditNoteNumber: 'VCN-1', issueDate: '2026-03-08', currency: 'EUR', lines: [{ description: 'r', expenseAccount: '7710', net: '20.00', vatRate: 21, vat: '4.20' }] }, { vatInputAccount: '5722', vatOutputAccount: '5721', payablesAccount: '5310' });
     await approveProposal(tx, ctx(t), vcn.proposalId);
     await postApprovedPosting(tx, ctx(t), vcn.proposalId);
 

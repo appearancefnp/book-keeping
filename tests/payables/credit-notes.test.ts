@@ -7,7 +7,7 @@ import { createParty } from '../../src/parties/parties.js';
 import { getProposal } from '../../src/proposals/proposals.js';
 import { approveProposal } from '../../src/proposals/lifecycle.js';
 import { postApprovedPosting } from '../../src/proposals/post-proposal.js';
-import { getEntry } from '../../src/ledger/posting.js';
+import { getEntry, type NewJournalEntry } from '../../src/ledger/posting.js';
 import {
   buildCreditNoteEntry, createVendorCreditNote, getVendorCreditNote,
   type NewVendorCreditNote,
@@ -36,7 +36,7 @@ test('migration adds doc_type to einvoices and vendor_credit_notes tables', asyn
   expect(tbl.b).toBe('vendor_credit_note_lines');
 });
 
-const CN_ACCTS = { vatInputAccount: '5722', payablesAccount: '5310' };
+const CN_ACCTS = { vatInputAccount: '5722', vatOutputAccount: '5721', payablesAccount: '5310' };
 
 const sampleCn = (vendorPartyId: string): NewVendorCreditNote => ({
   vendorPartyId, creditNoteNumber: 'VCN-7', issueDate: '2026-03-20', currency: 'EUR',
@@ -109,4 +109,64 @@ test('createVendorCreditNote rejects negative line amounts', async () => {
     ...sampleCn(vendorId),
     lines: [{ description: 'x', expenseAccount: '7710', net: '-100.00', vatRate: 21, vat: '0.00' }],
   }, CN_ACCTS))).rejects.toThrow();
+});
+
+test('a reverse-charge vendor credit note reverses both self-assessed legs', async () => {
+  const { t, vendorId } = await seedVendor();
+  await withTenant(ctx(t), (tx) => createAccount(tx, ctx(t), { code: '5721', name: 'VAT output', type: 'liability' }));
+
+  const { creditNoteId, proposalId } = await withTenant(ctx(t), (tx) => createVendorCreditNote(tx, ctx(t), {
+    vendorPartyId: vendorId, creditNoteNumber: 'VCN-RC-1', issueDate: '2026-03-20',
+    currency: 'EUR', correctedBillNumber: null,
+    lines: [{ description: 'EU service credit', expenseAccount: '7710', net: '1000.00', vatRate: 21, vat: '0.00', vatCategory: 'AE' }],
+  }, CN_ACCTS));
+
+  const detail = await withTenant(ctx(t), (tx) => getVendorCreditNote(tx, ctx(t), creditNoteId));
+  expect(detail.lines[0]!.vatCategory).toBe('AE');
+  expect(detail.lines[0]!.vatDeductible).toBe(true);
+
+  // The proposal payload is the reversal: CR expense 1000, CR input VAT 210, DR payables 1000, DR output VAT 210.
+  const prop = await withTenant(ctx(t), (tx) => getProposal(tx, ctx(t), proposalId));
+  const payload = prop.payload as NewJournalEntry;
+  expect(payload.lines.find((l) => l.accountCode === '5722')?.credit).toBe('210.00');
+  expect(payload.lines.find((l) => l.accountCode === '5721')?.debit).toBe('210.00');
+  expect(payload.lines.find((l) => l.accountCode === '5310')?.debit).toBe('1000.00');
+  const debit = payload.lines.reduce((a, l) => a + Number(l.debit), 0);
+  const credit = payload.lines.reduce((a, l) => a + Number(l.credit), 0);
+  expect(debit).toBeCloseTo(credit);
+
+  // The full flow posts cleanly too — proves the accounts referenced by the reversal actually exist.
+  await withTenant(ctx(t), async (tx) => {
+    await approveProposal(tx, ctx(t), proposalId);
+    await postApprovedPosting(tx, ctx(t), proposalId);
+  });
+  const posted = await withTenant(ctx(t), (tx) => getVendorCreditNote(tx, ctx(t), creditNoteId));
+  expect(posted.status).toBe('applied');
+  expect(posted.journalEntryId).not.toBeNull();
+});
+
+test('a non-deductible reverse-charge vendor credit note posts the VAT into the expense reversal, no VAT-input leg', async () => {
+  const { t, vendorId } = await seedVendor();
+  await withTenant(ctx(t), (tx) => createAccount(tx, ctx(t), { code: '5721', name: 'VAT output', type: 'liability' }));
+
+  const { creditNoteId, proposalId } = await withTenant(ctx(t), (tx) => createVendorCreditNote(tx, ctx(t), {
+    vendorPartyId: vendorId, creditNoteNumber: 'VCN-RC-2', issueDate: '2026-03-20',
+    currency: 'EUR', correctedBillNumber: null,
+    lines: [{ description: 'EU goods credit (non-deductible)', expenseAccount: '7710', net: '500.00', vatRate: 12, vat: '0.00', vatCategory: 'K', vatDeductible: false }],
+  }, CN_ACCTS));
+
+  const detail = await withTenant(ctx(t), (tx) => getVendorCreditNote(tx, ctx(t), creditNoteId));
+  expect(detail.lines[0]!.vatCategory).toBe('K');
+  expect(detail.lines[0]!.vatDeductible).toBe(false);
+
+  const prop = await withTenant(ctx(t), (tx) => getProposal(tx, ctx(t), proposalId));
+  const payload = prop.payload as NewJournalEntry;
+  // assessed = 500 * 12% = 60.00; expense reversal carries net + assessed, no 5722 leg.
+  expect(payload.lines.find((l) => l.accountCode === '7710')).toMatchObject({ debit: '0', credit: '560.00' });
+  expect(payload.lines.find((l) => l.accountCode === '5722')).toBeUndefined();
+  expect(payload.lines.find((l) => l.accountCode === '5310')?.debit).toBe('500.00');
+  expect(payload.lines.find((l) => l.accountCode === '5721')?.debit).toBe('60.00');
+  const debit = payload.lines.reduce((a, l) => a + Number(l.debit), 0);
+  const credit = payload.lines.reduce((a, l) => a + Number(l.credit), 0);
+  expect(debit).toBeCloseTo(credit);
 });

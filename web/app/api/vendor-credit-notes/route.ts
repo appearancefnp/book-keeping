@@ -8,8 +8,11 @@ import { listVendorCreditNotes, createVendorCreditNote, type NewVendorCreditNote
 import { getSessionToken, nowUnix } from '@/app/lib/session';
 import { assertRoleAllowed, errorToStatus } from '@/app/lib/authz';
 
-// Same LR chart defaults as /api/bills — input VAT 5722, payables 5310.
-const AP_ACCOUNTS = { vatInputAccount: '5722', payablesAccount: '5310' };
+// Same LR chart defaults as /api/bills — input VAT 5722, payables 5310. The output-VAT
+// account must be the identical GL account bills self-assess into, or a reversed AE/K
+// line would never net to zero across the bill/credit-note pair.
+const VAT_OUTPUT_ACCOUNT = process.env.BILL_VAT_OUTPUT_ACCOUNT ?? '5721';
+const AP_ACCOUNTS = { vatInputAccount: '5722', vatOutputAccount: VAT_OUTPUT_ACCOUNT, payablesAccount: '5310' };
 
 export async function GET(req: NextRequest) {
   const token = await getSessionToken();
