@@ -61,6 +61,10 @@ test('approving + posting the proposal posts the exact entry and flips the claim
     await createAccount(tx, f.accountantCtx, { code: '5722', name: 'VAT input (expenses)', type: 'asset' });
     await createAccount(tx, f.accountantCtx, { code: '5610', name: 'Employee settlements', type: 'liability' });
     await openPeriod(tx, f.accountantCtx, { year: 2026, month: 7 });
+    // submitClaim posts on the claim's createdAt (wall clock), not its July line dates, so the
+    // current month must be open too — hardcoding July alone broke these from 2026-08-01 on.
+    const nowP = new Date();
+    await openPeriod(tx, f.accountantCtx, { year: nowP.getUTCFullYear(), month: nowP.getUTCMonth() + 1 });
     const { claimId } = await saveClaim(tx, f.accountantCtx, {
       employeeId: f.employeeAId, description: 'July expenses',
       lines: [RECEIPT_DEDUCTIBLE, RECEIPT_NONDEDUCTIBLE, MILEAGE],

@@ -33,6 +33,11 @@ async function setupAccounts(f: Fixture): Promise<void> {
     await createAccount(tx, f.accountantCtx, { code: '5610', name: 'Employee settlements', type: 'liability' });
     await createAccount(tx, f.accountantCtx, { code: '2620', name: 'Bank', type: 'asset' });
     await openPeriod(tx, f.accountantCtx, { year: 2026, month: 7 });
+    // submitClaim posts on the claim's createdAt (wall clock), not its July line dates, so the
+    // period that must be open is the CURRENT month — hardcoding July alone made these tests
+    // pass all through July 2026 and fail from August 1st on. openPeriod is idempotent.
+    const now = new Date();
+    await openPeriod(tx, f.accountantCtx, { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 });
   });
 }
 

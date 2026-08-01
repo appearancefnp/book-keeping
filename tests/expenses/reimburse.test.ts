@@ -31,6 +31,10 @@ async function setupAccounts(f: Fixture): Promise<void> {
     await createAccount(tx, f.accountantCtx, { code: '5610', name: 'Employee settlements', type: 'liability' });
     await createAccount(tx, f.accountantCtx, { code: '2620', name: 'Bank', type: 'asset' });
     await openPeriod(tx, f.accountantCtx, { year: 2026, month: 7 });
+    // submitClaim/settleClaim post on wall-clock dates, not the July line dates, so the current
+    // month must be open too — hardcoding July alone broke these from 2026-08-01 on.
+    const now = new Date();
+    await openPeriod(tx, f.accountantCtx, { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 });
   });
 }
 
