@@ -13,8 +13,8 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  /* Reserve space for the sidebar */
-  margin-left: 248px;
+  /* Reserve space for the sidebar (must match Sidebar .sidebar width) */
+  margin-left: 260px;
 }
 
 .main {

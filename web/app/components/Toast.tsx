@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useMessages } from '@/app/lib/i18n-context';
 import styles from './Toast.module.css';
 
 export type ToastKind = 'ok' | 'error';
@@ -13,6 +14,7 @@ export interface ToastProps {
 }
 
 export function Toast({ message, kind, onDismiss, durationMs = 3500 }: ToastProps) {
+  const { t } = useMessages();
   useEffect(() => {
     const t = setTimeout(onDismiss, durationMs);
     return () => clearTimeout(t);
@@ -50,7 +52,7 @@ export function Toast({ message, kind, onDismiss, durationMs = 3500 }: ToastProp
         type="button"
         className={styles.dismiss}
         onClick={onDismiss}
-        aria-label="Dismiss"
+        aria-label={t('a11y.dismiss')}
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
           <path

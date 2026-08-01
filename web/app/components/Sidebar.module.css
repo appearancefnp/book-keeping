@@ -5,8 +5,9 @@
   top: 0;
   left: 0;
   /* Wide enough for the longest LV/RU labels ("Apstiprināšanas rinda",
-     "Администрирование") without ellipsis. */
-  width: 248px;
+     "Администрирование") without ellipsis — 248px clipped the LV label,
+     so widened to 260px. Keep AppShell .body margin-left in sync. */
+  width: 260px;
   height: 100vh;
   background: var(--surface);
   border-right: 1px solid var(--border);

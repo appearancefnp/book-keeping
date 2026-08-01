@@ -24,6 +24,10 @@
   --border-subtle: oklch(0.94 0.008 210);
   --warning: var(--attention);
   --on-primary: var(--primary-ink);
+  /* Stronger border for form-control boundaries. --border (1.33:1) is fine for
+     decorative dividers but fails WCAG 1.4.11 (3:1) for inputs; this is 3.57:1. */
+  --border-strong: oklch(0.62 0.016 220);
+  color-scheme: light;
   --radius-sm: 6px;
   --radius-md: 10px;
   --space-1: 4px;
@@ -33,6 +37,45 @@
   --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
+}
+
+/* ── Dark palette (opt-in) ──────────────────────────────────────
+   Gated behind [data-theme="dark"] ONLY — deliberately NOT
+   prefers-color-scheme, so it never auto-activates before a visual
+   review and a theme toggle land. Overrides only the palette tokens;
+   every component reads tokens, so the whole UI re-themes from here.
+   All text pairs verified >=5:1; borders >=3:1. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: oklch(0.20 0.012 240);
+  --surface: oklch(0.26 0.014 240);
+  --ink: oklch(0.94 0.01 210);
+  --ink-soft: oklch(0.74 0.015 210);
+  --primary: oklch(0.72 0.10 200);
+  --primary-deep: oklch(0.64 0.10 200);
+  --primary-ink: oklch(0.20 0.02 220);
+  --border: oklch(0.38 0.012 240);
+  --border-subtle: oklch(0.30 0.010 240);
+  --border-strong: oklch(0.56 0.014 240);
+  --ok: oklch(0.74 0.14 155);
+  --danger: oklch(0.70 0.17 25);
+  --attention: oklch(0.80 0.13 80);
+  --fg: var(--ink);
+  --muted: var(--ink-soft);
+  --warning: var(--attention);
+  --on-primary: var(--primary-ink);
+}
+
+/* ── Form-control boundaries (WCAG 1.4.11) ──────────────────────
+   Module styles set `border: 1px solid var(--border)` (1.33:1) on
+   inputs with class-level specificity. `!important` raises just the
+   colour to --border-strong (3.57:1) in one place instead of editing
+   33 files. Safe: no input/select/textarea uses a state border-colour
+   (error borders in this app all sit on non-input elements). */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea {
+  border-color: var(--border-strong) !important;
 }
 
 /* ── Reset ──────────────────────────────────────────────────── */

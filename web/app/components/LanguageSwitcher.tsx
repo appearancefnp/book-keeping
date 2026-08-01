@@ -10,9 +10,9 @@ const LANGS: { code: Lang; label: string }[] = [
 ];
 
 export function LanguageSwitcher() {
-  const { lang, setLang } = useMessages();
+  const { lang, setLang, t } = useMessages();
   return (
-    <div className={styles.switcher} role="group" aria-label="Language">
+    <div className={styles.switcher} role="group" aria-label={t('a11y.language')}>
       {LANGS.map(({ code, label }) => (
         <button
           key={code}

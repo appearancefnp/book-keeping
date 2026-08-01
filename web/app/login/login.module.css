@@ -103,3 +103,25 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+/* Secondary "Back" on the 2FA step — returns to the credentials step. */
+.backLink {
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: none;
+  background: none;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  width: 100%;
+  border-radius: var(--radius-sm);
+}
+.backLink:hover:not(:disabled) {
+  color: var(--ink);
+  text-decoration: underline;
+}
+.backLink:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

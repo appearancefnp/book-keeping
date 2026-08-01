@@ -64,6 +64,9 @@
   border: none;
   border-radius: var(--radius-sm);
   padding: var(--space-1) var(--space-3);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   cursor: pointer;
   font-family: inherit;
   transition: background 120ms;
@@ -99,6 +102,9 @@
   cursor: pointer;
   font-family: inherit;
   padding: var(--space-1) var(--space-2);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
   border-radius: var(--radius-sm);
   transition: color 120ms, background 120ms;
   white-space: nowrap;
