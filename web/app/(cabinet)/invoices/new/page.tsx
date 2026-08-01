@@ -225,22 +225,22 @@ function ComposerInner() {
 
   if (loadError) {
     return (
-      <div className={styles.page}><main className={styles.main}>
+      <div className={styles.page}><section className={styles.main}>
         <ErrorState message={loadError} onRetry={() => clientCompanyId && load(clientCompanyId)} />
-      </main></div>
+      </section></div>
     );
   }
   if (!customers) {
     return (
-      <div className={styles.page}><main className={styles.main}>
+      <div className={styles.page}><section className={styles.main}>
         <div className={styles.skeletons}><SkeletonCard /><SkeletonCard /></div>
-      </main></div>
+      </section></div>
     );
   }
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.pageHeading}>
           {docType === 'credit_note'
             ? t('einv.composeCreditNote')
@@ -478,7 +478,7 @@ function ComposerInner() {
             </section>
           </form>
         )}
-      </main>
+      </section>
     </div>
   );
 }
@@ -486,9 +486,9 @@ function ComposerInner() {
 function ComposerSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.skeletons}><SkeletonCard /><SkeletonCard /></div>
-      </main>
+      </section>
     </div>
   );
 }

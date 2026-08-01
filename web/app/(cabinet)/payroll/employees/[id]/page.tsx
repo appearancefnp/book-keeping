@@ -81,11 +81,11 @@ function DetailInner() {
 
   const [y, m] = period.split('-').map(Number);
 
-  if (!client) return <div className={styles.page}><main className={styles.main}><PayrollTabs client={null} /><EmptyState message={t('pay.selectClient')} /></main></div>;
+  if (!client) return <div className={styles.page}><section className={styles.main}><PayrollTabs client={null} /><EmptyState message={t('pay.selectClient')} /></section></div>;
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.headRow}>
           <h1 className={styles.pageHeading}>{emp ? `${emp.lastName} ${emp.firstName}` : t('pay.emp.title')}</h1>
           <Link className={styles.ghostBtn} href={`/payroll?client=${encodeURIComponent(client)}`}>{t('pay.run.close')}</Link>
@@ -191,7 +191,7 @@ function DetailInner() {
             </section>
           </>
         )}
-      </main>
+      </section>
     </div>
   );
 }

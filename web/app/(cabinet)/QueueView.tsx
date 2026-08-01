@@ -207,7 +207,7 @@ function ApprovalQueue() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.queueHeading}>{t('nav.queue')}</h1>
 
         {/* General error */}
@@ -269,7 +269,7 @@ function ApprovalQueue() {
             )}
           </section>
         )}
-      </main>
+      </section>
 
       {/* Toast region — screen-reader live region */}
       <div className={styles.toastRegion} aria-label={t('nav.notifications')}>
@@ -291,13 +291,13 @@ function ApprovalQueue() {
 function QueueSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <ul className={styles.list}>
           <li><SkeletonCard /></li>
           <li><SkeletonCard /></li>
           <li><SkeletonCard /></li>
         </ul>
-      </main>
+      </section>
     </div>
   );
 }

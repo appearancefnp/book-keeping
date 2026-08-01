@@ -107,7 +107,7 @@ function AdminInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.pageHeading}>{t('admin.title')}</h1>
 
         {/* Forbidden */}
@@ -150,7 +150,7 @@ function AdminInner() {
             />
           </>
         )}
-      </main>
+      </section>
     </div>
   );
 }
@@ -160,13 +160,13 @@ function AdminInner() {
 function AdminSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.skeletons}>
           <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
         </div>
-      </main>
+      </section>
     </div>
   );
 }

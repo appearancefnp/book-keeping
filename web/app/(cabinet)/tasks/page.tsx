@@ -69,7 +69,7 @@ function TasksInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.pageHeading}>{t('tasks.title')}</h1>
 
         {/* No client selected */}
@@ -107,7 +107,7 @@ function TasksInner() {
             )}
           </>
         )}
-      </main>
+      </section>
     </div>
   );
 }
@@ -117,13 +117,13 @@ function TasksInner() {
 function TasksSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.skeletons}>
           <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
         </div>
-      </main>
+      </section>
     </div>
   );
 }

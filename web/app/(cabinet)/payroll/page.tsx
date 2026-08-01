@@ -71,7 +71,7 @@ function EmployeesInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.headRow}>
           <h1 className={styles.pageHeading}>{t('pay.title')}</h1>
           {client && (
@@ -154,7 +154,7 @@ function EmployeesInner() {
             </table>
           </div>
         )}
-      </main>
+      </section>
     </div>
   );
 }

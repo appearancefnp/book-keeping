@@ -395,7 +395,7 @@ function ExpensesInner({ role }: { role: string }) {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.headRow}>
           <h1 className={styles.pageHeading}>{t('exp.title')}</h1>
           <button type="button" className={styles.primaryBtn} onClick={openComposer}>{t('exp.new')}</button>
@@ -606,7 +606,7 @@ function ExpensesInner({ role }: { role: string }) {
             </div>
           </div>
         )}
-      </main>
+      </section>
 
       <div className={styles.toastRegion} aria-label={t('nav.notifications')}>
         {toasts.map((entry) => (
@@ -620,9 +620,9 @@ function ExpensesInner({ role }: { role: string }) {
 function ExpensesSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.skeletons}><SkeletonCard /><SkeletonCard /></div>
-      </main>
+      </section>
     </div>
   );
 }

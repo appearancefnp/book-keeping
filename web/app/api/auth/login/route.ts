@@ -44,7 +44,7 @@ export async function POST(req: Request) {
       maxAge: 60 * 60 * 12,
     });
     return NextResponse.json({ ok: true }, { status: 200 });
-  } catch (e) {
+  } catch {
     if (!authenticated) {
       try {
         await recordLoginFailure(identifiers, at);
@@ -54,8 +54,13 @@ export async function POST(req: Request) {
         // the next check simply sees one fewer recorded failure.)
       }
     }
-    const msg = e instanceof Error ? e.message : 'login failed';
-    return NextResponse.json({ error: msg }, { status: 401 });
+    // One generic error for every failure — bad user, wrong password, or wrong/
+    // replayed 2FA. Returning the domain message (`Invalid credentials` vs
+    // `Invalid 2FA code`) made this a password-validity oracle: a `2FA` response
+    // confirmed the password was correct, letting credential-stuffing attackers
+    // validate stolen passwords without the second factor. Matches the unified
+    // lockout message above, and stops leaking internal errors to the client.
+    return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
   }
 }
 

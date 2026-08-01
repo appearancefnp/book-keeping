@@ -64,7 +64,7 @@ function PayInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.pageHeading}>{t('payrun.title')}</h1>
         {error && <ErrorState message={error} onRetry={load} />}
         {runId && (
@@ -108,7 +108,7 @@ function PayInner() {
             </button>
           </>
         )}
-      </main>
+      </section>
     </div>
   );
 }

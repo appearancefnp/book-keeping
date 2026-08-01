@@ -655,12 +655,12 @@ export const EN = {
 } as const;
 
 export const LV: Record<keyof typeof EN, string> = {
-  'nav.home': 'Sākums', 'nav.queue': 'Apstiprināšanas rinda', 'nav.documents': 'Dokumenti', 'nav.overview': 'Pārskats',
+  'nav.home': 'Sākums', 'nav.queue': 'Apstiprināšanas rinda', 'nav.documents': 'Dokumenti', 'nav.overview': 'Kopskats',
   'nav.tasks': 'Uzdevumi', 'nav.notifications': 'Paziņojumi', 'nav.admin': 'Administrēšana',
   'nav.parties': 'Klienti un piegādātāji', 'nav.invoices': 'Rēķini', 'nav.bank': 'Banka',
   'nav.journal': 'Žurnāls',
   'nav.reports': 'Pārskati',
-  'nav.short.home': 'Sākums', 'nav.short.queue': 'Rinda', 'nav.short.documents': 'Dokumenti', 'nav.short.overview': 'Pārskats',
+  'nav.short.home': 'Sākums', 'nav.short.queue': 'Rinda', 'nav.short.documents': 'Dokumenti', 'nav.short.overview': 'Kopskats',
   'nav.short.tasks': 'Uzdevumi', 'nav.short.notifications': 'Paziņojumi', 'nav.short.admin': 'Admin',
   'nav.short.parties': 'Partneri', 'nav.short.invoices': 'Rēķini', 'nav.short.bank': 'Banka',
   'nav.short.journal': 'Žurnāls',

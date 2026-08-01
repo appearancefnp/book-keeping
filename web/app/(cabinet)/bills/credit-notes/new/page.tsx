@@ -98,7 +98,7 @@ function NewCreditNoteInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.pageHeading}>{t('bills.creditNote.new')}</h1>
 
         <div className={styles.fields}>
@@ -224,7 +224,7 @@ function NewCreditNoteInner() {
         <button type="button" className={styles.submit} disabled={!valid || saving} onClick={submit}>
           {t('bills.creditNote.submit')}
         </button>
-      </main>
+      </section>
     </div>
   );
 }
@@ -232,9 +232,9 @@ function NewCreditNoteInner() {
 function NewCreditNoteSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <SkeletonCard />
-      </main>
+      </section>
     </div>
   );
 }

@@ -68,11 +68,11 @@ function RunInner() {
 
   const exceptions = useMemo(() => run?.items.filter((i) => i.warnings.length > 0) ?? [], [run]);
 
-  if (!client) return <div className={styles.page}><main className={styles.main}><PayrollTabs client={null} /></main></div>;
+  if (!client) return <div className={styles.page}><section className={styles.main}><PayrollTabs client={null} /></section></div>;
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.headRow}>
           <h1 className={styles.pageHeading}>
             {run ? `${run.year}-${String(run.month).padStart(2, '0')}` : t('pay.run.title')}
@@ -177,7 +177,7 @@ function RunInner() {
             </div>
           </div>
         )}
-      </main>
+      </section>
     </div>
   );
 }

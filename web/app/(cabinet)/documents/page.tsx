@@ -92,7 +92,7 @@ function DocumentsInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.heading}>{t('docs.title')}</h1>
 
         {/* Upload zone */}
@@ -129,7 +129,7 @@ function DocumentsInner() {
             )}
           </>
         )}
-      </main>
+      </section>
 
       {/* Toast region */}
       <div className={styles.toastRegion} aria-label={t('nav.notifications')}>
@@ -151,12 +151,12 @@ function DocumentsInner() {
 function DocumentsSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <ul className={styles.skeletonList}>
           <li><SkeletonCard /></li>
           <li><SkeletonCard /></li>
         </ul>
-      </main>
+      </section>
     </div>
   );
 }

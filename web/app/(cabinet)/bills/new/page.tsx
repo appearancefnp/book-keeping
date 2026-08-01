@@ -95,7 +95,7 @@ function NewBillInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.pageHeading}>{t('bills.new')}</h1>
 
         <div className={styles.fields}>
@@ -221,7 +221,7 @@ function NewBillInner() {
         <button type="button" className={styles.submit} disabled={!valid || saving} onClick={submit}>
           {t('bills.submit')}
         </button>
-      </main>
+      </section>
     </div>
   );
 }
@@ -229,9 +229,9 @@ function NewBillInner() {
 function NewBillSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <SkeletonCard />
-      </main>
+      </section>
     </div>
   );
 }

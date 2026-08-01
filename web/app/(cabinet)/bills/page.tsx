@@ -57,7 +57,7 @@ function BillsInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.header}>
           <h1 className={styles.pageHeading}>{t('bills.title')}</h1>
           <div className={styles.actions}>
@@ -95,7 +95,7 @@ function BillsInner() {
             </tbody>
           </table>
         )}
-      </main>
+      </section>
     </div>
   );
 }

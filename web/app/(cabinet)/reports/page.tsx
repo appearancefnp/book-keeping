@@ -354,7 +354,7 @@ function ReportsInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.pageHeading}>{t('reports.title')}</h1>
 
         <div className={styles.tabs} role="tablist">
@@ -722,7 +722,7 @@ function ReportsInner() {
             </div>
           </div>
         )}
-      </main>
+      </section>
     </div>
   );
 }
