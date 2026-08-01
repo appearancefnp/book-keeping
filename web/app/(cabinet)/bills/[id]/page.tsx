@@ -73,12 +73,12 @@ function DetailInner() {
   const fmtDate = (iso: string) =>
     new Intl.DateTimeFormat(LOCALE_FOR[lang], { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
 
-  if (error) return <div className={styles.page}><main className={styles.main}><ErrorState message={error} onRetry={load} /></main></div>;
-  if (!bill) return <div className={styles.page}><main className={styles.main}><SkeletonCard /></main></div>;
+  if (error) return <div className={styles.page}><section className={styles.main}><ErrorState message={error} onRetry={load} /></section></div>;
+  if (!bill) return <div className={styles.page}><section className={styles.main}><SkeletonCard /></section></div>;
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.pageHeading}>{bill.vendorName} · {bill.billNumber}</h1>
         <dl className={styles.meta}>
           <div><dt>{t('bills.issueDate')}</dt><dd>{fmtDate(bill.issueDate)}</dd></div>
@@ -112,7 +112,7 @@ function DetailInner() {
             {t('bills.void')}
           </button>
         )}
-      </main>
+      </section>
     </div>
   );
 }
@@ -120,9 +120,9 @@ function DetailInner() {
 function BillDetailSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <SkeletonCard />
-      </main>
+      </section>
     </div>
   );
 }

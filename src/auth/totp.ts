@@ -37,10 +37,22 @@ export function totpCodeFor(secret: string, atUnixSeconds: number): string {
   return hotp(secret, Math.floor(atUnixSeconds / 30));
 }
 
+/**
+ * Return the time-step a code matches within ±1 window (for clock skew), or null.
+ * Callers that enforce single-use compare the returned step against the last
+ * accepted one so a code cannot be replayed within its window.
+ */
+export function verifyTotpStep(secret: string, code: string, atUnixSeconds: number): number | null {
+  const step = Math.floor(atUnixSeconds / 30);
+  for (const c of [step - 1, step, step + 1]) {
+    if (hotp(secret, c) === code) return c;
+  }
+  return null;
+}
+
 /** Verify with ±1 time-step (30s) tolerance for clock skew. */
 export function verifyTotp(secret: string, code: string, atUnixSeconds: number): boolean {
-  const step = Math.floor(atUnixSeconds / 30);
-  return [step - 1, step, step + 1].some((c) => hotp(secret, c) === code);
+  return verifyTotpStep(secret, code, atUnixSeconds) !== null;
 }
 
 export function totpUri(secret: string, label: string, issuer = 'Bookkeeping'): string {

@@ -63,7 +63,7 @@ function JournalInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.pageHeading}>{t('journal.title')}</h1>
 
         {error && <ErrorState message={error} onRetry={() => clientCompanyId && load(clientCompanyId, limit, false)} />}
@@ -117,7 +117,7 @@ function JournalInner() {
             )}
           </div>
         )}
-      </main>
+      </section>
     </div>
   );
 }
@@ -125,9 +125,9 @@ function JournalInner() {
 function JournalSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.skeletons}><SkeletonCard /><SkeletonCard /></div>
-      </main>
+      </section>
     </div>
   );
 }

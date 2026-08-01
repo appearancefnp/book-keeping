@@ -175,7 +175,7 @@ function InvoicesInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.headRow}>
           <h1 className={styles.pageHeading}>{t('einv.title')}</h1>
           <Link
@@ -342,7 +342,7 @@ function InvoicesInner() {
             </div>
           </div>
         )}
-      </main>
+      </section>
     </div>
   );
 }
@@ -350,9 +350,9 @@ function InvoicesInner() {
 function InvoicesSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.skeletons}><SkeletonCard /><SkeletonCard /></div>
-      </main>
+      </section>
     </div>
   );
 }

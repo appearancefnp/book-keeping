@@ -8,9 +8,25 @@
   --primary-deep: oklch(0.45 0.10 200);
   --primary-ink: oklch(0.99 0.01 200);
   --border: oklch(0.90 0.01 210);
-  --ok: oklch(0.55 0.11 155);
+  /* --ok / --attention darkened to clear WCAG AA (4.5:1) as text on --bg and
+     --surface: --ok was 4.25:1 (fail), --attention 2.71:1 (fail). Now 4.97:1
+     and 4.65:1 respectively. --attention shifts toward amber-orange to reach
+     contrast — yellow-gold cannot pass AA on a light background. */
+  --ok: oklch(0.51 0.13 155);
   --danger: oklch(0.52 0.15 25);
-  --attention: oklch(0.68 0.12 75);
+  --attention: oklch(0.55 0.12 60);
+  /* Aliases so legacy pages that reference these names resolve into the token
+     system instead of silently falling back to hardcoded hex (they were never
+     defined, so var(--muted, #6b7280) etc. always rendered the fallback). This
+     reunites the palette and lets a future retheme/dark-mode reach every page. */
+  --fg: var(--ink);
+  --muted: var(--ink-soft);
+  --border-subtle: oklch(0.94 0.008 210);
+  --warning: var(--attention);
+  --on-primary: var(--primary-ink);
+  /* Stronger border for form-control boundaries. --border (1.33:1) is fine for
+     decorative dividers but fails WCAG 1.4.11 (3:1) for inputs; this is 3.57:1. */
+  --border-strong: oklch(0.62 0.016 220);
   --radius-sm: 6px;
   --radius-md: 10px;
   --space-1: 4px;
@@ -20,6 +36,18 @@
   --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
+}
+
+/* ── Form-control boundaries (WCAG 1.4.11) ──────────────────────
+   Module styles set `border: 1px solid var(--border)` (1.33:1) on
+   inputs with class-level specificity. `!important` raises just the
+   colour to --border-strong (3.57:1) in one place instead of editing
+   33 files. Safe: no input/select/textarea uses a state border-colour
+   (error borders in this app all sit on non-input elements). */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea {
+  border-color: var(--border-strong) !important;
 }
 
 /* ── Reset ──────────────────────────────────────────────────── */

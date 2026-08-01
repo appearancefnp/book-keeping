@@ -25,6 +25,18 @@ test('login requires a valid password AND totp; returns a session', async () => 
   const s = await validateSession(sessionToken, NOW);
   expect(s?.role).toBe('accountant');
 });
+test('a TOTP code cannot be replayed within its window (single-use)', async () => {
+  const { totpSecret } = await seedUser();
+  const code = totpCodeFor(totpSecret, NOW);
+  const { sessionToken } = await login('a@b.lv', 'password123', code, NOW);
+  expect(sessionToken).toBeTruthy();
+  // Same code, same 30s window — must now be rejected: the step was consumed.
+  await expect(login('a@b.lv', 'password123', code, NOW)).rejects.toThrow(/2fa|code/i);
+  // A fresh code from a later window still authenticates.
+  const later = NOW + 60;
+  const { sessionToken: t2 } = await login('a@b.lv', 'password123', totpCodeFor(totpSecret, later), later);
+  expect(t2).toBeTruthy();
+});
 test('wrong password is rejected', async () => {
   await seedUser();
   await expect(login('a@b.lv', 'nope', '000000', NOW)).rejects.toThrow(/credentials/i);

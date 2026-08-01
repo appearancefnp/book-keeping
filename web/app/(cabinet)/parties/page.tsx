@@ -91,7 +91,7 @@ function PartiesInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.headRow}>
           <h1 className={styles.pageHeading}>{t('parties.title')}</h1>
           <button type="button" className={styles.primaryBtn} onClick={() => { setSaveError(null); setForm({ ...EMPTY_FORM }); }}>
@@ -204,7 +204,7 @@ function PartiesInner() {
             </table>
           </div>
         )}
-      </main>
+      </section>
     </div>
   );
 }
@@ -212,9 +212,9 @@ function PartiesInner() {
 function PartiesSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.skeletons}><SkeletonCard /><SkeletonCard /></div>
-      </main>
+      </section>
     </div>
   );
 }

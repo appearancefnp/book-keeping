@@ -87,7 +87,7 @@ function OrdersInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.headRow}>
           <h1 className={styles.pageHeading}>{t('pay.ord.title')}</h1>
           {client && <button className={styles.primaryBtn} onClick={() => setOpen(true)}>{t('pay.ord.new')}</button>}
@@ -171,7 +171,7 @@ function OrdersInner() {
             </table>
           </div>
         )}
-      </main>
+      </section>
     </div>
   );
 }

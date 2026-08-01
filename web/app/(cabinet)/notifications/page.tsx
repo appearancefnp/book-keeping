@@ -63,7 +63,7 @@ function NotificationsInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.pageHeading}>{t('notif.title')}</h1>
 
         {/* No client selected */}
@@ -101,7 +101,7 @@ function NotificationsInner() {
             )}
           </>
         )}
-      </main>
+      </section>
     </div>
   );
 }
@@ -109,13 +109,13 @@ function NotificationsInner() {
 function NotificationsSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.skeletons}>
           <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
         </div>
-      </main>
+      </section>
     </div>
   );
 }

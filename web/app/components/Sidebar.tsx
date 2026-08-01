@@ -73,7 +73,7 @@ export function Sidebar({ role, unreadCount = 0 }: SidebarProps) {
   }
 
   return (
-    <nav className={styles.sidebar} aria-label="Main navigation">
+    <nav className={styles.sidebar} aria-label={t('a11y.mainNav')}>
       <div className={styles.brand}>
         <span className={styles.brandName}>Cabinet</span>
       </div>

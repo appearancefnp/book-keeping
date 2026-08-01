@@ -34,20 +34,12 @@ export function LoginForm() {
       router.push('/');
     } catch (err) {
       const e = err as Error & { status?: number };
-      if (e.status === 401) {
-        const msg = e.message ?? '';
-        // Surface the right message based on what the backend returns
-        if (msg.includes('2FA') || msg.includes('Invalid 2FA')) {
-          setError(t('login.badCode'));
-        } else {
-          // Could be wrong creds — go back to step 1
-          setError(t('login.badCreds'));
-          setStep('credentials');
-          setCode('');
-        }
-      } else {
-        setError(e.message ?? t('state.error'));
-      }
+      // The backend returns one generic 401 for every failure (no password-vs-2FA
+      // oracle), so the client can't and shouldn't say which factor was wrong.
+      // Stay on the code step — a mistyped code is the common case — with a neutral
+      // message; "Back" returns to credentials if the email/password were wrong.
+      setError(e.status === 401 ? t('login.failed') : (e.message ?? t('state.error')));
+      setCode('');
     } finally {
       setBusy(false);
     }
@@ -132,6 +124,18 @@ export function LoginForm() {
               disabled={busy || code.length !== 6}
             >
               {busy ? '…' : t('login.verify')}
+            </button>
+            <button
+              type="button"
+              className={styles.backLink}
+              onClick={() => {
+                setStep('credentials');
+                setError(null);
+                setCode('');
+              }}
+              disabled={busy}
+            >
+              {t('login.back')}
             </button>
           </div>
         </form>

@@ -247,7 +247,7 @@ function FilingsInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.pageHeading}>{t('filings.title')}</h1>
 
         <div className={styles.tabs} role="tablist">
@@ -444,7 +444,7 @@ function FilingsInner() {
             </div>
           </div>
         )}
-      </main>
+      </section>
     </div>
   );
 }

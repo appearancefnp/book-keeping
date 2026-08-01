@@ -127,7 +127,7 @@ function OverviewInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.pageHeading}>{t('over.title')}</h1>
 
         {/* Error */}
@@ -216,7 +216,7 @@ function OverviewInner() {
 
           </div>
         )}
-      </main>
+      </section>
     </div>
   );
 }
@@ -226,12 +226,12 @@ function OverviewInner() {
 function OverviewSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.skeletons}>
           <SkeletonCard />
           <SkeletonCard />
         </div>
-      </main>
+      </section>
     </div>
   );
 }

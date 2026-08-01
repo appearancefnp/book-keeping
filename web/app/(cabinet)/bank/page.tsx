@@ -127,7 +127,7 @@ function BankInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.pageHeading}>{t('bankpage.title')}</h1>
 
         {clientCompanyId && <FeedsSection clientCompanyId={clientCompanyId} />}
@@ -220,7 +220,7 @@ function BankInner() {
           {orderMsg && <p className={styles.okMsg} role="status">{orderMsg}</p>}
           {orderError && <p className={styles.formError} role="alert">{orderError}</p>}
         </section>
-      </main>
+      </section>
     </div>
   );
 }
@@ -228,9 +228,9 @@ function BankInner() {
 function BankSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.skeletons}><SkeletonCard /><SkeletonCard /></div>
-      </main>
+      </section>
     </div>
   );
 }

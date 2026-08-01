@@ -41,7 +41,7 @@ function CallbackInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.pageHeading}>{t('bankfeedcb.title')}</h1>
         <section className={styles.card}>
           {state === 'working' && <p className={styles.hint} role="status">{t('bankfeedcb.working')}</p>}
@@ -55,7 +55,7 @@ function CallbackInner() {
             </>
           )}
         </section>
-      </main>
+      </section>
     </div>
   );
 }

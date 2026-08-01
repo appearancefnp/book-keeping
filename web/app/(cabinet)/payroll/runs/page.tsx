@@ -50,7 +50,7 @@ function RunsInner() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.headRow}>
           <h1 className={styles.pageHeading}>{t('pay.run.title')}</h1>
         </div>
@@ -91,7 +91,7 @@ function RunsInner() {
             </table>
           </div>
         )}
-      </main>
+      </section>
     </div>
   );
 }

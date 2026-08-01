@@ -81,22 +81,22 @@ function SettingsInner() {
 
   if (error) {
     return (
-      <div className={styles.page}><main className={styles.main}>
+      <div className={styles.page}><section className={styles.main}>
         <ErrorState message={error} onRetry={() => clientCompanyId && load(clientCompanyId)} />
-      </main></div>
+      </section></div>
     );
   }
   if (!periods || !policies) {
     return (
-      <div className={styles.page}><main className={styles.main}>
+      <div className={styles.page}><section className={styles.main}>
         <div className={styles.skeletons}><SkeletonCard /><SkeletonCard /></div>
-      </main></div>
+      </section></div>
     );
   }
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <h1 className={styles.pageHeading}>{t('settings.title')}</h1>
         {actionError && <p className={styles.formError} role="alert">{actionError}</p>}
 
@@ -226,7 +226,7 @@ function SettingsInner() {
         </section>
 
         {clientCompanyId && <InvoiceDefaultsForm clientCompanyId={clientCompanyId} />}
-      </main>
+      </section>
     </div>
   );
 }
@@ -234,9 +234,9 @@ function SettingsInner() {
 function SettingsSkeleton() {
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <section className={styles.main}>
         <div className={styles.skeletons}><SkeletonCard /><SkeletonCard /></div>
-      </main>
+      </section>
     </div>
   );
 }
